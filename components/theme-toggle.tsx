@@ -23,7 +23,7 @@ export function ThemeToggle() {
       size="default" // Using default to ensure square aspect if needed, or define specific h/w below
       onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
       className={cn(
-        "fixed top-6 right-6 z-50 h-10 w-10 rounded-full p-0",
+        "fixed bottom-5 left-5 z-50 h-10 w-10 rounded-full p-0",
         "bg-background/80 backdrop-blur-sm border-slate-200 dark:border-slate-800",
         "shadow-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-all duration-300"
       )}

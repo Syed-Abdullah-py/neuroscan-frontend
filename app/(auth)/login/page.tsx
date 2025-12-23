@@ -1,98 +1,137 @@
 import { Metadata } from "next";
 import Link from "next/link";
-import { Mail, Lock, ShieldCheck, Activity } from "lucide-react";
+import { Mail, Lock, Activity, ArrowRight, ShieldCheck } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { BiometricScanner } from "@/features/auth/components/biometric-scanner";
 
 export const metadata: Metadata = {
-  title: "Login | NeuroScan Admin Portal",
+    title: "Login | NeuroScan Admin Portal",
 };
 
 export default function LoginPage() {
-  return (
-    <div className="min-h-screen grid lg:grid-cols-2 bg-background transition-colors duration-300">
-      {/* LEFT: Hero Section (Kept Dark intentionally for visual weight, or switch to bg-secondary) */}
-      <div className="relative hidden lg:flex flex-col justify-end p-12 bg-slate-950 text-white overflow-hidden dark:bg-black/40 dark:border-r dark:border-border">
-        {/* Abstract Background */}
-        <div className="absolute inset-0 z-0 bg-[radial-gradient(circle_at_center,var(--tw-gradient-stops))] from-blue-900/40 via-slate-950 to-slate-950" />
-        
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-blue-500/10 rounded-full blur-3xl" />
-        
-        <div className="relative z-10 flex-1 flex items-center justify-center">
-           <div className="w-96 h-96 rounded-full border border-blue-500/30 flex items-center justify-center bg-black/50 shadow-[0_0_50px_rgba(59,130,246,0.2)]">
-             <Activity className="w-32 h-32 text-blue-500 opacity-80" />
-           </div>
-        </div>
+    return (
+        <div className="min-h-screen relative flex flex-col items-center justify-center font-sans text-slate-900 dark:text-slate-100 selection:bg-blue-500/30">
 
-        <div className="relative z-10 max-w-lg">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-900/30 border border-blue-500/30 text-blue-200 text-xs font-medium mb-6">
-                <ShieldCheck className="w-3 h-3" />
-                HIPAA Compliant v2.4.1
-            </div>
-            <h1 className="text-4xl font-bold tracking-tight mb-4 text-white">
-                AI-Powered Tumor Detection & Segmentation
-            </h1>
-            <p className="text-slate-400 text-lg leading-relaxed">
-                Secure access for administrators and specialists. Our deep learning models assist in rapid diagnosis with 99.8% accuracy.
-            </p>
-        </div>
-      </div>
-
-      {/* RIGHT: Login Form (Adapts to Theme) */}
-      <div className="flex flex-col justify-center items-center p-8 bg-background text-foreground">
-        <div className="w-full max-w-[440px] space-y-8">
-            {/* Header */}
-            <div className="space-y-2">
-                <div className="flex items-center gap-2 mb-8">
-                    <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-primary-foreground font-bold">N</div>
-                    <span className="text-xl font-bold text-foreground">NeuroScan</span>
-                </div>
-                <h2 className="text-3xl font-semibold text-foreground">Admin Portal</h2>
-                <p className="text-muted-foreground">
-                    Please enter your credentials or use biometric verification to access patient data.
-                </p>
+            {/* 
+               PERFORMANCE OPTIMIZATION: 
+               1. No transitions on background layers.
+               2. No backdrop-blur on full-screen layers.
+               3. Static gradients.
+            */}
+            <div className="fixed inset-0 z-0">
+                <div className="absolute inset-0 bg-slate-50 dark:bg-slate-950" />
+                {/* Opacity layer instead of blur for performance */}
+                <div className="absolute inset-0 bg-white/60 dark:bg-slate-950/90" />
+                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,var(--tw-gradient-stops))] from-blue-500/10 via-transparent to-transparent opacity-50 pointer-events-none" />
             </div>
 
-            {/* Form */}
-            <form className="space-y-5">
-                <div className="space-y-1">
-                    <label className="text-sm font-medium text-foreground">Institutional Email</label>
-                    <Input 
-                        type="email" 
-                        placeholder="doctor@hospital.org" 
-                        icon={<Mail className="w-4 h-4" />}
-                        className="bg-background border-border text-foreground placeholder:text-muted-foreground"
-                    />
+            {/* Navbar - Matched Signup Page Structure */}
+            <header className="absolute top-0 left-0 w-full p-4 md:p-8 flex items-center justify-between z-20">
+                <div className="flex items-center gap-2 md:gap-3">
+                    <Link href="/" className="flex items-center gap-2 md:gap-3">
+                        <div className="w-8 h-8 md:w-9 md:h-9 bg-blue-600 rounded-lg flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
+                            <Activity className="w-5 h-5" />
+                        </div>
+                        <span className="text-lg md:text-xl font-bold tracking-tight text-slate-900 dark:text-white">NeuroScan AI</span>
+                    </Link>
                 </div>
-                <div className="space-y-1">
-                    <div className="flex items-center justify-between">
-                        <label className="text-sm font-medium text-foreground">Password</label>
-                        <Link href="#" className="text-sm text-primary hover:underline">Forgot Password?</Link>
+                <div className="text-sm font-medium text-slate-600 dark:text-slate-400 flex items-center gap-2">
+                    <span className="hidden md:inline">Don&apos;t have an account?</span>
+                    <Link href="/signup" className="text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center group">
+                        Create Workspace <ArrowRight className="w-4 h-4 ml-1 transition-transform group-hover:translate-x-1" />
+                    </Link>
+                </div>
+            </header>
+
+            {/* Main Content */}
+            <main className="relative z-10 w-full max-w-[700px] px-4 pt-24 pb-12 md:py-20">
+
+                {/* Card Title */}
+                <div className="text-center mb-8 md:mb-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                    <h1 className="text-2xl md:text-4xl font-bold tracking-tight mb-2 md:mb-3 text-slate-900 dark:text-white">
+                        Admin Portal
+                    </h1>
+                    <p className="text-slate-500 dark:text-slate-400 text-base md:text-lg px-4">
+                        Enter your credentials to access patient data.
+                    </p>
+                </div>
+
+                {/* Glass Card - Matched Styles */}
+                <div className="bg-white/80 dark:bg-slate-900/60 border border-slate-200/60 dark:border-white/10 rounded-2xl md:rounded-3xl shadow-lg shadow-slate-300/60 dark:shadow-xl dark:shadow-black overflow-hidden">
+
+                    <div className="p-6 md:p-12 space-y-8">
+
+                        {/* Form */}
+                        <form className="space-y-6">
+                            <div className="space-y-2">
+                                <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 tracking-wider uppercase ml-1">
+                                    Institutional Email
+                                </label>
+                                <Input
+                                    type="email"
+                                    placeholder="doctor@hospital.org"
+                                    icon={<Mail className="w-4 h-4 text-slate-400" />}
+                                    className="bg-slate-50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 h-12 rounded-xl focus-visible:ring-blue-600"
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between ml-1">
+                                    <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 tracking-wider uppercase">
+                                        Password
+                                    </label>
+                                    <Link href="#" className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 hover:underline">
+                                        Forgot Password?
+                                    </Link>
+                                </div>
+                                <Input
+                                    type="password"
+                                    placeholder="••••••••"
+                                    icon={<Lock className="w-4 h-4 text-slate-400" />}
+                                    className="bg-slate-50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 h-12 rounded-xl focus-visible:ring-blue-600"
+                                />
+                            </div>
+
+                            <Button className="w-full bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/20 h-12 text-sm font-semibold rounded-xl transition-all active:scale-[0.98]">
+                                Sign In <ArrowRight className="w-4 h-4 ml-2" />
+                            </Button>
+                        </form>
+
+                        {/* Divider */}
+                        <div className="relative py-2">
+                            <div className="absolute inset-0 flex items-center">
+                                <span className="w-full border-t border-slate-200 dark:border-slate-800" />
+                            </div>
+                            <div className="relative flex justify-center text-[10px] uppercase tracking-widest font-bold">
+                                <span className="bg-transparent px-3 text-slate-400 dark:text-slate-500">
+                                    Or verify with
+                                </span>
+                            </div>
+                        </div>
+
+                        {/* Biometric Component Container */}
+                        <div className="bg-slate-50 dark:bg-black/20 rounded-2xl border border-slate-100 dark:border-white/5 p-5">
+                            <BiometricScanner />
+                        </div>
                     </div>
-                    <Input 
-                        type="password" 
-                        placeholder="••••••••" 
-                        icon={<Lock className="w-4 h-4" />}
-                        className="bg-background border-border text-foreground placeholder:text-muted-foreground"
-                    />
+
+                    {/* Bottom Disclaimer */}
+                    <div className="bg-slate-50/80 dark:bg-black/20 p-4 text-center border-t border-slate-100 dark:border-white/5">
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 leading-relaxed">
+                            By logging in, you agree to NeuroScan&apos;s <Link href="#" className="underline hover:text-blue-500">Terms</Link> and <Link href="#" className="underline hover:text-blue-500">Privacy Policy</Link>.
+                        </p>
+                    </div>
                 </div>
 
-                <Button className="w-full text-base" size="lg">Sign In</Button>
-            </form>
-
-            <div className="relative">
-                <div className="absolute inset-0 flex items-center"><span className="w-full border-t border-border" /></div>
-                <div className="relative flex justify-center text-xs uppercase"><span className="bg-background px-2 text-muted-foreground">or verify with</span></div>
-            </div>
-
-            <BiometricScanner />
-
-            <p className="text-center text-xs text-muted-foreground mt-8">
-                By logging in, you agree to NeuroScan&apos;s <Link href="#" className="underline hover:text-foreground">Terms of Service</Link> and <Link href="#" className="underline hover:text-foreground">Privacy Policy</Link>.
-            </p>
+                {/* Footer Badges */}
+                <div className="mt-8 flex justify-center gap-2 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200">
+                    <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/60 dark:bg-white/5 border border-white/50 dark:border-white/10 text-[10px] font-medium text-slate-600 dark:text-slate-400">
+                        <ShieldCheck className="w-3 h-3 text-green-500" />
+                        HIPAA Compliant v2.4.1
+                    </div>
+                </div>
+            </main>
         </div>
-      </div>
-    </div>
-  );
+    );
 }
