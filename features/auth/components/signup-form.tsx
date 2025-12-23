@@ -1,229 +1,208 @@
 "use client";
 
-import { useState } from "react";
 import { cn } from "@/lib/utils";
-import { Stethoscope, Shield, Check, Eye, EyeOff } from "lucide-react";
+import { Stethoscope, Shield, Eye, EyeOff, CheckCircle2 } from "lucide-react";
+import Link from "next/link";
+import { useState } from "react";
 
 // Types
 type Step = 1 | 2 | 3;
 type Role = "radiologist" | "admin";
 
-export function SignupForm() {
-    const [step, setStep] = useState<Step>(1);
-    const [role, setRole] = useState<Role | null>(null);
+interface SignupFormProps {
+    currentStep: Step;
+    onNext: () => void;
+    onBack: () => void;
+    onRoleSelect: (role: Role) => void;
+    selectedRole: Role | null;
+}
+
+export function SignupForm({ currentStep, onNext, onBack, onRoleSelect, selectedRole }: SignupFormProps) {
     const [showPass, setShowPass] = useState(false);
+
+    // Common Input Styles
+    const inputClasses = "w-full bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 rounded-xl h-12 px-4 text-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600";
+    const labelClasses = "text-[11px] font-bold text-slate-500 dark:text-slate-400 tracking-wider uppercase mb-2 block";
 
     // Step 1 UI
     const StepOne = () => (
-        <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-            <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500 dark:text-slate-400 tracking-wide uppercase">First Name</label>
-                    <input
-                        className="w-full bg-white dark:bg-white/5 border border-slate-200 dark:border-slate-700 rounded-lg h-11 px-4 text-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
-                        placeholder="e.g. Jane"
-                    />
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <div className="grid grid-cols-2 gap-5">
+                <div>
+                    <label className={labelClasses}>First Name</label>
+                    <input className={inputClasses} placeholder="e.g. Jane" />
                 </div>
-                <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500 dark:text-slate-400 tracking-wide uppercase">Last Name</label>
-                    <input
-                        className="w-full bg-white dark:bg-white/5 border border-slate-200 dark:border-slate-700 rounded-lg h-11 px-4 text-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
-                        placeholder="e.g. Doe"
-                    />
+                <div>
+                    <label className={labelClasses}>Last Name</label>
+                    <input className={inputClasses} placeholder="e.g. Doe" />
                 </div>
             </div>
 
-            <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-500 dark:text-slate-400 tracking-wide uppercase">Work Email</label>
+            <div>
+                <label className={labelClasses}>Work Email</label>
                 <div className="relative">
-                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="4" width="20" height="16" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></svg>
+                    <input className={cn(inputClasses, "pl-11")} placeholder="doctor@hospital.org" />
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="4" width="20" height="16" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></svg>
                     </div>
-                    <input
-                        className="w-full bg-white dark:bg-white/5 border border-slate-200 dark:border-slate-700 rounded-lg h-11 pl-10 pr-4 text-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
-                        placeholder="doctor@hospital.org"
-                    />
                 </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500 dark:text-slate-400 tracking-wide uppercase">Medical License ID</label>
-                    <input
-                        className="w-full bg-white dark:bg-white/5 border border-slate-200 dark:border-slate-700 rounded-lg h-11 px-4 text-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
-                        placeholder="LIC-12345678"
-                    />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                    <label className={labelClasses}>Medical License ID</label>
+                    <input className={inputClasses} placeholder="LIC-12345678" />
                 </div>
-                <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500 dark:text-slate-400 tracking-wide uppercase">Password</label>
+                <div>
+                    <label className={labelClasses}>Password</label>
                     <div className="relative">
                         <input
                             type={showPass ? "text" : "password"}
-                            className="w-full bg-white dark:bg-white/5 border border-slate-200 dark:border-slate-700 rounded-lg h-11 pl-4 pr-10 text-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600"
+                            className={cn(inputClasses, "pr-11")}
                             placeholder="••••••••"
                         />
                         <button
                             type="button"
                             onClick={() => setShowPass(!showPass)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
                         >
-                            {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
+                            {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
                         </button>
                     </div>
                 </div>
+            </div>
+
+            {/* Terms Footer inside the form */}
+            <div className="pt-4 flex items-center justify-between border-t border-slate-100 dark:border-white/5 mt-8">
+                <p className="text-xs text-slate-400 dark:text-slate-500 max-w-xs leading-relaxed">
+                    By continuing, you agree to NeuroScan&apos;s <Link href="#" className="underline hover:text-blue-500">Terms of Service</Link> and <Link href="#" className="underline hover:text-blue-500">Privacy Policy</Link>.
+                </p>
+                <button
+                    onClick={onNext}
+                    className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-3 rounded-xl text-sm font-semibold shadow-lg shadow-blue-600/20 hover:shadow-blue-600/40 transition-all transform hover:-translate-y-0.5 active:scale-95"
+                >
+                    Continue
+                </button>
             </div>
         </div>
     );
 
     // Step 2 UI
     const StepTwo = () => (
-        <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Select Role</h3>
-            <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <h3 className="text-center text-lg font-medium text-slate-900 dark:text-white mb-6">Select your primary role</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Role Card 1 */}
                 <div
-                    onClick={() => setRole("radiologist")}
+                    onClick={() => onRoleSelect("radiologist")}
                     className={cn(
-                        "cursor-pointer relative p-6 rounded-xl border transition-all duration-200",
-                        role === "radiologist"
-                            ? "border-blue-600 dark:border-blue-500 bg-blue-50 dark:bg-blue-500/10 ring-1 ring-blue-600 dark:ring-blue-500"
-                            : "border-slate-200 dark:border-slate-700 bg-white dark:bg-transparent hover:border-blue-300 dark:hover:bg-slate-900/50"
+                        "cursor-pointer group relative p-6 rounded-2xl border-2 transition-all duration-300",
+                        selectedRole === "radiologist"
+                            ? "border-blue-600 bg-blue-50/50 dark:bg-blue-900/10"
+                            : "border-slate-200 dark:border-slate-800 bg-transparent hover:border-blue-300 dark:hover:border-blue-600"
                     )}
                 >
-                    <div className={cn(
-                        "w-12 h-12 rounded-lg flex items-center justify-center mb-4 transition-colors",
-                        role === "radiologist"
-                            ? "bg-blue-600 text-white dark:bg-blue-900/30 dark:text-blue-400"
-                            : "bg-blue-100 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400"
-                    )}>
-                        <Stethoscope className="w-6 h-6" />
+                    <div className="flex justify-between items-start mb-4">
+                        <div className={cn(
+                            "w-12 h-12 rounded-xl flex items-center justify-center transition-colors",
+                            selectedRole === "radiologist"
+                                ? "bg-blue-600 text-white"
+                                : "bg-slate-100 dark:bg-slate-800 text-blue-500 dark:text-blue-400 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/30 group-hover:text-blue-600"
+                        )}>
+                            <Stethoscope className="w-6 h-6" />
+                        </div>
+                        {selectedRole === "radiologist" && <CheckCircle2 className="text-blue-600" size={24} />}
                     </div>
-                    <h4 className={cn("font-bold text-sm mb-1", role === "radiologist" ? "text-blue-900 dark:text-white" : "text-slate-900 dark:text-slate-100")}>
+
+                    <h4 className={cn("font-bold text-sm mb-2", selectedRole === "radiologist" ? "text-blue-700 dark:text-blue-400" : "text-slate-900 dark:text-white")}>
                         Radiologist / Doctor
                     </h4>
-                    <p className={cn("text-xs leading-relaxed", role === "radiologist" ? "text-blue-700 dark:text-slate-400" : "text-slate-500 dark:text-slate-400")}>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
                         Full access to scan analysis, AI segmentation tools, and patient reporting workflows.
                     </p>
                 </div>
 
                 {/* Role Card 2 */}
                 <div
-                    onClick={() => setRole("admin")}
+                    onClick={() => onRoleSelect("admin")}
                     className={cn(
-                        "cursor-pointer relative p-6 rounded-xl border transition-all duration-200",
-                        role === "admin"
-                            ? "border-blue-600 dark:border-blue-500 bg-blue-50 dark:bg-blue-500/10 ring-1 ring-blue-600 dark:ring-blue-500"
-                            : "border-slate-200 dark:border-slate-700 bg-white dark:bg-transparent hover:border-purple-300 dark:hover:bg-slate-900/50"
+                        "cursor-pointer group relative p-6 rounded-2xl border-2 transition-all duration-300",
+                        selectedRole === "admin"
+                            ? "border-purple-600 bg-purple-50/50 dark:bg-purple-900/10"
+                            : "border-slate-200 dark:border-slate-800 bg-transparent hover:border-purple-300 dark:hover:border-purple-400"
                     )}
                 >
-                    <div className={cn(
-                        "w-12 h-12 rounded-lg flex items-center justify-center mb-4 transition-colors",
-                        role === "admin"
-                            ? "bg-purple-600 text-white dark:bg-purple-900/30 dark:text-purple-400"
-                            : "bg-purple-100 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400"
-                    )}>
-                        <Shield className="w-6 h-6" />
+                    <div className="flex justify-between items-start mb-4">
+                        <div className={cn(
+                            "w-12 h-12 rounded-xl flex items-center justify-center transition-colors",
+                            selectedRole === "admin"
+                                ? "bg-purple-600 text-white"
+                                : "bg-slate-100 dark:bg-slate-800 text-purple-600 dark:text-purple-400 group-hover:bg-purple-100 dark:group-hover:bg-purple-900/30 group-hover:text-purple-600"
+                        )}>
+                            <Shield className="w-6 h-6" />
+                        </div>
+                        {selectedRole === "admin" && <CheckCircle2 className="text-purple-600" size={24} />}
                     </div>
-                    <h4 className={cn("font-bold text-sm mb-1", role === "admin" ? "text-blue-900 dark:text-white" : "text-slate-900 dark:text-slate-100")}>
+
+                    <h4 className={cn("font-bold text-sm mb-2", selectedRole === "admin" ? "text-purple-700 dark:text-purple-400" : "text-slate-900 dark:text-white")}>
                         Administrator
                     </h4>
-                    <p className={cn("text-xs leading-relaxed", role === "admin" ? "text-blue-700 dark:text-slate-400" : "text-slate-500 dark:text-slate-400")}>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
                         Manage institution settings, user permissions, integrations, and compliance audits.
                     </p>
                 </div>
+            </div>
+
+            <div className="pt-6 flex justify-between items-center border-t border-slate-100 dark:border-white/5 mt-8">
+                <button
+                    onClick={onBack}
+                    className="text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white text-sm font-medium transition-colors"
+                >
+                    Back
+                </button>
+                <button
+                    onClick={onNext}
+                    disabled={!selectedRole}
+                    className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-8 py-3 rounded-xl text-sm font-semibold shadow-lg shadow-blue-600/20 hover:shadow-blue-600/40 transition-all transform hover:-translate-y-0.5 active:scale-95"
+                >
+                    Continue
+                </button>
+            </div>
+        </div>
+    );
+
+    // Step 3 UI Placeholder
+    const StepThree = () => (
+        <div className="text-center py-10 animate-in fade-in zoom-in-95 duration-500">
+            <div className="w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                <CheckCircle2 className="w-10 h-10 text-green-500" />
+            </div>
+            <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Setup Complete!</h3>
+            <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-8">
+                Your workspace preferences have been saved. You are ready to enter the platform.
+            </p>
+            <div className="flex justify-center gap-4">
+                <button
+                    onClick={onBack}
+                    className="text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white text-sm font-medium transition-colors"
+                >
+                    Back
+                </button>
+                <button
+                    onClick={onNext}
+                    className="bg-blue-600 hover:bg-blue-500 text-white px-10 py-3 rounded-xl text-sm font-semibold shadow-lg shadow-blue-600/20 hover:shadow-blue-600/40 transition-all transform hover:-translate-y-0.5 active:scale-95"
+                >
+                    Enter Workspace
+                </button>
             </div>
         </div>
     );
 
     return (
         <div className="relative">
-            {/* Steps Vertical Line */}
-            <div className="absolute -left-12 top-2 bottom-0 w-px bg-slate-200 dark:bg-slate-800 hidden lg:block">
-                <div
-                    className="absolute top-0 w-full bg-blue-600 dark:bg-blue-500 transition-all duration-500"
-                    style={{ height: step === 1 ? "10%" : step === 2 ? "50%" : "100%" }}
-                />
-            </div>
-
-            {/* Step Indicators */}
-            <div className="space-y-12 relative">
-                {/* Step 1 Block */}
-                <div className={cn("transition-opacity duration-300", step !== 1 && "opacity-40 pointer-events-none")}>
-                    <div className="flex items-center gap-3 mb-6">
-                        <div className={cn(
-                            "w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border transition-colors",
-                            step >= 1
-                                ? "bg-blue-600 border-blue-600 text-white"
-                                : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-500"
-                        )}>
-                            {step > 1 ? <Check size={16} /> : "1"}
-                        </div>
-                        <h3 className="font-semibold text-lg text-slate-900 dark:text-white">Identity & Credentials</h3>
-                    </div>
-                    {step === 1 && (
-                        <div className="pl-11 pb-8 border-l border-slate-200 dark:border-slate-800 ml-4 lg:ml-0 lg:border-none lg:pl-0 lg:pb-0">
-                            <StepOne />
-                            <div className="mt-6 flex justify-end">
-                                <button
-                                    onClick={() => setStep(2)}
-                                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-sm"
-                                >
-                                    Continue
-                                </button>
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* Step 2 Block */}
-                <div className={cn("transition-opacity duration-300", step !== 2 && "opacity-40 pointer-events-none")}>
-                    <div className="flex items-center gap-3 mb-6">
-                        <div className={cn(
-                            "w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border transition-colors",
-                            step >= 2
-                                ? "bg-blue-600 border-blue-600 text-white"
-                                : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-500"
-                        )}>
-                            {step > 2 ? <Check size={16} /> : "2"}
-                        </div>
-                        <h3 className="font-semibold text-lg text-slate-900 dark:text-white">Select Role</h3>
-                    </div>
-                    {step === 2 && (
-                        <div className="pl-11 pb-8 border-l border-slate-200 dark:border-slate-800 ml-4 lg:ml-0 lg:border-none lg:pl-0 lg:pb-0">
-                            <StepTwo />
-                            <div className="mt-6 flex justify-end gap-3">
-                                <button
-                                    onClick={() => setStep(1)}
-                                    className="text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white px-6 py-2.5 text-sm font-medium transition-colors"
-                                >
-                                    Back
-                                </button>
-                                <button
-                                    onClick={() => setStep(3)}
-                                    disabled={!role}
-                                    className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white px-6 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-sm"
-                                >
-                                    Continue
-                                </button>
-                            </div>
-                        </div>
-                    )}
-                </div>
-
-                {/* Step 3 Placeholder */}
-                <div className={cn("transition-opacity duration-300", step !== 3 && "opacity-40")}>
-                    <div className="flex items-center gap-3 mb-6">
-                        <div className={cn(
-                            "w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold border transition-colors",
-                            step >= 3
-                                ? "bg-blue-600 border-blue-600 text-white"
-                                : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 text-slate-500"
-                        )}>3</div>
-                        <h3 className="font-semibold text-lg text-slate-900 dark:text-white">System Preferences</h3>
-                    </div>
-                </div>
-
-            </div>
+            {currentStep === 1 && <StepOne />}
+            {currentStep === 2 && <StepTwo />}
+            {currentStep === 3 && <StepThree />}
         </div>
     );
 }
