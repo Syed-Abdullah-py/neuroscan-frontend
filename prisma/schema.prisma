@@ -1,0 +1,66 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// SQLite does not support ENUMS, so we remove them.
+// We will enforce these values in our App Logic (Zod).
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  password      String
+  
+  // Changed from Enum to String
+  role          String    @default("DOCTOR") // Values: "ADMIN", "DOCTOR", "PATIENT"
+  
+  medicalLicenseId String?
+  institution   String?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  assignedCases Case[]    @relation("AssignedDoctor")
+  uploadedCases Case[]    @relation("Uploader")
+}
+
+model Patient {
+  id          String   @id @default(cuid())
+  firstName   String
+  lastName    String
+  dob         DateTime
+  gender      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  cases       Case[]
+}
+
+model Case {
+  id          String     @id @default(cuid())
+  
+  // Changed from Enum to String
+  status      String     @default("PENDING") // Values: "PENDING", "PROCESSING", "COMPLETED"
+  
+  priority    String     @default("normal")
+  scanUrl     String     
+  maskUrl     String?
+  bodyPart    String     @default("BRAIN")
+  notes       String?
+  
+  patientId   String
+  patient     Patient    @relation(fields: [patientId], references: [id])
+  
+  doctorId    String?
+  doctor      User?      @relation("AssignedDoctor", fields: [doctorId], references: [id])
+  
+  uploaderId  String
+  uploader    User       @relation("Uploader", fields: [uploaderId], references: [id])
+
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}

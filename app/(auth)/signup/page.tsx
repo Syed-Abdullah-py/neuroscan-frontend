@@ -20,18 +20,14 @@ export default function SignupPage() {
     return (
         <div className="min-h-screen relative flex flex-col items-center justify-center font-sans text-slate-900 dark:text-slate-100 selection:bg-blue-500/30">
 
-            {/* 
-               PERFORMANCE FIX:
-               1. Removed 'transition-colors' from background layers (reduces repaints).
-               2. Removed 'backdrop-blur' from the full-screen overlay (major lag cause).
-            */}
+            {/* Background Layers */}
             <div className="fixed inset-0 z-0">
                 <div className="absolute inset-0 bg-slate-50 dark:bg-slate-950" />
                 <div className="absolute inset-0 bg-white/60 dark:bg-slate-950/90" />
                 <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,var(--tw-gradient-stops))] from-blue-500/10 via-transparent to-transparent opacity-50 pointer-events-none" />
             </div>
 
-            {/* Header - Fixed Navbar Alignment */}
+            {/* Header */}
             <header className="absolute top-0 left-0 w-full p-4 md:p-8 flex items-center justify-between z-20">
                 <div className="flex items-center gap-2 md:gap-3">
                     <Link href="/" className="flex items-center gap-2 md:gap-3">
@@ -42,7 +38,6 @@ export default function SignupPage() {
                     </Link>
                 </div>
                 <div className="text-sm font-medium text-slate-600 dark:text-slate-400 flex items-center gap-2">
-                    {/* Hidden on mobile, visible on medium screens and up */}
                     <span className="hidden md:inline">Already a member?</span>
                     <Link href="/login" className="text-slate-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center group">
                         Log In <ArrowRight className="w-4 h-4 ml-1 transition-transform group-hover:translate-x-1" />
@@ -80,11 +75,10 @@ export default function SignupPage() {
                                         <div className={cn(
                                             "w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center text-xs md:text-sm font-bold border-2 transition-all duration-300",
                                             s === step
-                                                ? "bg-blue-600 border-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.5)] scale-110" // Current Step
+                                                ? "bg-blue-600 border-blue-600 text-white shadow-[0_0_15px_rgba(37,99,235,0.5)] scale-110"
                                                 : s < step
-                                                    // VISIBILITY FIX: Changed bg-slate-900 to bg-blue-100 for light mode
-                                                    ? "bg-blue-100 border-blue-600 text-blue-600 dark:bg-slate-900 dark:text-blue-500" // Completed Step
-                                                    : "bg-slate-100 border-slate-300 text-slate-400 dark:bg-slate-950 dark:border-slate-800 dark:text-slate-600" // Upcoming Step
+                                                    ? "bg-blue-100 border-blue-600 text-blue-600 dark:bg-slate-900 dark:text-blue-500"
+                                                    : "bg-slate-100 border-slate-300 text-slate-400 dark:bg-slate-950 dark:border-slate-800 dark:text-slate-600"
                                         )}>
                                             {s < step ? <Check size={14} strokeWidth={3} /> : s}
                                         </div>
@@ -103,7 +97,7 @@ export default function SignupPage() {
                             </div>
                         </div>
 
-                        {/* Form Area */}
+                        {/* Form Area - Passing State to the Logic Component */}
                         <div className="min-h-[300px]">
                             <SignupForm
                                 currentStep={step}
