@@ -12,6 +12,17 @@ const initialState = {
     message: "",
 };
 
+/**
+ * Login Form Component.
+ * 
+ * Provides a user interface for users to sign in.
+ * Utilizes `useActionState` to handle the `loginUser` server action.
+ * Displays success messages after registration and error messages for invalid credentials.
+ * Includes fields for email and password.
+ *
+ * @returns A form element with email and password inputs and a submit button.
+ */
+
 export function LoginForm() {
     // <--- CHANGED: useActionState returns [state, action, isPending]
     const [state, formAction, isPending] = useActionState(loginUser, initialState);

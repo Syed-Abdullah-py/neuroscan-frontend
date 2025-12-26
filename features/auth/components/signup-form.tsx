@@ -23,6 +23,25 @@ const initialState = {
     errors: {} as Record<string, string[]>,
 };
 
+/**
+ * Multi-step Signup Form Component.
+ * 
+ * Orchestrates the user registration process through a wizard-like interface:
+ * - Step 1: Collects identity and credential information (Name, Email, Password, License ID).
+ * - Step 2: Allows the user to select their role (Radiologist/Doctor or Admin).
+ * - Step 3: Confirmation and final submission.
+ * 
+ * Uses `registerUser` server action for data submission.
+ * Maintains local state for wizard navigation and form data persistence between steps.
+ *
+ * @param currentStep - The current step of the wizard (1, 2, or 3).
+ * @param onNext - Callback to proceed to the next step.
+ * @param onBack - Callback to return to the previous step.
+ * @param onRoleSelect - Callback to handle role selection.
+ * @param selectedRole - The role currently selected by the user.
+ * @returns A form wizard for user registration.
+ */
+
 export function SignupForm({ currentStep, onNext, onBack, onRoleSelect, selectedRole }: SignupFormProps) {
     const [showPass, setShowPass] = useState(false);
     const [state, formAction, isPending] = useActionState(registerUser, initialState);

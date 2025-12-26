@@ -6,6 +6,17 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
     size?: "default" | "sm" | "lg";
 }
 
+/*
+ * Button Component
+ *
+ * A reusable button component with optional variants and sizes.
+ * Utilizes the `cn` utility function for class name merging.
+ *
+ * @param {ButtonProps} props - The properties for the button component.
+ * @param {React.RefObject<HTMLButtonElement>} ref - The reference for the button element.
+ * @returns {React.ReactNode} The rendered button component.
+ */
+
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     ({ className, variant = "default", size = "default", ...props }, ref) => {
         return (

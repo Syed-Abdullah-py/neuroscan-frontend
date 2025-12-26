@@ -5,12 +5,23 @@ export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> 
   icon?: React.ReactNode;
 }
 
+/*
+ * Input Component
+ *
+ * A reusable input component with an optional icon.
+ * Utilizes the `cn` utility function for class name merging.
+ *
+ * @param {InputProps} props - The properties for the input component.
+ * @param {React.RefObject<HTMLInputElement>} ref - The reference for the input element.
+ * @returns {React.ReactNode} The rendered input component.
+ */
+
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ className, type, icon, ...props }, ref) => {
     return (
       <div className="relative w-full">
         {icon && (
-          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-slate-400">
+          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
             {icon}
           </div>
         )}

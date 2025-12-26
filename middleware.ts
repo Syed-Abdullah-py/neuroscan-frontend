@@ -2,8 +2,10 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 
+// Encode the secret
 const secret = new TextEncoder().encode(process.env.AUTH_SECRET);
 
+// Middleware function
 export async function middleware(request: NextRequest) {
     // 1. Check for the session cookie
     const session = request.cookies.get("session")?.value;

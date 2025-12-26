@@ -4,7 +4,7 @@ import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers"; // <--- Import remains the same
+import { cookies } from "next/headers";
 import { SignJWT } from "jose";
 
 const secret = new TextEncoder().encode(process.env.AUTH_SECRET);
@@ -13,18 +13,31 @@ const secret = new TextEncoder().encode(process.env.AUTH_SECRET);
 const SignupSchema = z.object({
   firstName: z.string().min(2, "First name is too short"),
   lastName: z.string().min(2, "Last name is too short"),
-  email: z.string().email("Invalid email address"),
+  email: z.email("Invalid email address"),
   password: z.string().min(8, "Password must be at least 8 characters"),
   role: z.enum(["radiologist", "admin"]),
   licenseId: z.string().optional(),
 });
 
 const LoginSchema = z.object({
-  email: z.string().email("Invalid email address"),
+  email: z.email("Invalid email address"),
   password: z.string().min(1, "Password is required"),
 });
 
 // --- ACTIONS ---
+
+/**
+ * Registers a new user in the system.
+ * 
+ * Validates the input data against the SignupSchema.
+ * If validation passes, checks for existing users by email.
+ * Hashes the password and creates a new user record in the database.
+ * Redirects to the login page upon successful registration.
+ *
+ * @param prevState - The previous state of the form action (unused but required by useFormState).
+ * @param formData - The form data containing user registration details.
+ * @returns An object containing an error message if validation or registration fails.
+ */
 export async function registerUser(prevState: any, formData: FormData) {
   const rawData = Object.fromEntries(formData.entries());
 
@@ -70,6 +83,18 @@ export async function registerUser(prevState: any, formData: FormData) {
   redirect("/login?success=true");
 }
 
+/**
+ * Authenticates a user and creates a session.
+ * 
+ * Validates the login credentials.
+ * If valid, generates a JWT signed with the HS256 algorithm.
+ * Sets a secure, HTTP-only cookie containing the JWT.
+ * Redirects the user to their respective dashboard (Admin or Doctor).
+ *
+ * @param prevState - The previous state of the form action.
+ * @param formData - The form data containing email and password.
+ * @returns An error message object if authentication fails.
+ */
 export async function loginUser(prevState: any, formData: FormData) {
   const rawData = Object.fromEntries(formData.entries());
 
@@ -114,6 +139,11 @@ export async function loginUser(prevState: any, formData: FormData) {
   }
 }
 
+/**
+ * Logs out the current user.
+ * 
+ * Deletes the session cookie and redirects to the login page.
+ */
 export async function logoutUser() {
   const cookieStore = await cookies();
 

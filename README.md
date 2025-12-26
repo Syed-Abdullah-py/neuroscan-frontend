@@ -1,36 +1,87 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# NeuroScan Frontend
 
-## Getting Started
+NeuroScan is a medical imaging analytics platform designed to empower radiologists with real-time AI segmentation, volumetric analysis, and case management tools. This repository contains the Next.js frontend application.
 
-First, run the development server:
+## 🚀 Tech Stack
+
+- **Framework:** [Next.js 14](https://nextjs.org/) (App Router)
+- **Language:** TypeScript
+- **Styling:** Tailwind CSS, Framer Motion (Code-driven animations)
+- **Database:** SQLite (via Prisma ORM)
+- **Authentication:** Custom JWT-based Auth (Server Actions)
+- **Validation:** Zod
+
+## 📂 Project Structure
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+├── actions/             # Server Actions (Backend Logic)
+│   ├── auth-actions.ts  # Login/Signup/Logout logic
+│   └── user-actions.ts  # User management logic
+├── app/                 # App Router Pages & API Routes
+│   ├── (auth)/          # Authentication routes (login/signup)
+│   └── (doctor)/        # Doctor dashboard routes
+├── features/            # Feature-based Modular Architecture
+│   └── auth/
+│       └── components/  # Auth UI components (Forms, Scanners)
+├── lib/                 # Shared Utilities
+│   ├── prisma.ts        # Database Client Singleton
+│   └── utils.tsx        # Helper functions (cn, formatBytes)
+└── prisma/              # Database Schema & Migrations
+    └── schema.prisma    # Data Models
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 💾 Database Schema
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+The application uses **Prisma** with a local **SQLite** database. Key models include:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### User
+Represents system users (Doctors/Admins).
+- **Role:** `DOCTOR` or `ADMIN`.
+- **Auth:** Email/Password (hashed with bcrypt).
+- **Relations:** owns `assignedCases` and `uploadedCases`.
 
-## Learn More
+### Case
+Represents a medical imaging case (MRI/CT Scan).
+- **Status:** `PENDING`, `PROCESSING`, `COMPLETED`.
+- **Data:** `scanUrl`, `maskUrl` (AI output), `priority`.
+- **Relations:** Linked to a `Patient` and a `Doctor`.
 
-To learn more about Next.js, take a look at the following resources:
+### Patient
+Represents the subject of the medical scans.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 🔄 Data Flow
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1.  **User Interaction:** User submits a form (e.g., Login).
+2.  **Server Action:** The request is handled by a function in `actions/*` (e.g., `loginUser`).
+3.  **Validation:** Input is validated using **Zod** schemas.
+4.  **Database:** Prisma Client queries the SQLite database.
+5.  **Response:** The Server Action returns success or error messages, or performs a redirect.
 
-## Deploy on Vercel
+## 🛠️ Key Functions
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Authentication (`actions/auth-actions.ts`)
+- `registerUser`: Validates input, checks for existing emails, hashes password, and creates a user.
+- `loginUser`: Verifies credentials, generates a signed JWT, and sets a secure `session` cookie.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Utils (`lib/utils.tsx`)
+- `cn`: Utility for merging Tailwind classes conditionally.
+- `formatBytes`: Helpers for displaying file sizes in the UI.
+
+## 📦 Getting Started
+
+1.  **Install Dependencies:**
+    ```bash
+    npm install
+    ```
+
+2.  **Setup Database:**
+    ```bash
+    npx prisma migrate dev --name init
+    ```
+
+3.  **Run Development Server:**
+    ```bash
+    npm run dev
+    ```
+
+4.  **Open:** [http://localhost:3000](http://localhost:3000)

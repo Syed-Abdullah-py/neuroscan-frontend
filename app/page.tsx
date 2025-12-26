@@ -2,6 +2,19 @@ import Link from "next/link";
 import { ArrowRight, ShieldCheck, Activity } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+/**
+ * Landing Page Component.
+ * 
+ * The public-facing home page of the application.
+ * Features:
+ * - Responsive navigation bar.
+ * - Hero section with animated background visuals.
+ * - Call-to-action buttons for Sign Up and Login.
+ * - Conceptual dashboard preview.
+ *
+ * @returns The rendered landing page.
+ */
+
 export default function LandingPage() {
   return (
     <div className="min-h-screen relative flex flex-col font-sans text-slate-900 dark:text-slate-100 transition-colors duration-300 selection:bg-blue-500/30">

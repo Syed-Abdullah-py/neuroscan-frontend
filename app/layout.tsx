@@ -12,6 +12,18 @@ export const metadata: Metadata = {
   description: "Professional Imaging Analytics Platform",
 };
 
+/**
+ * Root Layout Component.
+ * 
+ * Provides the global HTML structure and common providers for the application.
+ * - Applies the `Inter` font globally.
+ * - Wraps children in the `ThemeProvider` for dark/light mode support.
+ * - Includes a global `ThemeToggle` button.
+ *
+ * @param children - The page content to be rendered within the layout.
+ * @returns The root html and body structure.
+ */
+
 export default function RootLayout({
   children,
 }: Readonly<{
