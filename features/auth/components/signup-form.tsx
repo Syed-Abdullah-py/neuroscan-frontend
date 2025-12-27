@@ -51,22 +51,72 @@ export function SignupForm({ currentStep, onNext, onBack, onRoleSelect, selected
         firstName: "",
         lastName: "",
         email: "",
+        workspaceName: "",
         licenseId: "",
         password: ""
     });
 
+    const [errors, setErrors] = useState<Record<string, string>>({});
+
+    const validateField = (name: string, value: string) => {
+        let error = "";
+        switch (name) {
+            case "firstName":
+                if (!value.trim()) error = "First name is required";
+                else if (value.length < 2) error = "Must be at least 2 chars";
+                break;
+            case "lastName":
+                if (!value.trim()) error = "Last name is required";
+                else if (value.length < 2) error = "Must be at least 2 chars";
+                break;
+            case "workspaceName":
+                if (!value.trim()) error = "Workspace name is required";
+                else if (value.length < 3) error = "Must be at least 3 chars";
+                break;
+            case "email":
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!value.trim()) error = "Email is required";
+                else if (!emailRegex.test(value)) error = "Invalid email address";
+                break;
+            case "password":
+                if (!value) error = "Password is required";
+                else if (value.length < 8) error = "Must be at least 8 chars";
+                break;
+            case "licenseId":
+                if (!value.trim()) error = "Medical License ID is required";
+                break;
+        }
+        setErrors(prev => ({ ...prev, [name]: error }));
+        return !error;
+    };
+
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
+        validateField(name, value);
+    };
+
+    const handleStep1Next = () => {
+        const fields = ["firstName", "lastName", "email", "workspaceName", "password", "licenseId"];
+        let isValid = true;
+        fields.forEach(field => {
+            const valid = validateField(field, formData[field as keyof typeof formData]);
+            if (!valid) isValid = false;
+        });
+
+        if (isValid) {
+            onNext();
+        }
     };
 
     // Common Input Styles
     const inputClasses = "w-full bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 rounded-xl h-12 px-4 text-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600";
+    const errorInputClasses = "border-red-500 focus:ring-red-500";
     const labelClasses = "text-[11px] font-bold text-slate-500 dark:text-slate-400 tracking-wider uppercase mb-2 block";
 
     return (
         <form action={formAction} className="relative">
-            
+
             {/* STEP 1: Identity & Credentials */}
             {currentStep === 1 && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -77,10 +127,11 @@ export function SignupForm({ currentStep, onNext, onBack, onRoleSelect, selected
                                 name="firstName"
                                 value={formData.firstName}
                                 onChange={handleInputChange}
-                                className={inputClasses}
+                                className={cn(inputClasses, errors.firstName && errorInputClasses)}
                                 placeholder="e.g. Jane"
                                 required
                             />
+                            {errors.firstName && <p className="text-xs text-red-500 mt-1 font-medium animate-in slide-in-from-top-1">{errors.firstName}</p>}
                         </div>
                         <div>
                             <label className={labelClasses}>Last Name</label>
@@ -88,11 +139,25 @@ export function SignupForm({ currentStep, onNext, onBack, onRoleSelect, selected
                                 name="lastName"
                                 value={formData.lastName}
                                 onChange={handleInputChange}
-                                className={inputClasses}
+                                className={cn(inputClasses, errors.lastName && errorInputClasses)}
                                 placeholder="e.g. Doe"
                                 required
                             />
+                            {errors.lastName && <p className="text-xs text-red-500 mt-1 font-medium animate-in slide-in-from-top-1">{errors.lastName}</p>}
                         </div>
+                    </div>
+
+                    <div>
+                        <label className={labelClasses}>Workspace Name</label>
+                        <input
+                            name="workspaceName"
+                            value={formData.workspaceName}
+                            onChange={handleInputChange}
+                            className={cn(inputClasses, errors.workspaceName && errorInputClasses)}
+                            placeholder="e.g. City Hospital Radiology"
+                            required
+                        />
+                        {errors.workspaceName && <p className="text-xs text-red-500 mt-1 font-medium animate-in slide-in-from-top-1">{errors.workspaceName}</p>}
                     </div>
 
                     <div>
@@ -103,7 +168,7 @@ export function SignupForm({ currentStep, onNext, onBack, onRoleSelect, selected
                                 type="email"
                                 value={formData.email}
                                 onChange={handleInputChange}
-                                className={cn(inputClasses, "pl-11")}
+                                className={cn(inputClasses, "pl-11", errors.email && errorInputClasses)}
                                 placeholder="doctor@hospital.org"
                                 required
                             />
@@ -111,6 +176,7 @@ export function SignupForm({ currentStep, onNext, onBack, onRoleSelect, selected
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="4" width="20" height="16" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></svg>
                             </div>
                         </div>
+                        {errors.email && <p className="text-xs text-red-500 mt-1 font-medium animate-in slide-in-from-top-1">{errors.email}</p>}
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -120,9 +186,11 @@ export function SignupForm({ currentStep, onNext, onBack, onRoleSelect, selected
                                 name="licenseId"
                                 value={formData.licenseId}
                                 onChange={handleInputChange}
-                                className={inputClasses}
+                                className={cn(inputClasses, errors.licenseId && errorInputClasses)}
                                 placeholder="LIC-12345678"
+                                required
                             />
+                            {errors.licenseId && <p className="text-xs text-red-500 mt-1 font-medium animate-in slide-in-from-top-1">{errors.licenseId}</p>}
                         </div>
                         <div>
                             <label className={labelClasses}>Password</label>
@@ -132,7 +200,7 @@ export function SignupForm({ currentStep, onNext, onBack, onRoleSelect, selected
                                     type={showPass ? "text" : "password"}
                                     value={formData.password}
                                     onChange={handleInputChange}
-                                    className={cn(inputClasses, "pr-11")}
+                                    className={cn(inputClasses, "pr-11", errors.password && errorInputClasses)}
                                     placeholder="••••••••"
                                     required
                                     minLength={8}
@@ -145,6 +213,7 @@ export function SignupForm({ currentStep, onNext, onBack, onRoleSelect, selected
                                     {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
                                 </button>
                             </div>
+                            {errors.password && <p className="text-xs text-red-500 mt-1 font-medium animate-in slide-in-from-top-1">{errors.password}</p>}
                         </div>
                     </div>
 
@@ -154,7 +223,7 @@ export function SignupForm({ currentStep, onNext, onBack, onRoleSelect, selected
                         </p>
                         <button
                             type="button"
-                            onClick={onNext}
+                            onClick={handleStep1Next}
                             className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-3 rounded-xl text-sm font-semibold shadow-lg shadow-blue-600/20 hover:shadow-blue-600/40 transition-all transform hover:-translate-y-0.5 active:scale-95"
                         >
                             Continue
@@ -267,6 +336,7 @@ export function SignupForm({ currentStep, onNext, onBack, onRoleSelect, selected
                     <input type="hidden" name="firstName" value={formData.firstName} />
                     <input type="hidden" name="lastName" value={formData.lastName} />
                     <input type="hidden" name="email" value={formData.email} />
+                    <input type="hidden" name="workspaceName" value={formData.workspaceName} />
                     <input type="hidden" name="password" value={formData.password} />
                     <input type="hidden" name="licenseId" value={formData.licenseId} />
                     <input type="hidden" name="role" value={selectedRole || ""} />

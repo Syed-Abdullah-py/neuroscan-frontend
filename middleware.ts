@@ -29,7 +29,7 @@ export async function middleware(request: NextRequest) {
         const role = payload.role as string;
 
         // Prevent Doctors from accessing Admin routes
-        if (path.startsWith("/admin") && role !== "ADMIN") {
+        if (path.startsWith("/admin") && role !== "ADMIN" && role !== "OWNER") {
             return NextResponse.redirect(new URL("/doctor", request.url));
         }
 

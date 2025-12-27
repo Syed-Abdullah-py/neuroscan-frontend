@@ -14,6 +14,7 @@ const SignupSchema = z.object({
   firstName: z.string().min(2, "First name is too short"),
   lastName: z.string().min(2, "Last name is too short"),
   email: z.email("Invalid email address"),
+  workspaceName: z.string().min(3, "Workspace name must be at least 3 chars"),
   password: z.string().min(8, "Password must be at least 8 characters"),
   role: z.enum(["radiologist", "admin"]),
   licenseId: z.string().optional(),
@@ -27,16 +28,7 @@ const LoginSchema = z.object({
 // --- ACTIONS ---
 
 /**
- * Registers a new user in the system.
- * 
- * Validates the input data against the SignupSchema.
- * If validation passes, checks for existing users by email.
- * Hashes the password and creates a new user record in the database.
- * Redirects to the login page upon successful registration.
- *
- * @param prevState - The previous state of the form action (unused but required by useFormState).
- * @param formData - The form data containing user registration details.
- * @returns An object containing an error message if validation or registration fails.
+ * Registers a new user and creates their workspace.
  */
 export async function registerUser(prevState: any, formData: FormData) {
   const rawData = Object.fromEntries(formData.entries());
@@ -45,6 +37,7 @@ export async function registerUser(prevState: any, formData: FormData) {
     firstName: rawData.firstName,
     lastName: rawData.lastName,
     email: rawData.email,
+    workspaceName: rawData.workspaceName,
     password: rawData.password,
     role: rawData.role,
     licenseId: rawData.licenseId,
@@ -56,25 +49,54 @@ export async function registerUser(prevState: any, formData: FormData) {
     };
   }
 
-  const { email, password, firstName, lastName, role, licenseId } = validated.data;
+  const { email, password, firstName, lastName, role, licenseId, workspaceName } = validated.data;
 
   const existingUser = await prisma.user.findUnique({ where: { email } });
   if (existingUser) {
     return { message: "Email already registered." };
   }
 
+  // Generate slug from workspace name (simple slugify)
+  const slug = workspaceName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+
+  const existingSlug = await prisma.workspace.findUnique({ where: { slug } });
+  if (existingSlug) {
+    return { message: "Workspace name already taken. Please choose another." };
+  }
+
   const hashedPassword = await bcrypt.hash(password, 10);
 
   try {
-    await prisma.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        name: `${firstName} ${lastName}`,
-        role: role === "radiologist" ? "DOCTOR" : "ADMIN",
-        medicalLicenseId: licenseId || null,
-      },
+    await prisma.$transaction(async (tx) => {
+      // 1. Create User
+      const user = await tx.user.create({
+        data: {
+          email,
+          password: hashedPassword,
+          name: `${firstName} ${lastName}`,
+          medicalLicenseId: licenseId || null,
+        },
+      });
+
+      // 2. Create Workspace
+      const workspace = await tx.workspace.create({
+        data: {
+          name: workspaceName,
+          slug,
+          ownerId: user.id
+        }
+      });
+
+      // 3. Create Membership (OWNER since they created it)
+      await tx.workspaceMember.create({
+        data: {
+          userId: user.id,
+          workspaceId: workspace.id,
+          role: "OWNER" // The creator is the owner
+        }
+      });
     });
+
   } catch (error) {
     console.error("Registration Error:", error);
     return { message: "Database error. Please try again." };
@@ -84,16 +106,7 @@ export async function registerUser(prevState: any, formData: FormData) {
 }
 
 /**
- * Authenticates a user and creates a session.
- * 
- * Validates the login credentials.
- * If valid, generates a JWT signed with the HS256 algorithm.
- * Sets a secure, HTTP-only cookie containing the JWT.
- * Redirects the user to their respective dashboard (Admin or Doctor).
- *
- * @param prevState - The previous state of the form action.
- * @param formData - The form data containing email and password.
- * @returns An error message object if authentication fails.
+ * Authenticates a user and creates a session with Workspace context.
  */
 export async function loginUser(prevState: any, formData: FormData) {
   const rawData = Object.fromEntries(formData.entries());
@@ -105,21 +118,39 @@ export async function loginUser(prevState: any, formData: FormData) {
 
   const { email, password } = validated.data;
 
-  const user = await prisma.user.findUnique({ where: { email } });
+  // Include memberships to find the default workspace
+  const user = await prisma.user.findUnique({
+    where: { email },
+    include: { memberships: true }
+  });
+
   if (!user) {
-    return { message: "Invalid credentials." };
+    return { message: "Invalid email." };
   }
 
   const isValid = await bcrypt.compare(password, user.password);
   if (!isValid) {
-    return { message: "Invalid credentials." };
+    return { message: "Invalid password." };
   }
 
+  // --- WORKSPACE LOGIC ---
+  if (!user.memberships || user.memberships.length === 0) {
+    return { message: "No workspace found. Please contact support." };
+  }
+
+  // For MVP, default to the first workspace found
+  // In a real app, we might ask them to select one if they have multiple
+  const defaultMembership = user.memberships[0];
+
   const alg = "HS256";
-  const jwt = await new SignJWT({ sub: user.id, role: user.role })
+  const jwt = await new SignJWT({
+    sub: user.id,
+    workspaceId: defaultMembership.workspaceId,
+    role: defaultMembership.role
+  })
     .setProtectedHeader({ alg })
     .setIssuedAt()
-    .setExpirationTime("15m") // <--- FIX 1: Expires in 15 minutes
+    .setExpirationTime("15m")
     .sign(secret);
 
   const cookieStore = await cookies();
@@ -132,7 +163,9 @@ export async function loginUser(prevState: any, formData: FormData) {
     sameSite: "lax",
   });
 
-  if (user.role === "ADMIN") {
+  // Redirect based on role in that workspace
+  const role = defaultMembership.role;
+  if (role === "OWNER" || role === "ADMIN") {
     redirect("/admin");
   } else {
     redirect("/doctor");

@@ -1,6 +1,7 @@
 import { Metadata } from "next";
+import { Suspense } from "react";
 import Link from "next/link";
-import { Activity, ArrowRight, ShieldCheck } from "lucide-react";
+import { Activity, ArrowRight, ShieldCheck, Loader2 } from "lucide-react";
 import { BiometricScanner } from "@/features/auth/components/biometric-scanner";
 import { LoginForm } from "@/features/auth/components/login-form";
 
@@ -50,9 +51,11 @@ export default function LoginPage() {
 
                 <div className="bg-white/80 dark:bg-slate-900/60 border border-slate-200/60 dark:border-white/10 rounded-2xl md:rounded-3xl shadow-lg shadow-slate-300/60 dark:shadow-xl dark:shadow-black overflow-hidden">
                     <div className="p-6 md:p-12 space-y-8">
-                        
+
                         {/* Interactive Form Component */}
-                        <LoginForm />
+                        <Suspense fallback={<div className="h-64 flex items-center justify-center"><Loader2 className="animate-spin text-blue-500" /></div>}>
+                            <LoginForm />
+                        </Suspense>
 
                         <div className="relative py-2">
                             <div className="absolute inset-0 flex items-center">
