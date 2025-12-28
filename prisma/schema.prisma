@@ -16,12 +16,15 @@ model User {
   // Professional details
   medicalLicenseId String? 
   avatarUrl     String?
+  faceEncoding  String? // Stored as JSON string of the list
+  role          String?   // "ADMIN" or "RADIOLOGIST" (Global role)
 
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
   memberships   WorkspaceMember[]
   ownedWorkspaces Workspace[] 
+  joinRequests  JoinRequest[]
 }
 
 model Workspace {
@@ -39,6 +42,7 @@ model Workspace {
   members       WorkspaceMember[]
   patients      Patient[]
   invitations   Invitation[]
+  joinRequests  JoinRequest[]
 }
 
 model WorkspaceMember {
@@ -110,4 +114,16 @@ model Invitation {
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@unique([email, workspaceId])
+}
+
+model JoinRequest {
+  id          String    @id @default(cuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  status      String    @default("PENDING") // PENDING, REJECTED
+  createdAt   DateTime  @default(now())
+  
+  @@unique([userId, workspaceId])
 }

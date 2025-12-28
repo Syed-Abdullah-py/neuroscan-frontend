@@ -11,6 +11,10 @@ import {
   Activity,
   LogOut
 } from "lucide-react";
+import WorkspaceSwitcher from "@/components/layout/workspace-switcher";
+
+// ... existing imports ...
+
 import { LogoutButton } from "@/features/auth/components/logout-button";
 
 const adminRoutes = [
@@ -18,30 +22,38 @@ const adminRoutes = [
   { name: "Patients", href: "/admin/patients", icon: Users },
   { name: "Cases", href: "/admin/cases", icon: FileText },
   { name: "Settings", href: "/admin/settings", icon: Settings },
+  { name: "Management", href: "/admin/management", icon: Users }, // Added Management
 ];
 
-export function Sidebar({ role = "admin" }: { role?: "admin" | "doctor" }) {
+const doctorRoutes = [
+  { name: "Overview", href: "/doctor", icon: LayoutDashboard },
+  { name: "My Cases", href: "/doctor/cases", icon: FileText },
+];
+
+type UserSummary = {
+  name: string | null;
+  email: string;
+  avatar: string;
+  role?: string;
+};
+
+// Add workspaces prop
+export function Sidebar({ role = "admin", user, workspaces = [] }: { role?: "admin" | "doctor", user?: UserSummary | null, workspaces?: any[] }) {
   const pathname = usePathname();
-  const routes = role === "admin" ? adminRoutes : adminRoutes; // Add doctor routes later
+  const effectiveRole = user?.role === "radiologist" || user?.role === "doctor" ? "doctor" : "admin";
+  const routes = effectiveRole === "doctor" ? doctorRoutes : adminRoutes;
 
   return (
     <aside className="hidden md:flex flex-col w-64 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 h-screen fixed left-0 top-0 z-40">
-      {/* Header */}
-      <div className="h-16 flex items-center px-6 border-b border-slate-200 dark:border-slate-800">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white">
-            <Activity className="w-5 h-5" />
-          </div>
-          <span className="font-bold text-lg text-slate-900 dark:text-white tracking-tight">
-            NeuroScan
-          </span>
-        </div>
+      {/* Header with Workspace Switcher */}
+      <div className="h-20 flex items-center px-4 border-b border-slate-200 dark:border-slate-800">
+        <WorkspaceSwitcher items={workspaces} />
       </div>
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-6 px-4 space-y-1">
         {routes.map((route) => {
-          const isActive = pathname === route.href;
+          const isActive = pathname === route.href || pathname?.startsWith(route.href + "/");
           return (
             <Link
               key={route.href}
@@ -69,10 +81,15 @@ export function Sidebar({ role = "admin" }: { role?: "admin" | "doctor" }) {
         {/* User Profile Info */}
         <div className="flex items-center gap-3 px-3">
           <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
-            <span className="text-xs font-bold text-slate-600 dark:text-slate-300">AD</span>
+            <span className="text-xs font-bold text-slate-600 dark:text-slate-300">{user?.avatar || "U"}</span>
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-slate-900 dark:text-white truncate">Administrator</p>
+            <p className="text-sm font-medium text-slate-900 dark:text-white truncate">{user?.name || "User"}</p>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] uppercase font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded">
+                {user?.role || "USER"}
+              </span>
+            </div>
           </div>
         </div>
       </div>

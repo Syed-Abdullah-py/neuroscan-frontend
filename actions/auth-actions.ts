@@ -5,19 +5,19 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
-import { SignJWT } from "jose";
+import { SignJWT, jwtVerify } from "jose";
 
 const secret = new TextEncoder().encode(process.env.AUTH_SECRET);
+const FACE_SERVICE_URL = "http://127.0.0.1:8000";
 
 // --- SCHEMAS ---
 const SignupSchema = z.object({
   firstName: z.string().min(2, "First name is too short"),
   lastName: z.string().min(2, "Last name is too short"),
   email: z.email("Invalid email address"),
-  workspaceName: z.string().min(3, "Workspace name must be at least 3 chars"),
   password: z.string().min(8, "Password must be at least 8 characters"),
   role: z.enum(["radiologist", "admin"]),
-  licenseId: z.string().optional(),
+  faceImage: z.any().optional(), // File object
 });
 
 const LoginSchema = z.object({
@@ -37,10 +37,8 @@ export async function registerUser(prevState: any, formData: FormData) {
     firstName: rawData.firstName,
     lastName: rawData.lastName,
     email: rawData.email,
-    workspaceName: rawData.workspaceName,
     password: rawData.password,
     role: rawData.role,
-    licenseId: rawData.licenseId,
   });
 
   if (!validated.success) {
@@ -49,20 +47,39 @@ export async function registerUser(prevState: any, formData: FormData) {
     };
   }
 
-  const { email, password, firstName, lastName, role, licenseId, workspaceName } = validated.data;
+  const { email, password, firstName, lastName, role } = validated.data;
+  const faceImage = rawData.faceImage as File;
+  let faceEncodingString: string | null = null;
+
+  if (faceImage && faceImage.size > 0) {
+    try {
+      const uploadData = new FormData();
+      uploadData.append("file", faceImage);
+
+      const res = await fetch(`${FACE_SERVICE_URL}/encode`, {
+        method: "POST",
+        body: uploadData,
+      });
+
+      if (res.ok) {
+        const json = await res.json();
+        if (json.encoding) {
+          faceEncodingString = JSON.stringify(json.encoding);
+        }
+      } else {
+        console.error("Face encoding failed", await res.text());
+      }
+    } catch (e) {
+      console.error("Face service error", e);
+    }
+  }
 
   const existingUser = await prisma.user.findUnique({ where: { email } });
   if (existingUser) {
     return { message: "Email already registered." };
   }
 
-  // Generate slug from workspace name (simple slugify)
-  const slug = workspaceName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-
-  const existingSlug = await prisma.workspace.findUnique({ where: { slug } });
-  if (existingSlug) {
-    return { message: "Workspace name already taken. Please choose another." };
-  }
+  // Slug generation removed (deferred)
 
   const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -74,27 +91,11 @@ export async function registerUser(prevState: any, formData: FormData) {
           email,
           password: hashedPassword,
           name: `${firstName} ${lastName}`,
-          medicalLicenseId: licenseId || null,
+          faceEncoding: faceEncodingString,
+          role: role === "admin" ? "ADMIN" : "RADIOLOGIST",
         },
       });
-
-      // 2. Create Workspace
-      const workspace = await tx.workspace.create({
-        data: {
-          name: workspaceName,
-          slug,
-          ownerId: user.id
-        }
-      });
-
-      // 3. Create Membership (OWNER since they created it)
-      await tx.workspaceMember.create({
-        data: {
-          userId: user.id,
-          workspaceId: workspace.id,
-          role: "OWNER" // The creator is the owner
-        }
-      });
+      // Workspace creation is deferred to the dashboard.
     });
 
   } catch (error) {
@@ -133,43 +134,43 @@ export async function loginUser(prevState: any, formData: FormData) {
     return { message: "Invalid password." };
   }
 
-  // --- WORKSPACE LOGIC ---
-  if (!user.memberships || user.memberships.length === 0) {
-    return { message: "No workspace found. Please contact support." };
+  let redirectPath = "/doctor";
+  let sessionPayload: { sub: string; workspaceId?: string; role?: string } = { sub: user.id };
+
+  if (user.memberships && user.memberships.length > 0) {
+    // For MVP, default to the first workspace found
+    const defaultMembership = user.memberships[0];
+    sessionPayload.workspaceId = defaultMembership.workspaceId;
+    sessionPayload.role = defaultMembership.role;
+
+    if (defaultMembership.role === "OWNER" || defaultMembership.role === "ADMIN") {
+      redirectPath = "/admin";
+    } else {
+      redirectPath = "/doctor";
+    }
+  } else {
+    // User has no workspace. Default to DOCTOR role to allow access to onboarding.
+    sessionPayload.role = "DOCTOR";
+    redirectPath = "/doctor";
   }
 
-  // For MVP, default to the first workspace found
-  // In a real app, we might ask them to select one if they have multiple
-  const defaultMembership = user.memberships[0];
-
   const alg = "HS256";
-  const jwt = await new SignJWT({
-    sub: user.id,
-    workspaceId: defaultMembership.workspaceId,
-    role: defaultMembership.role
-  })
+  const jwt = await new SignJWT(sessionPayload)
     .setProtectedHeader({ alg })
     .setIssuedAt()
     .setExpirationTime("15m")
     .sign(secret);
 
   const cookieStore = await cookies();
-
   cookieStore.set("session", jwt, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
-    maxAge: 60 * 15, // 15 minutes
+    maxAge: 60 * 15,
     path: "/",
     sameSite: "lax",
   });
 
-  // Redirect based on role in that workspace
-  const role = defaultMembership.role;
-  if (role === "OWNER" || role === "ADMIN") {
-    redirect("/admin");
-  } else {
-    redirect("/doctor");
-  }
+  redirect(redirectPath);
 }
 
 /**
@@ -184,4 +185,640 @@ export async function logoutUser() {
   cookieStore.delete("session");
 
   redirect("/login");
+}
+
+/**
+ * Logs in a user via Face Recognition.
+ */
+export async function loginUserWithFace(prevState: any, formData: FormData) {
+  const faceImage = formData.get("faceImage") as File;
+
+  if (!faceImage || faceImage.size === 0) {
+    return { message: "Face image is required." };
+  }
+
+  try {
+    // 1. Fetch all users with face encodings
+    // Optimize: In production, filter by expected email if available, or chunk.
+    const usersWithFace = await prisma.user.findMany({
+      where: {
+        faceEncoding: { not: null }
+      },
+      select: {
+        id: true,
+        faceEncoding: true,
+        email: true,
+        memberships: true, // Need memberships for login logic
+      }
+    });
+
+    if (usersWithFace.length === 0) {
+      return { message: "No users registered with face data." };
+    }
+
+    // 2. Prepare known data for Python service
+    const knownData = usersWithFace.map(u => {
+      try {
+        return {
+          userId: u.id,
+          encoding: JSON.parse(u.faceEncoding!)
+        };
+      } catch (e) {
+        return null;
+      }
+    }).filter(Boolean);
+
+    // 3. Call Python Verify Endpoint
+    const uploadData = new FormData();
+    uploadData.append("file", faceImage);
+    uploadData.append("known_data", JSON.stringify(knownData));
+
+    const res = await fetch(`${FACE_SERVICE_URL}/recognize`, {
+      method: "POST",
+      body: uploadData,
+    });
+
+    if (!res.ok) {
+      return { message: "Face recognition service error." };
+    }
+
+    const result = await res.json();
+
+    if (!result.match || !result.userId) {
+      return { message: "Face not recognized." };
+    }
+
+    // 4. Log the user in
+    const user = usersWithFace.find(u => u.id === result.userId);
+    if (!user) return { message: "User not found locally." };
+
+    let redirectPath = "/doctor";
+    let sessionPayload: { sub: string; workspaceId?: string; role?: string } = { sub: user.id };
+
+    if (user.memberships && user.memberships.length > 0) {
+      const defaultMembership = user.memberships[0];
+      sessionPayload.workspaceId = defaultMembership.workspaceId;
+      sessionPayload.role = defaultMembership.role;
+
+      if (defaultMembership.role === "OWNER" || defaultMembership.role === "ADMIN") {
+        redirectPath = "/admin";
+      } else {
+        redirectPath = "/doctor";
+      }
+    } else {
+      // User has no workspace. Default to DOCTOR role to allow access to onboarding.
+      sessionPayload.role = "DOCTOR";
+      redirectPath = "/doctor";
+    }
+
+    const alg = "HS256";
+    const jwt = await new SignJWT(sessionPayload)
+      .setProtectedHeader({ alg })
+      .setIssuedAt()
+      .setExpirationTime("15m")
+      .sign(secret);
+
+    const cookieStore = await cookies();
+    cookieStore.set("session", jwt, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 60 * 15,
+      path: "/",
+      sameSite: "lax",
+    });
+
+    redirect(redirectPath);
+
+  } catch (error) {
+    if ((error as Error).message === "NEXT_REDIRECT") {
+      throw error;
+    }
+    console.error("Face Login Error:", error);
+    // Since we called redirect, we might verify expected behavior. Next.js redirect throws error?
+    // "NEXT_REDIRECT" error type.
+    if (String(error).includes("NEXT_REDIRECT")) {
+      throw error;
+    }
+    return { message: "System error during face login." };
+  }
+}
+
+/**
+ * Retrieves the currently logged in user based on the session cookie.
+ */
+export async function getCurrentUser() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get("session")?.value;
+
+  if (!token) return null;
+
+  try {
+    const { payload } = await jwtVerify(token, secret);
+    const userId = payload.sub as string;
+    const workspaceId = payload.workspaceId as string | undefined;
+    const role = payload.role as string | undefined;
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true, email: true }
+    });
+
+    if (!user) return null;
+
+    return {
+      id: userId,
+      name: user.name,
+      email: user.email,
+      role: role?.toLowerCase() || "doctor",
+      avatar: user.name?.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2) || "U",
+      workspaceId: workspaceId,
+    };
+
+
+
+  } catch (error) {
+    return null;
+  }
+}
+
+/**
+ * Adds a user to the current user's workspace.
+ * Only accessible by OWNER.
+ */
+export async function addTeamMember(formData: FormData) {
+  const email = formData.get("email") as string;
+  const role = formData.get("role") as "ADMIN" | "DOCTOR";
+
+  if (!email || !role) return { message: "Email and role are required." };
+
+  try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser || currentUser.role !== "owner" || !currentUser.workspaceId) {
+      return { message: "Unauthorized. Only workspace owners can add members." };
+    }
+
+    const targetUser = await prisma.user.findUnique({
+      where: { email },
+      include: { memberships: true }
+    });
+
+    if (!targetUser) {
+      return { message: "User not found. Please ask them to sign up first." };
+    }
+
+    // Check if already in THIS workspace
+    const exists = targetUser.memberships.find(m => m.workspaceId === currentUser.workspaceId);
+    if (exists) {
+      return { message: "User is already a member of this workspace." };
+    }
+
+    // Check if in ANY workspace (for MVP maybe limit to 1?)
+    // if (targetUser.memberships.length > 0) { ... } // strict mode?
+    // Let's allow multiple for now or just add them.
+
+    await prisma.workspaceMember.create({
+      data: {
+        userId: targetUser.id,
+        workspaceId: currentUser.workspaceId,
+        role: role
+      }
+    });
+
+    return { success: true, message: "Member added successfully." };
+
+  } catch (error) {
+    console.error("Add Member Error:", error);
+    return { message: "Failed to add member." };
+  }
+}
+
+/**
+ * Removes a user from the workspace.
+ * Only accessible by OWNER.
+ */
+export async function removeTeamMember(userId: string) {
+  try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser || currentUser.role !== "owner" || !currentUser.workspaceId) {
+      return { message: "Unauthorized." };
+    }
+
+    if (userId === currentUser.email) { // Wait, userId is ID not email? Passed param.
+      // We need to resolve ID.
+      // Let's assume userId is the ID of the user to remove.
+      return { message: "Cannot remove yourself." };
+    }
+
+    // Verify target is in workspace
+    const targetMember = await prisma.workspaceMember.findUnique({
+      where: {
+        userId_workspaceId: {
+          userId,
+          workspaceId: currentUser.workspaceId
+        }
+      }
+    });
+
+    if (!targetMember) return { message: "Member not found in workspace." };
+    if (targetMember.role === "OWNER") return { message: "Cannot remove the owner." };
+
+    await prisma.workspaceMember.delete({
+      where: {
+        userId_workspaceId: {
+          userId,
+          workspaceId: currentUser.workspaceId
+        }
+      }
+    });
+
+    return { success: true, message: "Member removed." };
+
+  } catch (error) {
+    console.error("Remove Member Error:", error);
+    return { message: "Failed to remove member." };
+  }
+}
+
+/**
+ * Fetches all members of the current user's workspace.
+ */
+export async function getTeamMembers() {
+  try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser || !currentUser.workspaceId) return [];
+
+    const members = await prisma.workspaceMember.findMany({
+      where: { workspaceId: currentUser.workspaceId },
+      include: {
+        user: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            medicalLicenseId: true
+          }
+        }
+      },
+      orderBy: { role: 'asc' } // OWNER first usually, or just alphabetical
+    });
+
+    return members.map(m => ({
+      userId: m.userId,
+      role: m.role,
+      name: m.user.name,
+      email: m.user.email,
+      licenseId: m.user.medicalLicenseId
+    }));
+  } catch (error) {
+    console.error("Get Team Error:", error);
+    return [];
+  }
+}
+
+/**
+ * Creates a new workspace and makes the current user the OWNER.
+ */
+export async function createWorkspace(prevState: any, formData: FormData) {
+  const workspaceName = formData.get("workspaceName") as string;
+  if (!workspaceName || workspaceName.length < 3) {
+    return { success: false, message: "Workspace name must be at least 3 characters." };
+  }
+
+  try {
+    const currentUser = await getCurrentUser();
+
+    // Check if user is logged in
+    const cookieStore = await cookies();
+    const token = cookieStore.get("session")?.value;
+    if (!token) return { success: false, message: "Not authenticated." };
+    const { payload } = await jwtVerify(token, secret);
+    const userId = payload.sub as string;
+
+    // Slugify
+    const slug = workspaceName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+
+    // Check slug uniqueness
+    const existing = await prisma.workspace.findUnique({ where: { slug } });
+    if (existing) {
+      return { success: false, message: "Workspace name taken." };
+    }
+
+    const newWorkspace = await prisma.$transaction(async (tx) => {
+      const w = await tx.workspace.create({
+        data: {
+          name: workspaceName,
+          slug,
+          ownerId: userId
+        }
+      });
+
+      await tx.workspaceMember.create({
+        data: {
+          userId: userId,
+          workspaceId: w.id,
+          role: "OWNER"
+        }
+      });
+      return w;
+    });
+
+    // Update Session to include new workspace
+    // We can't update the cookie easily here without rewriting it.
+    // Simplest approach: Logout and force login or just redirect to login?
+    // Better: Issue new token.
+
+    const sessionPayload = { sub: userId, workspaceId: newWorkspace.id, role: "OWNER" };
+    const alg = "HS256";
+    const jwt = await new SignJWT(sessionPayload)
+      .setProtectedHeader({ alg })
+      .setIssuedAt()
+      .setExpirationTime("15m")
+      .sign(secret);
+
+    cookieStore.set("session", jwt, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 60 * 15,
+      path: "/",
+      sameSite: "lax",
+    });
+
+    return { success: true };
+
+  } catch (error) {
+    console.error("Create Workspace Error:", error);
+    return { success: false, message: "Failed to create workspace." };
+  }
+}
+
+/**
+ * Requests to join an existing workspace by Slug.
+ */
+export async function requestJoinWorkspace(prevState: any, formData: FormData) {
+  const slug = formData.get("workspaceSlug") as string;
+  if (!slug) return { success: false, message: "Workspace identifier required." };
+
+  try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get("session")?.value;
+    if (!token) return { success: false, message: "Not authenticated." };
+    const { payload } = await jwtVerify(token, secret);
+    const userId = payload.sub as string;
+
+    const workspace = await prisma.workspace.findUnique({ where: { slug } });
+    let targetId = workspace?.id;
+
+    if (!workspace) {
+      // Try searching by name if slug fails? simple match
+      const byName = await prisma.workspace.findFirst({ where: { name: slug } });
+      if (!byName) return { success: false, message: "Workspace not found." };
+      // use mapped one
+      targetId = byName.id;
+    }
+
+    if (!targetId) return { success: false, message: "Workspace not found." };
+
+    // Check if already a member
+    const existingMember = await prisma.workspaceMember.findUnique({
+      where: { userId_workspaceId: { userId, workspaceId: targetId } }
+    });
+    if (existingMember) return { success: false, message: "You are already a member." };
+
+    // Check if pending request exists
+    const existingReq = await prisma.joinRequest.findUnique({
+      where: { userId_workspaceId: { userId, workspaceId: targetId } }
+    });
+    if (existingReq) return { success: false, message: "Request already pending." };
+
+    await prisma.joinRequest.create({
+      data: {
+        userId,
+        workspaceId: targetId,
+        status: "PENDING"
+      }
+    });
+
+    return { success: true, message: "Request sent successfully." };
+
+  } catch (error) {
+    console.error("Join Request Error:", error);
+    return { success: false, message: "Failed to send request." };
+  }
+}
+
+/**
+ * Resolves a Join Request (Accept/Reject).
+ * Only OWNER.
+ */
+export async function resolveJoinRequest(requestId: string, action: "ACCEPT" | "REJECT") {
+  try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser || currentUser.role !== "owner" || !currentUser.workspaceId) {
+      return { message: "Unauthorized." };
+    }
+
+    const request = await prisma.joinRequest.findUnique({
+      where: { id: requestId },
+      include: { user: true } // Need user info for new member role?
+    });
+
+    if (!request) return { message: "Request not found." };
+    if (request.workspaceId !== currentUser.workspaceId) return { message: "Unauthorized." };
+
+    if (action === "REJECT") {
+      await prisma.joinRequest.delete({ where: { id: requestId } });
+      return { success: true, message: "Request rejected." };
+    }
+
+    if (action === "ACCEPT") {
+      await prisma.$transaction(async (tx) => {
+        // Add as Doctor by default? Or Admin?
+        // Let's default to DOCTOR for safety, Owner can promote later if we impl that.
+        // Or maybe the request should specify? Schema doesn't have it.
+        // Default to DOCTOR.
+        await tx.workspaceMember.create({
+          data: {
+            userId: request.userId,
+            workspaceId: request.workspaceId,
+            role: "DOCTOR"
+          }
+        });
+        await tx.joinRequest.delete({ where: { id: requestId } });
+      });
+      return { success: true, message: "Member accepted." };
+    }
+
+  } catch (error) {
+    console.error("Resolve Request Error:", error);
+    return { message: "Operation failed." };
+  }
+}
+
+/**
+ * Get Pending Join Requests for the current workspace.
+ */
+export async function getJoinRequests() {
+  try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser || currentUser.role !== "owner" || !currentUser.workspaceId) return [];
+
+    const requests = await prisma.joinRequest.findMany({
+      where: { workspaceId: currentUser.workspaceId, status: "PENDING" },
+      include: { user: true }
+    });
+
+    return requests.map(r => ({
+      id: r.id,
+      user: {
+        name: r.user.name,
+        email: r.user.email
+      },
+      createdAt: r.createdAt
+    }));
+
+  } catch (error) {
+    return [];
+  }
+}
+
+/**
+ * Get Workspaces owned or joined by the current user for switching.
+ */
+export async function getUserWorkspaces() {
+  try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) return [];
+
+    const memberships = await prisma.workspaceMember.findMany({
+      where: { userId: currentUser.id },
+      include: { workspace: true }
+    });
+
+    return memberships.map(m => ({
+      id: m.workspace.id,
+      name: m.workspace.name,
+      role: m.role,
+      slug: m.workspace.slug,
+      active: m.workspace.id === currentUser.workspaceId
+    }));
+  } catch (error) {
+    return [];
+  }
+}
+
+/**
+ * Search users by name or email.
+ * Excludes current workspace members.
+ */
+export async function searchUsers(query: string) {
+  try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser?.workspaceId) return [];
+
+    const workspaceMembers = await prisma.workspaceMember.findMany({
+      where: { workspaceId: currentUser.workspaceId },
+      select: { userId: true }
+    });
+    const memberIds = workspaceMembers.map(m => m.userId);
+
+    const users = await prisma.user.findMany({
+      where: {
+        AND: [
+          {
+            OR: [
+              { name: { contains: query } },
+              { email: { contains: query } }
+            ]
+          },
+          { id: { notIn: memberIds } }
+        ]
+      },
+      select: { id: true, name: true, email: true, role: true },
+      take: 10
+    });
+
+    return users;
+  } catch (error) {
+    console.error("Search Error:", error);
+    return [];
+  }
+}
+
+/**
+ * Invite a user to the workspace.
+ * Uses their global role to determine workspace role.
+ */
+export async function inviteUser(userId: string) {
+  try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser || currentUser.role !== "owner" || !currentUser.workspaceId) {
+      return { success: false, message: "Unauthorized." };
+    }
+
+    const targetUser = await prisma.user.findUnique({ where: { id: userId } });
+    if (!targetUser) return { success: false, message: "User not found." };
+
+    let workspaceRole = "DOCTOR";
+    if (targetUser.role === "ADMIN") workspaceRole = "ADMIN";
+    // Radiologist -> DOCTOR
+
+    await prisma.workspaceMember.create({
+      data: {
+        userId,
+        workspaceId: currentUser.workspaceId,
+        role: workspaceRole
+      }
+    });
+
+    return { success: true, message: "User added successfully." };
+  } catch (error) {
+    console.error("Invite Error:", error);
+    return { success: false, message: "Failed to add user." };
+  }
+}
+
+/**
+ * Switch active workspace session.
+ */
+export async function switchWorkspace(workspaceId: string) {
+  try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) return { success: false, message: "Not authenticated" };
+
+    // Verify membership
+    const membership = await prisma.workspaceMember.findUnique({
+      where: { userId_workspaceId: { userId: currentUser.id, workspaceId } }
+    });
+
+    if (!membership) {
+      return { success: false, message: "You are not a member of this workspace." };
+    }
+
+    // Create new session
+    const sessionPayload = {
+      sub: currentUser.id,
+      workspaceId: membership.workspaceId,
+      role: membership.role
+    };
+
+    const alg = "HS256";
+    const jwt = await new SignJWT(sessionPayload)
+      .setProtectedHeader({ alg })
+      .setIssuedAt()
+      .setExpirationTime("1day") // Longer session
+      .sign(secret);
+
+    const cookieStore = await cookies();
+    cookieStore.set("session", jwt, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 60 * 60 * 24, // 1 day
+      path: "/",
+      sameSite: "lax",
+    });
+
+    return { success: true };
+  } catch (error) {
+    return { success: false, message: "Failed to switch workspace" };
+  }
 }

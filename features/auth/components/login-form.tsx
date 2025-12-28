@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useActionState } from "react";
-import { loginUser } from "@/actions/auth-actions";
+import { useState, useActionState, startTransition } from "react";
+import { loginUser, loginUserWithFace } from "@/actions/auth-actions";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Mail, Lock, ArrowRight, Loader2, AlertCircle } from "lucide-react";
+import { Mail, Lock, ArrowRight, Loader2, AlertCircle, ScanFace } from "lucide-react";
+import { FaceCapture } from "./face-capture";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
@@ -24,8 +25,14 @@ const initialState = {
  */
 
 export function LoginForm() {
-    // <--- CHANGED: useActionState returns [state, action, isPending]
+    // Standard Login
     const [state, formAction, isPending] = useActionState(loginUser, initialState);
+    // Face Login
+    const [faceState, faceAction, isFacePending] = useActionState(loginUserWithFace, initialState);
+
+    // Toggle Mode
+    const [mode, setMode] = useState<"email" | "face">("email");
+
     const searchParams = useSearchParams();
     const isSuccess = searchParams.get("success") === "true";
 
@@ -85,81 +92,143 @@ export function LoginForm() {
                 </div>
             )}
 
-            <form action={handleSubmit} className="space-y-6">
-                <div className="space-y-2">
-                    <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 tracking-wider uppercase ml-1">
-                        Institutional Email
-                    </label>
-                    <Input
-                        name="email"
-                        type="email"
-                        value={email}
-                        onChange={(e) => {
-                            const val = e.target.value;
-                            setEmail(val);
-                            validateField("email", val);
-                        }}
-                        placeholder="doctor@hospital.org"
-                        icon={<Mail className="w-4 h-4 text-slate-400" />}
-                        className={`bg-slate-50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 h-12 rounded-xl focus-visible:ring-blue-600 ${errors.email ? "border-red-500 focus-visible:ring-red-500" : ""
-                            }`}
-                        required
-                    />
-                    {errors.email && (
-                        <p className="text-xs text-red-500 font-medium ml-1 animate-in slide-in-from-top-1 fade-in duration-200">
-                            {errors.email}
-                        </p>
-                    )}
+            {faceState?.message && mode === "face" && (
+                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-600 dark:text-red-400 text-sm flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4" />
+                    {faceState.message}
                 </div>
+            )}
 
-                <div className="space-y-2">
-                    <div className="flex items-center justify-between ml-1">
-                        <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 tracking-wider uppercase">
-                            Password
+            {/* Mode Toggles */}
+            <div className="flex p-1 bg-slate-100 dark:bg-slate-900 rounded-xl">
+                <button
+                    type="button"
+                    onClick={() => setMode("email")}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-xs font-semibold rounded-lg transition-all ${mode === "email"
+                        ? "bg-white dark:bg-slate-800 text-blue-600 shadow-sm"
+                        : "text-slate-500 dark:text-slate-400 hover:text-slate-700"
+                        }`}
+                >
+                    <Mail className="w-3.5 h-3.5" />
+                    Email Login
+                </button>
+                <button
+                    type="button"
+                    onClick={() => setMode("face")}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-xs font-semibold rounded-lg transition-all ${mode === "face"
+                        ? "bg-white dark:bg-slate-800 text-blue-600 shadow-sm"
+                        : "text-slate-500 dark:text-slate-400 hover:text-slate-700"
+                        }`}
+                >
+                    <ScanFace className="w-3.5 h-3.5" />
+                    Face Login
+                </button>
+            </div>
+
+            {mode === "email" ? (
+                <form action={handleSubmit} className="space-y-6">
+                    <div className="space-y-2">
+                        <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 tracking-wider uppercase ml-1">
+                            Institutional Email
                         </label>
-                        <Link
-                            href="#"
-                            className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 hover:underline"
-                        >
-                            Forgot Password?
-                        </Link>
+                        <Input
+                            name="email"
+                            type="email"
+                            value={email}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                setEmail(val);
+                                validateField("email", val);
+                            }}
+                            placeholder="doctor@hospital.org"
+                            icon={<Mail className="w-4 h-4 text-slate-400" />}
+                            className={`bg-slate-50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 h-12 rounded-xl focus-visible:ring-blue-600 ${errors.email ? "border-red-500 focus-visible:ring-red-500" : ""
+                                }`}
+                            required
+                        />
+                        {errors.email && (
+                            <p className="text-xs text-red-500 font-medium ml-1 animate-in slide-in-from-top-1 fade-in duration-200">
+                                {errors.email}
+                            </p>
+                        )}
                     </div>
-                    <Input
-                        name="password"
-                        type="password"
-                        value={password}
-                        onChange={(e) => {
-                            const val = e.target.value;
-                            setPassword(val);
-                            validateField("password", val);
-                        }}
-                        placeholder="••••••••"
-                        icon={<Lock className="w-4 h-4 text-slate-400" />}
-                        className={`bg-slate-50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 h-12 rounded-xl focus-visible:ring-blue-600 ${errors.password ? "border-red-500 focus-visible:ring-red-500" : ""
-                            }`}
-                        required
-                    />
-                    {errors.password && (
-                        <p className="text-xs text-red-500 font-medium ml-1 animate-in slide-in-from-top-1 fade-in duration-200">
-                            {errors.password}
-                        </p>
-                    )}
-                </div>
 
-                {/* 
+                    <div className="space-y-2">
+                        <div className="flex items-center justify-between ml-1">
+                            <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 tracking-wider uppercase">
+                                Password
+                            </label>
+                            <Link
+                                href="#"
+                                className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 hover:underline"
+                            >
+                                Forgot Password?
+                            </Link>
+                        </div>
+                        <Input
+                            name="password"
+                            type="password"
+                            value={password}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                setPassword(val);
+                                validateField("password", val);
+                            }}
+                            placeholder="••••••••"
+                            icon={<Lock className="w-4 h-4 text-slate-400" />}
+                            className={`bg-slate-50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 h-12 rounded-xl focus-visible:ring-blue-600 ${errors.password ? "border-red-500 focus-visible:ring-red-500" : ""
+                                }`}
+                            required
+                        />
+                        {errors.password && (
+                            <p className="text-xs text-red-500 font-medium ml-1 animate-in slide-in-from-top-1 fade-in duration-200">
+                                {errors.password}
+                            </p>
+                        )}
+                    </div>
+
+                    {/* 
            We can now use the `isPending` from useActionState directly 
            instead of the complex separate component with useFormStatus 
         */}
-                <Button
-                    type="submit"
-                    disabled={isPending}
-                    className="w-full bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/20 h-12 text-sm font-semibold rounded-xl transition-all active:scale-[0.98] flex items-center justify-center gap-2"
-                >
-                    {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
-                    {isPending ? "Signing In..." : "Sign In"}
-                    {!isPending && <ArrowRight className="w-4 h-4" />}
-                </Button>
-            </form>
+                    <Button
+                        type="submit"
+                        disabled={isPending}
+                        className="w-full bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/20 h-12 text-sm font-semibold rounded-xl transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                    >
+                        {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+                        {isPending ? "Signing In..." : "Sign In"}
+                        {!isPending && <ArrowRight className="w-4 h-4" />}
+                    </Button>
+                </form>
+            ) : (
+                <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
+                    <div className="text-center space-y-2">
+                        <h3 className="font-semibold text-slate-900 dark:text-white">Authenticate with Face ID</h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">
+                            Look at the camera to verify your identity.
+                        </p>
+                    </div>
+
+                    <FaceCapture
+                        label={isFacePending ? "Verifying..." : "Scan Face to Login"}
+                        onCapture={(file) => {
+                            const fd = new FormData();
+                            fd.append("faceImage", file);
+                            startTransition(() => {
+                                faceAction(fd);
+                            });
+                        }}
+                    />
+
+                    {isFacePending && (
+                        <div className="flex items-center justify-center gap-2 text-blue-600 text-sm font-medium">
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Verifying Biometrics...
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 }
