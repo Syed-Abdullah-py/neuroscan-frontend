@@ -35,6 +35,7 @@ type UserSummary = {
   email: string;
   avatar: string;
   role?: string;
+  globalRole?: string;
 };
 
 // Add workspaces prop
@@ -47,7 +48,7 @@ export function Sidebar({ role = "admin", user, workspaces = [] }: { role?: "adm
     <aside className="hidden md:flex flex-col w-64 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 h-screen fixed left-0 top-0 z-40">
       {/* Header with Workspace Switcher */}
       <div className="h-20 flex items-center px-4 border-b border-slate-200 dark:border-slate-800">
-        <WorkspaceSwitcher items={workspaces} />
+        <WorkspaceSwitcher items={workspaces} userRole={user?.globalRole} />
       </div>
 
       {/* Navigation */}
@@ -87,7 +88,7 @@ export function Sidebar({ role = "admin", user, workspaces = [] }: { role?: "adm
             <p className="text-sm font-medium text-slate-900 dark:text-white truncate">{user?.name || "User"}</p>
             <div className="flex items-center gap-1.5">
               <span className="text-[10px] uppercase font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded">
-                {user?.role || "USER"}
+                {user?.globalRole || user?.role || "USER"}
               </span>
             </div>
           </div>

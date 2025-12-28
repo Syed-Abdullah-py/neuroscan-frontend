@@ -210,16 +210,19 @@ export function LoginForm() {
                         </p>
                     </div>
 
-                    <FaceCapture
-                        label={isFacePending ? "Verifying..." : "Scan Face to Login"}
-                        onCapture={(file) => {
-                            const fd = new FormData();
-                            fd.append("faceImage", file);
-                            startTransition(() => {
-                                faceAction(fd);
-                            });
-                        }}
-                    />
+                    {!isFacePending ? (
+                        <FaceCapture
+                            label="Scan Face to Login"
+                            shouldStop={isFacePending}
+                            onCapture={(file) => {
+                                const fd = new FormData();
+                                fd.append("faceImage", file);
+                                startTransition(() => {
+                                    faceAction(fd);
+                                });
+                            }}
+                        />
+                    ) : null}
 
                     {isFacePending && (
                         <div className="flex items-center justify-center gap-2 text-blue-600 text-sm font-medium">

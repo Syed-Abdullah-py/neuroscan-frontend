@@ -19,8 +19,9 @@ interface WorkspaceSwitcherProps {
 
 export default function WorkspaceSwitcher({
     className,
-    items = []
-}: WorkspaceSwitcherProps) {
+    items = [],
+    userRole
+}: WorkspaceSwitcherProps & { userRole?: string }) {
     const router = useRouter();
     const [open, setOpen] = useState(false);
     const [isPending, startTransition] = useTransition();
@@ -97,15 +98,18 @@ export default function WorkspaceSwitcher({
 
                     <div className="h-px bg-slate-100 dark:bg-slate-800 my-1" />
 
-                    <button
-                        onClick={() => router.push("/onboarding?mode=create")}
-                        className="w-full flex items-center gap-2 px-2 py-2 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors font-medium"
-                    >
-                        <div className="w-6 h-6 rounded-md flex items-center justify-center bg-blue-100 dark:bg-blue-900/40">
-                            <Plus className="h-3.5 w-3.5" />
-                        </div>
-                        Create Workspace
-                    </button>
+                    {/* Check GLOBAL role for creation permission */}
+                    {(userRole === "ADMIN" || userRole === "OWNER") && (
+                        <button
+                            onClick={() => router.push("/onboarding?mode=create")}
+                            className="w-full flex items-center gap-2 px-2 py-2 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors font-medium"
+                        >
+                            <div className="w-6 h-6 rounded-md flex items-center justify-center bg-blue-100 dark:bg-blue-900/40">
+                                <Plus className="h-3.5 w-3.5" />
+                            </div>
+                            Create Workspace
+                        </button>
+                    )}
                 </div>
             )}
         </div>
