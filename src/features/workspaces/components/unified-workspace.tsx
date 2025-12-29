@@ -4,9 +4,12 @@ import { useState } from "react";
 import { WorkspaceManager } from "./workspace-manager";
 import { WorkspaceSettings } from "@/features/admin/components/workspace-settings";
 import { TeamManagement } from "@/features/admin/components/team-management";
-import { Building2, Settings, Users, Copy, Check, LayoutDashboard, ChevronRight } from "lucide-react";
+import { Building2, Settings, Users, Copy, Check, LayoutDashboard, ChevronRight, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
+import { JoinRequestsList } from "@/features/admin/components/join-requests-list";
+import { InvitationsList } from "./invitations-list";
+import { useRouter } from "next/navigation";
 
 interface UnifiedWorkspaceProps {
     user: {
@@ -19,11 +22,15 @@ interface UnifiedWorkspaceProps {
     workspaces: any[];
     currentWorkspaceName?: string;
     members?: any[];
+    joinRequests?: any[]; // Received requests (Admin view)
+    invitations?: any[]; // Sent TO the user
+    sentInvitations?: any[]; // Sent BY this workspace
 }
 
-export function UnifiedWorkspace({ user, workspaces, currentWorkspaceName, members = [] }: UnifiedWorkspaceProps) {
+export function UnifiedWorkspace({ user, workspaces, currentWorkspaceName, members = [], joinRequests = [], invitations = [], sentInvitations = [] }: UnifiedWorkspaceProps) {
     const [activeTab, setActiveTab] = useState<"overview" | "members" | "settings">("overview");
     const [copied, setCopied] = useState(false);
+    const router = useRouter();
 
     // Resolve permissions for the CURRENT active workspace
     const currentMembership = workspaces.find(w => w.id === user.workspaceId);
@@ -41,9 +48,9 @@ export function UnifiedWorkspace({ user, workspaces, currentWorkspaceName, membe
     };
 
     return (
-        <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
             {/* Left Sidebar: Workspace List */}
-            <div className="xl:col-span-4 space-y-6 sticky top-6">
+            <div className="xl:col-span-3 space-y-6 sticky top-6">
                 <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-black/20 overflow-hidden">
                     <div className="p-6 pb-2">
                         <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-1">Workspaces</h3>
@@ -59,8 +66,8 @@ export function UnifiedWorkspace({ user, workspaces, currentWorkspaceName, membe
                 </div>
             </div>
 
-            {/* Right Content: Active Workspace Details */}
-            <div className="xl:col-span-8">
+            {/* Center Content: Active Workspace Details */}
+            <div className="xl:col-span-6 order-last xl:order-0">
                 <AnimatePresence mode="wait">
                     {user.workspaceId ? (
                         <motion.div
@@ -112,20 +119,18 @@ export function UnifiedWorkspace({ user, workspaces, currentWorkspaceName, membe
                                         Overview
                                     </button>
 
-                                    {isAdmin && (
-                                        <button
-                                            onClick={() => setActiveTab("members")}
-                                            className={cn(
-                                                "px-5 py-2.5 rounded-full text-sm font-semibold transition-all flex items-center gap-2 whitespace-nowrap",
-                                                activeTab === "members"
-                                                    ? "bg-slate-900 text-white shadow-lg shadow-slate-900/20 dark:bg-white dark:text-slate-900"
-                                                    : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-                                            )}
-                                        >
-                                            <Users size={16} />
-                                            Members
-                                        </button>
-                                    )}
+                                    <button
+                                        onClick={() => setActiveTab("members")}
+                                        className={cn(
+                                            "px-5 py-2.5 rounded-full text-sm font-semibold transition-all flex items-center gap-2 whitespace-nowrap",
+                                            activeTab === "members"
+                                                ? "bg-slate-900 text-white shadow-lg shadow-slate-900/20 dark:bg-white dark:text-slate-900"
+                                                : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+                                        )}
+                                    >
+                                        <Users size={16} />
+                                        Members
+                                    </button>
 
                                     {isOwner && (
                                         <button
@@ -181,7 +186,7 @@ export function UnifiedWorkspace({ user, workspaces, currentWorkspaceName, membe
                                 )}
 
 
-                                {activeTab === "members" && isAdmin && (
+                                {activeTab === "members" && (
                                     <motion.div
                                         initial={{ opacity: 0, x: 20 }}
                                         animate={{ opacity: 1, x: 0 }}
@@ -225,11 +230,74 @@ export function UnifiedWorkspace({ user, workspaces, currentWorkspaceName, membe
                             <p className="text-slate-500 max-w-sm mx-auto leading-relaxed">
                                 Select a workspace from the list on the left to view details, or create a new one to get started.
                             </p>
+                            <button
+                                onClick={() => router.push("?action=join")}
+                                className="mt-6 px-6 py-3 rounded-xl bg-slate-900 text-white dark:bg-white dark:text-slate-900 font-bold text-sm shadow-lg hover:opacity-90 transition-all"
+                            >
+                                Join a Workspace
+                            </button>
                         </motion.div>
                     )
                     }
                 </AnimatePresence >
             </div >
+
+            {/* Right Sidebar: Requests & Invitations */}
+            <div className="xl:col-span-3 space-y-6 sticky top-6">
+                {/* Requests first for Admin */}
+                {isAdmin && (
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-black/20 overflow-hidden p-6">
+                        <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-4 flex items-center justify-between">
+                            Received Requests
+                            <button
+                                onClick={() => router.refresh()}
+                                className="p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors rounded-full hover:bg-slate-100 dark:hover:bg-slate-800"
+                                title="Refresh"
+                            >
+                                <RefreshCw size={14} />
+                            </button>
+                        </h4>
+                        <JoinRequestsList requests={joinRequests} currentUserEmail={user.email} />
+
+                        {isAdmin && sentInvitations.length > 0 && (
+                            <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800">
+                                <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">
+                                    Pending Sent Invitations
+                                </h5>
+                                <div className="space-y-2">
+                                    {sentInvitations.map(inv => (
+                                        <div key={inv.id} className="flex items-center justify-between text-xs p-2 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-100 dark:border-slate-800">
+                                            <span className="font-medium text-slate-600 dark:text-slate-400 truncate max-w-[120px]">
+                                                {inv.email}
+                                            </span>
+                                            <span className="px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[10px] font-bold uppercase">
+                                                {inv.role}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Workspace Invitations */}
+                <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-black/20 overflow-hidden p-6">
+                    <div className="flex items-center justify-between mb-4">
+                        <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                            Workspace Invitations
+                        </h4>
+                        <button
+                            onClick={() => router.refresh()}
+                            className="p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors rounded-full hover:bg-slate-100 dark:hover:bg-slate-800"
+                            title="Refresh"
+                        >
+                            <RefreshCw size={14} />
+                        </button>
+                    </div>
+                    <InvitationsList invitations={invitations} />
+                </div>
+            </div>
         </div >
     );
 }

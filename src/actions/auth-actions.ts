@@ -723,12 +723,38 @@ export async function resolveJoinRequest(requestId: string, action: "ACCEPT" | "
 }
 
 /**
+ * Get Join Requests sent BY the current user.
+ */
+export async function getMySentJoinRequests() {
+  try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) return [];
+
+    const requests = await prisma.joinRequest.findMany({
+      where: { userId: currentUser.id },
+      include: { workspace: true },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    return requests.map(r => ({
+      id: r.id,
+      workspaceName: r.workspace.name,
+      status: r.status,
+      createdAt: r.createdAt
+    }));
+
+  } catch (error) {
+    return [];
+  }
+}
+
+/**
  * Get Pending Join Requests for the current workspace.
  */
 export async function getJoinRequests() {
   try {
     const currentUser = await getCurrentUser();
-    if (!currentUser || currentUser.role !== "owner" || !currentUser.workspaceId) return [];
+    if (!currentUser || !currentUser.workspaceId) return [];
 
     const requests = await prisma.joinRequest.findMany({
       where: { workspaceId: currentUser.workspaceId, status: "PENDING" },
@@ -838,7 +864,7 @@ export async function leaveWorkspace(workspaceId: string) {
     const currentUser = await getCurrentUser();
     if (!currentUser) return { message: "Not authenticated." };
 
-    // Prevent OWNER from leaving without transferring ownership (simplified for now: just block)
+    // Prevent OWNER from leaving without transferring ownership
     const membership = await prisma.workspaceMember.findUnique({
       where: {
         userId_workspaceId: {
@@ -863,9 +889,65 @@ export async function leaveWorkspace(workspaceId: string) {
       }
     });
 
-    // If the user left their *current* active workspace context, we need to handle that.
-    // The session update logic is tricky client-side, but ideally we'd refresh.
-    // For now, return success and let client handle redirect/refresh.
+    // --- SESSION UPDATE LOGIC ---
+    // If we left the *active* workspace, we must update the session cookie.
+    const cookieStore = await cookies();
+    const token = cookieStore.get("session")?.value;
+
+    if (token) {
+      try {
+        const { payload } = await jwtVerify(token, secret);
+
+        // Check if the current session workspace matches the one we just left
+        if (payload.workspaceId === workspaceId) {
+
+          // Fetch user again to see remaining memberships
+          const userWithMemberships = await prisma.user.findUnique({
+            where: { id: currentUser.id },
+            include: { memberships: true }
+          });
+
+          if (userWithMemberships) {
+            let newWorkspaceId: string | undefined = undefined;
+            let newRole = userWithMemberships.role === "ADMIN" ? "ADMIN" : "DOCTOR"; // Default to global role
+
+            // If other memberships exist, pick the best one
+            if (userWithMemberships.memberships.length > 0) {
+              const nextBest = userWithMemberships.memberships.find(m => m.role === "OWNER") ||
+                userWithMemberships.memberships.find(m => m.role === "ADMIN") ||
+                userWithMemberships.memberships[0];
+              newWorkspaceId = nextBest.workspaceId;
+              newRole = nextBest.role;
+            }
+
+            // Generate NEW Token
+            const sessionPayload = {
+              sub: currentUser.id,
+              workspaceId: newWorkspaceId,
+              role: newRole
+            };
+
+            const alg = "HS256";
+            const jwt = await new SignJWT(sessionPayload)
+              .setProtectedHeader({ alg })
+              .setIssuedAt()
+              .setExpirationTime("24h")
+              .sign(secret);
+
+            cookieStore.set("session", jwt, {
+              httpOnly: true,
+              secure: process.env.NODE_ENV === "production",
+              maxAge: 60 * 60 * 24, // 24 hours
+              path: "/",
+              sameSite: "lax",
+            });
+          }
+        }
+      } catch (e) {
+        console.error("Session update failed during leave:", e);
+        // Fallback: Just return success, client might need to re-login if token invalid
+      }
+    }
 
     return { success: true, message: "Left workspace successfully." };
 
@@ -971,6 +1053,30 @@ export async function getMyInvitations() {
       workspaceName: i.workspace.name,
       role: i.role,
       sentAt: i.expiresAt // Actually we don't store sentAt, using expiresAt for now or just ID
+    }));
+  } catch (error) {
+    return [];
+  }
+}
+
+/**
+ * Get pending invitations SENT BY the current workspace.
+ */
+export async function getWorkspaceInvitations() {
+  try {
+    const user = await getCurrentUser();
+    if (!user || !user.workspaceId) return [];
+
+    const invites = await prisma.invitation.findMany({
+      where: { workspaceId: user.workspaceId },
+      orderBy: { expiresAt: 'desc' }
+    });
+
+    return invites.map(i => ({
+      id: i.id,
+      email: i.email,
+      role: i.role,
+      expiresAt: i.expiresAt
     }));
   } catch (error) {
     return [];

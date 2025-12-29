@@ -1,4 +1,4 @@
-import { getCurrentUser, getUserWorkspaces, getTeamMembers } from "@/actions/auth-actions";
+import { getCurrentUser, getUserWorkspaces, getTeamMembers, getJoinRequests, getMyInvitations, getWorkspaceInvitations } from "@/actions/auth-actions"; // Added getJoinRequests
 import { UnifiedWorkspace } from "@/features/workspaces/components/unified-workspace";
 import { CameraCleanup } from "@/components/camera-cleanup";
 
@@ -9,6 +9,12 @@ export default async function AdminWorkspacesPage() {
     // Fetch members if active workspace
     const members = user?.workspaceId ? await getTeamMembers() : [];
 
+
+
+    // Fetch join requests if active workspace
+    const joinRequests = user?.workspaceId ? await getJoinRequests() : [];
+    const invitations = await getMyInvitations();
+    const sentInvitations = user?.workspaceId ? await getWorkspaceInvitations() : [];
     // Get current workspace name
     const currentWorkspaceName = workspaces.find(w => w.id === user?.workspaceId)?.name;
 
@@ -29,6 +35,9 @@ export default async function AdminWorkspacesPage() {
                 workspaces={workspaces}
                 currentWorkspaceName={currentWorkspaceName}
                 members={members}
+                joinRequests={joinRequests}
+                invitations={invitations}
+                sentInvitations={sentInvitations}
             />
         </div>
     );

@@ -1,4 +1,4 @@
-import { getCurrentUser, getUserWorkspaces, getTeamMembers } from "@/actions/auth-actions";
+import { getCurrentUser, getUserWorkspaces, getTeamMembers, getJoinRequests, getMyInvitations, getWorkspaceInvitations } from "@/actions/auth-actions";
 import { UnifiedWorkspace } from "@/features/workspaces/components/unified-workspace";
 
 export default async function DoctorWorkspacesPage() {
@@ -8,6 +8,12 @@ export default async function DoctorWorkspacesPage() {
     // Doctors might see members (read only) or just list. Component handles this.
     // We pass members so they see the count or list if allowed.
     const members = user?.workspaceId ? await getTeamMembers() : [];
+
+    // Fetch join requests in case the doctor is an admin of this workspace
+    // (A user can be Global Doctor but Workspace Admin)
+    const joinRequests = user?.workspaceId ? await getJoinRequests() : [];
+    const invitations = await getMyInvitations();
+    const sentInvitations = user?.workspaceId ? await getWorkspaceInvitations() : [];
 
     const currentWorkspaceName = workspaces.find(w => w.id === user?.workspaceId)?.name;
 
@@ -27,6 +33,9 @@ export default async function DoctorWorkspacesPage() {
                 workspaces={workspaces}
                 currentWorkspaceName={currentWorkspaceName}
                 members={members}
+                joinRequests={joinRequests}
+                invitations={invitations}
+                sentInvitations={sentInvitations}
             />
         </div>
     );

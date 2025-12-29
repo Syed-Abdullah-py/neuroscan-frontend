@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, X, User } from "lucide-react";
+import { Check, X, User, RefreshCw } from "lucide-react";
 import { resolveJoinRequest } from "@/actions/auth-actions";
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
@@ -33,8 +33,10 @@ export function JoinRequestsList({ requests, currentUserEmail }: JoinRequestsLis
 
     if (requests.length === 0) {
         return (
-            <div className="text-center py-8 text-slate-500 dark:text-slate-400 text-sm">
-                No pending requests.
+            <div className="space-y-3">
+                <div className="text-center py-8 text-slate-500 dark:text-slate-400 text-sm">
+                    No pending requests.
+                </div>
             </div>
         );
     }

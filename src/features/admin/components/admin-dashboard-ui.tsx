@@ -95,33 +95,6 @@ export function AdminDashboardUI({ user, joinRequests, workspaces }: AdminDashbo
                         </div>
                     )}
                 </div>
-
-                {/* Right Sidebar Area */}
-                <div className="space-y-6">
-
-                    {/* Join Requests Card */}
-                    {user.workspaceId && (
-                        <motion.div
-                            initial={{ opacity: 0, x: 20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: 0.5 }}
-                            className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-5 shadow-sm"
-                        >
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                                    <UserPlus className="w-4 h-4 text-blue-500" />
-                                    Join Requests
-                                </h3>
-                                {joinRequests.length > 0 && (
-                                    <span className="bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 text-xs font-bold px-2 py-0.5 rounded-full">
-                                        {joinRequests.length}
-                                    </span>
-                                )}
-                            </div>
-                            <JoinRequestsList requests={joinRequests} currentUserEmail={user.email!} />
-                        </motion.div>
-                    )}
-                </div>
             </div>
         </div>
     );

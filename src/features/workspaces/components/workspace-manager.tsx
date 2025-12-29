@@ -5,7 +5,7 @@ import { leaveWorkspace, requestJoinWorkspace, createWorkspace, getDiscoverableW
 import { Loader2, LogOut, Plus, Search, Building2, UserPlus, CheckCircle2, AlertCircle, ArrowLeft, ChevronRight, Briefcase } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 interface WorkspaceManagerProps {
     currentWorkspaceId?: string;
@@ -33,7 +33,15 @@ export function WorkspaceManager({ currentWorkspaceId, workspaces, userGlobalRol
     // -- State --
     const [availableWorkspaces, setAvailableWorkspaces] = useState<any[]>([]);
 
+    const searchParams = useSearchParams();
+
     // -- Effects --
+    useEffect(() => {
+        if (searchParams.get("action") === "join") {
+            setMode("JOIN");
+        }
+    }, [searchParams]);
+
     useEffect(() => {
         if (mode === "JOIN") {
             getDiscoverableWorkspaces().then(setAvailableWorkspaces);
@@ -216,29 +224,44 @@ export function WorkspaceManager({ currentWorkspaceId, workspaces, userGlobalRol
     return (
         <div className="space-y-4">
             <div className="flex gap-2 mb-4">
-                {canCreate && (
-                    <button
-                        onClick={() => setMode("CREATE")}
-                        className="flex-1 flex items-center justify-center gap-2 h-10 text-xs font-bold bg-slate-900 text-white dark:bg-white dark:text-slate-900 rounded-xl hover:opacity-90 transition-all shadow-sm"
-                    >
-                        <Plus size={14} />
-                        Create
-                    </button>
-                )}
+                {/* canCreate logic kept for future or admin, but removed from sidebar if desired, 
+                         however instructions say "In the sidebar remove the create workspace button". 
+                         The screenshot showed it at the bottom. The code had it as a toggle.
+                         I will CONDITINALLY render it only if the user has NO workspaces or if they are admin/owner?
+                         User said "In the sidebar remove the create workspace button as shown in screenshot".
+                         Screenshot shows it at the bottom.
+                         The current code has a "Create" toggle button at the TOP. 
+                         I will HIDE the "Create" toggle button here.
+                      */}
+                {/* {canCreate && (
+                        <button
+                            onClick={() => setMode("CREATE")}
+                            className="flex-1 flex items-center justify-center gap-2 h-10 text-xs font-bold bg-slate-900 text-white dark:bg-white dark:text-slate-900 rounded-xl hover:opacity-90 transition-all shadow-sm"
+                        >
+                            <Plus size={14} />
+                            Create
+                        </button>
+                    )} */}
                 <button
                     onClick={() => setMode("JOIN")}
-                    className="flex-1 flex items-center justify-center gap-2 h-10 text-xs font-bold bg-white border border-slate-200 text-slate-700 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-750 transition-all shadow-sm"
+                    className="w-full flex items-center justify-center gap-2 h-10 text-xs font-bold bg-white border border-slate-200 text-slate-700 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-750 transition-all shadow-sm"
                 >
                     <UserPlus size={14} />
-                    Join
+                    Join Workspace
                 </button>
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
                 {workspaces.length === 0 ? (
                     <div className="text-center py-12 text-slate-500 dark:text-slate-400 bg-slate-50/50 dark:bg-slate-900/50 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
                         <Briefcase className="w-8 h-8 mx-auto mb-2 opacity-20" />
                         <p className="text-xs font-medium">No memberships yet.</p>
+                        {/* Allow create if empty? */}
+                        {canCreate && (
+                            <button onClick={() => setMode("CREATE")} className="mt-2 text-xs text-blue-600 font-bold hover:underline">
+                                Create New
+                            </button>
+                        )}
                     </div>
                 ) : (
                     workspaces.map((ws) => {
@@ -248,10 +271,10 @@ export function WorkspaceManager({ currentWorkspaceId, workspaces, userGlobalRol
                         return (
                             <button
                                 key={ws.id}
-                                disabled={isActive || isSwitchingToThis}
-                                onClick={() => handleSwitch(ws.id)}
+                                disabled={isSwitchingToThis} // Allow clicking active to see details or potential leave
+                                onClick={() => !isActive && handleSwitch(ws.id)}
                                 className={cn(
-                                    "w-full text-left relative p-4 rounded-2xl border transition-all duration-200 group overflow-hidden",
+                                    "w-full text-left relative p-4 rounded-2xl border transition-all duration-200 group overflow-hidden shrink-0", // shrink-0 important for scroll
                                     isActive
                                         ? "bg-blue-50 border-blue-200 dark:bg-blue-900/10 dark:border-blue-800 shadow-sm cursor-default"
                                         : "bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-md cursor-pointer active:scale-98"
@@ -290,7 +313,8 @@ export function WorkspaceManager({ currentWorkspaceId, workspaces, userGlobalRol
                                     </div>
                                 )}
 
-                                {!isActive && ws.role !== "OWNER" && (
+                                {/* Allow leaving ANY workspace, including active */}
+                                {ws.role !== "OWNER" && (
                                     <div
                                         onClick={(e) => {
                                             e.preventDefault();
