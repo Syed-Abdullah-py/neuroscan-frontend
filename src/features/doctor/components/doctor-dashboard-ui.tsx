@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, Clock, FileText, CheckCircle2, Upload, Calendar, Building2, LogOut, Stethoscope } from "lucide-react";
+import { Activity, Clock, FileText, CheckCircle2, Upload, Calendar, Building2, LogOut, Stethoscope, Brain } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -155,7 +155,7 @@ export function DoctorDashboardUI({ stats, recentCases, user, workspaces }: Doct
                     >
                         <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
                             <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                                <Activity className="w-5 h-5 text-blue-500" />
+                                <Brain className="w-5 h-5 text-blue-500" />
                                 Recent Assigned Cases
                             </h2>
                             <Link href="/cases" className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline">

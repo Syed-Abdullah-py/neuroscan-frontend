@@ -1,7 +1,7 @@
 import { Metadata } from "next";
 import { Suspense } from "react";
 import Link from "next/link";
-import { Activity, ArrowRight, ShieldCheck, Loader2 } from "lucide-react";
+import { Activity, ArrowRight, ShieldCheck, Loader2, Brain } from "lucide-react";
 import { BiometricScanner } from "@/features/auth/components/biometric-scanner";
 import { LoginForm } from "@/features/auth/components/login-form";
 
@@ -25,7 +25,7 @@ export default function LoginPage() {
                 <div className="flex items-center gap-2 md:gap-3">
                     <Link href="/" className="flex items-center gap-2 md:gap-3">
                         <div className="w-8 h-8 md:w-9 md:h-9 bg-blue-600 rounded-lg flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
-                            <Activity className="w-5 h-5" />
+                            <Brain className="w-5 h-5" />
                         </div>
                         <span className="text-lg md:text-xl font-bold tracking-tight text-slate-900 dark:text-white">NeuroScan AI</span>
                     </Link>

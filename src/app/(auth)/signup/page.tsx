@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Check, ArrowRight, Lock, Activity } from "lucide-react";
+import { Check, ArrowRight, Lock, Activity, Brain } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SignupForm } from "@/features/auth/components/signup-form";
 import { useState } from "react";
@@ -32,7 +32,7 @@ export default function SignupPage() {
                 <div className="flex items-center gap-2 md:gap-3">
                     <Link href="/" className="flex items-center gap-2 md:gap-3">
                         <div className="w-8 h-8 md:w-9 md:h-9 bg-blue-600 rounded-lg flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
-                            <Activity className="w-5 h-5" />
+                            <Brain className="w-5 h-5" />
                         </div>
                         <span className="text-lg md:text-xl font-bold tracking-tight text-slate-900 dark:text-white">NeuroScan AI</span>
                     </Link>

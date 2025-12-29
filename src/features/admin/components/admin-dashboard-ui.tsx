@@ -10,7 +10,8 @@ import {
     ShieldCheck,
     CheckCircle2,
     Clock,
-    ChevronRight
+    ChevronRight,
+    Brain
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
@@ -192,7 +193,7 @@ export function AdminDashboardUI({ user, joinRequests, workspaces }: AdminDashbo
                                     </h2>
                                 </div>
                                 <div className="p-6 text-center text-slate-500 text-sm">
-                                    <Activity className="w-10 h-10 mx-auto mb-3 text-slate-300 dark:text-slate-700" />
+                                    <Brain className="w-10 h-10 mx-auto mb-3 text-slate-300 dark:text-slate-700" />
                                     Activity logs will appear here.
                                 </div>
                             </div>
