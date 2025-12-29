@@ -1,9 +1,21 @@
 "use client";
 
-import { Users, FileText, Activity, AlertCircle, UserPlus, FileUp } from "lucide-react";
+import {
+    Users,
+    FileText,
+    Activity,
+    AlertCircle,
+    UserPlus,
+    Building2,
+    ShieldCheck,
+    CheckCircle2,
+    Clock,
+    ChevronRight
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import { JoinRequestsList } from "@/features/admin/components/join-requests-list";
+import Link from "next/link";
 
 interface AdminDashboardUIProps {
     user: {
@@ -17,10 +29,9 @@ interface AdminDashboardUIProps {
     workspaces: any[];
 }
 
-import { WorkspaceManager } from "@/features/workspaces/components/workspace-manager";
-
 export function AdminDashboardUI({ user, joinRequests, workspaces }: AdminDashboardUIProps) {
-    if (!user) return null; // Should ideally redirect if not auth, but safe guard.
+    if (!user) return null;
+
     const container = {
         hidden: { opacity: 0 },
         show: {
@@ -31,6 +42,11 @@ export function AdminDashboardUI({ user, joinRequests, workspaces }: AdminDashbo
         }
     };
 
+    const item = {
+        hidden: { opacity: 0, y: 20 },
+        show: { opacity: 1, y: 0 }
+    };
+
     return (
         <div className="space-y-8 p-6 md:p-8 max-w-7xl mx-auto">
             {/* Header */}
@@ -38,7 +54,7 @@ export function AdminDashboardUI({ user, joinRequests, workspaces }: AdminDashbo
                 <div>
                     <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Admin Dashboard</h1>
                     <p className="text-slate-500 dark:text-slate-400 mt-1">
-                        {user.workspaceId ? `Overview for ${user.name}'s Workspace` : "Manage your Workspaces"}
+                        {`Welcome back, Mr. ${user.name}.`}
                     </p>
                 </div>
                 {user.workspaceId && (
@@ -47,60 +63,177 @@ export function AdminDashboardUI({ user, joinRequests, workspaces }: AdminDashbo
                             <UserPlus size={18} />
                             Invite Member
                         </button>
+                        <button className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 px-4 py-2.5 rounded-xl font-medium transition-all hover:scale-105 active:scale-95">
+                            <FileText size={18} />
+                            Reports
+                        </button>
                     </div>
                 )}
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 space-y-8">
-                    {user.workspaceId ? (
-                        <>
-                            {/* KPI Cards */}
-                            <motion.div
-                                variants={container}
-                                initial="hidden"
-                                animate="show"
-                                className="grid grid-cols-1 md:grid-cols-3 gap-4"
-                            >
-                                <KpiCard title="Total Patients" value="1,284" change="+12%" icon={Users} color="blue" />
-                                <KpiCard title="Pending Cases" value="42" change="+5" icon={AlertCircle} color="amber" alert />
-                                <KpiCard title="Active Doctors" value="24" change="0%" icon={FileText} color="green" />
-                            </motion.div>
+            {!user.workspaceId ? (
+                // ==========================================
+                // EMPTY STATE (Matches Doctor Dashboard)
+                // ==========================================
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, ease: "easeOut" }}
+                    className="relative overflow-hidden rounded-[2.5rem] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl shadow-slate-200/50 dark:shadow-black/40 min-h-[500px] flex flex-col items-center justify-center text-center p-8 md:p-16 group"
+                >
+                    {/* Decorative Background Elements */}
+                    <div className="absolute inset-0 bg-[radial(circle_at_top,var(--tw-gradient-stops))] from-blue-50/80 via-transparent to-transparent dark:from-blue-900/10 pointer-events-none" />
+                    <div className="absolute top-0 left-0 w-full h-1 bg-to-r from-blue-500 via-cyan-400 to-blue-500 opacity-50" />
 
-                            {/* Recent Activity / Charts Placeholder */}
-                            <motion.div
-                                initial={{ opacity: 0, y: 20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                transition={{ delay: 0.4 }}
-                                className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm min-h-[300px] flex items-center justify-center text-slate-400"
-                            >
-                                <div className="text-center">
-                                    <Activity className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                                    <p>Activity Analytics Coming Soon</p>
-                                </div>
-                            </motion.div>
-                        </>
-                    ) : (
-                        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-8 shadow-sm text-center py-20">
-                            <h3 className="text-xl font-semibold text-slate-900 dark:text-white">No Active Workspace</h3>
-                            <p className="text-slate-500 max-w-md mx-auto mt-2 mb-6">
-                                Create or select a workspace to view your dashboard.
-                            </p>
-                            <a
-                                href="/admin/workspaces"
-                                className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                            >
-                                Manage Workspaces
-                            </a>
+                    {/* Icon Animation */}
+                    <div className="relative mb-8 cursor-default">
+                        {/* Glow reacts to inner hover */}
+                        <div className="absolute inset-0 bg-blue-500/20 rounded-full blur-2xl transition-all duration-500 peer-hover:bg-blue-500/30" />
+
+                        {/* Inner Icon Container */}
+                        <div className="peer relative w-28 h-28 bg-white dark:bg-slate-800 rounded-3xl shadow-lg border border-slate-100 dark:border-slate-700 flex items-center justify-center transform -rotate-3 hover:rotate-3 transition-transform duration-500 ease-out">
+                            <Building2 className="w-16 h-16 text-blue-600 dark:text-blue-400 drop-shadow-md" strokeWidth={1.5} />
                         </div>
-                    )}
-                </div>
-            </div>
+                    </div>
+
+                    {/* Text Content */}
+                    <h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-4 tracking-tight max-w-lg">
+                        No Active Workspace
+                    </h2>
+                    <p className="text-slate-500 dark:text-slate-400 max-w-md mx-auto text-base leading-relaxed mb-10">
+                        Select a workspace from the sidebar to manage your team, view analytics, and handle access requests.
+                    </p>
+
+                    {/* CTA Buttons */}
+                    <div className="flex flex-col sm:flex-row gap-4 w-full justify-center">
+                        <Link href="/admin/workspaces">
+                            <button className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-8 py-3.5 rounded-xl font-bold text-sm shadow-lg shadow-blue-600/25">
+                                <Building2 size={18} />
+                                Manage Workspaces
+                            </button>
+                        </Link>
+                    </div>
+                </motion.div>
+            ) : (
+                <>
+                    {/* Stats Grid */}
+                    <motion.div
+                        variants={container}
+                        initial="hidden"
+                        animate="show"
+                        className="grid grid-cols-1 md:grid-cols-3 gap-6"
+                    >
+                        {/* Example Stats - You can plug real data here later */}
+                        <StatCard
+                            title="Total Members"
+                            value="14"
+                            icon={Users}
+                            color="blue"
+                            trend="+2 this month"
+                        />
+                        <StatCard
+                            title="Access Requests"
+                            value={joinRequests.length}
+                            icon={AlertCircle}
+                            color={joinRequests.length > 0 ? "amber" : "green"}
+                            trend={joinRequests.length > 0 ? "Action Required" : "All clear"}
+                        />
+                        <StatCard
+                            title="System Health"
+                            value="99.9%"
+                            icon={Activity}
+                            color="green"
+                            trend="Operational"
+                        />
+                    </motion.div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        {/* Recent Activity / Content Area */}
+                        <motion.div
+                            variants={item}
+                            initial="hidden"
+                            animate="show"
+                            className="lg:col-span-2 space-y-8"
+                        >
+                            {/* Access Requests Section */}
+                            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                                <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+                                    <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                        <ShieldCheck className="w-5 h-5 text-blue-500" />
+                                        Access Requests
+                                    </h2>
+                                    {joinRequests.length > 0 && (
+                                        <span className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 text-xs font-bold px-2 py-1 rounded-full">
+                                            {joinRequests.length} Pending
+                                        </span>
+                                    )}
+                                </div>
+
+                                {joinRequests.length === 0 ? (
+                                    <div className="p-12 text-center">
+                                        <div className="w-12 h-12 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                                            <CheckCircle2 className="w-6 h-6 text-green-600 dark:text-green-400" />
+                                        </div>
+                                        <h3 className="text-sm font-semibold text-slate-900 dark:text-white">All Caught Up</h3>
+                                        <p className="text-xs text-slate-500 mt-1">No pending access requests at the moment.</p>
+                                    </div>
+                                ) : (
+                                    <div className="p-2">
+                                        <JoinRequestsList requests={joinRequests} currentUserEmail={user.email || ""} />
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Recent Activity Placeholder */}
+                            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                                <div className="p-6 border-b border-slate-200 dark:border-slate-800">
+                                    <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                        <Clock className="w-5 h-5 text-slate-400" />
+                                        System Activity
+                                    </h2>
+                                </div>
+                                <div className="p-6 text-center text-slate-500 text-sm">
+                                    <Activity className="w-10 h-10 mx-auto mb-3 text-slate-300 dark:text-slate-700" />
+                                    Activity logs will appear here.
+                                </div>
+                            </div>
+                        </motion.div>
+
+                        {/* Quick Actions Sidebar */}
+                        <motion.div
+                            variants={item}
+                            initial="hidden"
+                            animate="show"
+                            className="space-y-6"
+                        >
+                            <div className="bg-to-br from-blue-600 to-blue-700 rounded-3xl p-6 text-white shadow-xl shadow-blue-900/20">
+                                <h3 className="text-lg font-bold mb-2">Admin Tools</h3>
+                                <p className="text-blue-100 text-sm mb-6">Quick access to workspace settings and audit logs.</p>
+
+                                <div className="space-y-3">
+                                    <button className="w-full flex items-center justify-between p-3 bg-white/10 hover:bg-white/20 rounded-xl transition-colors backdrop-blur-sm border border-white/10">
+                                        <span className="text-sm font-medium">Workspace Settings</span>
+                                        <ChevronRight size={16} />
+                                    </button>
+                                    <button className="w-full flex items-center justify-between p-3 bg-white/10 hover:bg-white/20 rounded-xl transition-colors backdrop-blur-sm border border-white/10">
+                                        <span className="text-sm font-medium">Audit Logs</span>
+                                        <ChevronRight size={16} />
+                                    </button>
+                                    <button className="w-full flex items-center justify-between p-3 bg-white/10 hover:bg-white/20 rounded-xl transition-colors backdrop-blur-sm border border-white/10">
+                                        <span className="text-sm font-medium">User Management</span>
+                                        <ChevronRight size={16} />
+                                    </button>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </div>
+                </>
+            )}
         </div>
     );
 }
 
-function KpiCard({ title, value, change, icon: Icon, alert, color }: any) {
+function StatCard({ title, value, icon: Icon, color, trend }: any) {
     const colors: any = {
         blue: "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400",
         green: "bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400",
@@ -113,26 +246,17 @@ function KpiCard({ title, value, change, icon: Icon, alert, color }: any) {
                 hidden: { opacity: 0, y: 20 },
                 show: { opacity: 1, y: 0 }
             }}
-            className="p-6 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition-all"
+            className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition-shadow"
         >
-            <div className="flex items-center justify-between mb-4">
-                <div className={cn("p-2.5 rounded-xl", colors[color] || colors.blue)}>
-                    <Icon size={20} />
+            <div className="flex justify-between items-start mb-4">
+                <div className={cn("p-3 rounded-xl", colors[color])}>
+                    <Icon size={24} />
                 </div>
-                <span className={`text-xs font-medium ${alert ? "text-amber-500" : "text-slate-400"}`}>
-                    {alert ? "Action Needed" : "This Week"}
-                </span>
             </div>
             <div>
-                <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-1">{value}</h3>
+                <h3 className="text-3xl font-bold text-slate-900 dark:text-white mb-1">{value}</h3>
                 <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">{title}</p>
-                <div className="flex items-center gap-1 mt-2">
-                    <span className={`text-xs font-bold ${change.startsWith("+") ? "text-green-600 dark:text-green-400" : "text-slate-500"}`}>
-                        {change}
-                    </span>
-                    <span className="text-xs text-slate-400">vs last week</span>
-                </div>
-
+                <p className="text-xs text-slate-400 mt-2">{trend}</p>
             </div>
         </motion.div>
     );

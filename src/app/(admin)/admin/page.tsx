@@ -1,5 +1,4 @@
 import { getCurrentUser, getJoinRequests, getUserWorkspaces } from "@/actions/auth-actions";
-import { CameraCleanup } from "@/components/camera-cleanup";
 import { AdminDashboardUI } from "@/features/admin/components/admin-dashboard-ui";
 
 export default async function AdminDashboard() {
@@ -17,7 +16,6 @@ export default async function AdminDashboard() {
 
     return (
         <>
-            <CameraCleanup />
             <AdminDashboardUI
                 user={user}
                 joinRequests={joinRequests}

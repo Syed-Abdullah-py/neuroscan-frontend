@@ -34,7 +34,8 @@ export function UnifiedWorkspace({ user, workspaces, currentWorkspaceName, membe
 
     // Resolve permissions for the CURRENT active workspace
     const currentMembership = workspaces.find(w => w.id === user.workspaceId);
-    const workspaceRole = currentMembership?.role || "DOCTOR"; // Default to lowest if not found (shouldn't happen if active)
+    // If user has a workspace membership, use that role; otherwise default to their global role
+    const workspaceRole = currentMembership?.role || user.globalRole || "[ERROR] Please Debug";
 
     const isOwner = workspaceRole === "OWNER";
     const isAdmin = workspaceRole === "ADMIN" || isOwner;
@@ -50,7 +51,12 @@ export function UnifiedWorkspace({ user, workspaces, currentWorkspaceName, membe
     return (
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
             {/* Left Sidebar: Workspace List */}
-            <div className="xl:col-span-3 space-y-6 sticky top-6">
+            <motion.div
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.4, delay: 0.1 }}
+                className="xl:col-span-4 space-y-6 sticky top-6"
+            >
                 <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-black/20 overflow-hidden">
                     <div className="p-6 pb-2">
                         <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-1">Workspaces</h3>
@@ -64,10 +70,10 @@ export function UnifiedWorkspace({ user, workspaces, currentWorkspaceName, membe
                         />
                     </div>
                 </div>
-            </div>
+            </motion.div>
 
             {/* Center Content: Active Workspace Details */}
-            <div className="xl:col-span-6 order-last xl:order-0">
+            <div className="xl:col-span-5 order-last xl:order-0">
                 <AnimatePresence mode="wait">
                     {user.workspaceId ? (
                         <motion.div
@@ -75,7 +81,7 @@ export function UnifiedWorkspace({ user, workspaces, currentWorkspaceName, membe
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -10 }}
                             transition={{ duration: 0.3 }}
-                            className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-black/20 min-h-[600px] flex flex-col overflow-hidden"
+                            className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-black/20 min-h-[400px] flex flex-col overflow-hidden"
                         >
                             {/* Hero Header Area */}
                             <div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-to-r from-slate-50 via-white to-white dark:from-slate-950 dark:via-slate-900 dark:to-slate-900">
@@ -216,37 +222,47 @@ export function UnifiedWorkspace({ user, workspaces, currentWorkspaceName, membe
                                 )}
                             </div>
                         </motion.div>
-                    ) : (
+                    ) :
                         <motion.div
                             initial={{ opacity: 0, scale: 0.95 }}
                             animate={{ opacity: 1, scale: 1 }}
-                            className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-black/20 p-12 text-center h-[500px] flex flex-col items-center justify-center relative overflow-hidden"
-                        >
-                            <div className="absolute inset-0 bg-to-b from-blue-50/50 to-transparent dark:from-blue-900/5 pointer-events-none" />
-                            <div className="w-24 h-24 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center mb-6 shadow-lg shadow-blue-500/10">
-                                <Building2 className="w-10 h-10 text-blue-500" />
+                            className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-12 shadow-xl shadow-slate-200/50 dark:shadow-black/20 text-center flex flex-col items-center justify-center min-h-[400px] relative overflow-hidden">
+                            {/* Ambient Background Glow */}
+                            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-1/2 bg-to-b from-blue-50/50 to-transparent dark:from-blue-900/10 pointer-events-none" />
+
+                            {/* Icon Container with Animation */}
+                            <div className="relative mb-8 group cursor-default">
+                                <div className="absolute inset-0 bg-blue-500/20 rounded-full blur-2xl group-hover:bg-blue-500/30 transition-all duration-500" />
+                                <div className="relative w-28 h-28 bg-white dark:bg-slate-800 rounded-3xl shadow-lg border border-slate-100 dark:border-slate-700 flex items-center justify-center transform -rotate-3 group-hover:rotate-3 transition-transform duration-500 ease-out">
+                                    <Building2 className="w-12 h-12 text-blue-600 dark:text-blue-400" />
+                                </div>
                             </div>
-                            <h3 className="text-2xl font-extrabold text-slate-900 dark:text-white mb-3">No Active Workspace</h3>
-                            <p className="text-slate-500 max-w-sm mx-auto leading-relaxed">
-                                Select a workspace from the list on the left to view details, or create a new one to get started.
+
+                            <h3 className="relative z-10 text-2xl font-extrabold text-slate-900 dark:text-white mb-4 tracking-tight">
+                                No Workspace Selected
+                            </h3>
+                            <p className="relative z-10 text-slate-500 dark:text-slate-400 max-w-md mx-auto text-base leading-relaxed mb-10 mt-5">
+                                You are not currently active in any workspace. Select an organization from the sidebar or create a new one to view insights.
                             </p>
-                            <button
-                                onClick={() => router.push("?action=join")}
-                                className="mt-6 px-6 py-3 rounded-xl bg-slate-900 text-white dark:bg-white dark:text-slate-900 font-bold text-sm shadow-lg hover:opacity-90 transition-all"
-                            >
-                                Join a Workspace
-                            </button>
-                        </motion.div>
-                    )
-                    }
+                        </motion.div>}
                 </AnimatePresence >
             </div >
 
             {/* Right Sidebar: Requests & Invitations */}
-            <div className="xl:col-span-3 space-y-6 sticky top-6">
+            <motion.div
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.4, delay: 0.2 }}
+                className="xl:col-span-3 space-y-6 sticky top-6"
+            >
                 {/* Requests first for Admin */}
                 {isAdmin && (
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-black/20 overflow-hidden p-6">
+                    <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.3, delay: 0.3 }}
+                        className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-black/20 overflow-hidden p-6 w-full min-w-[355px]"
+                    >
                         <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-4 flex items-center justify-between">
                             Received Requests
                             <button
@@ -278,11 +294,16 @@ export function UnifiedWorkspace({ user, workspaces, currentWorkspaceName, membe
                                 </div>
                             </div>
                         )}
-                    </div>
+                    </motion.div>
                 )}
 
                 {/* Workspace Invitations */}
-                <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-black/20 overflow-hidden p-6">
+                <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: isAdmin ? 0.4 : 0.3 }}
+                    className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-black/20 overflow-hidden p-6 w-full min-w-[355px]"
+                >
                     <div className="flex items-center justify-between mb-4">
                         <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                             Workspace Invitations
@@ -296,8 +317,8 @@ export function UnifiedWorkspace({ user, workspaces, currentWorkspaceName, membe
                         </button>
                     </div>
                     <InvitationsList invitations={invitations} />
-                </div>
-            </div>
+                </motion.div>
+            </motion.div>
         </div >
     );
 }

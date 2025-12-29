@@ -223,32 +223,47 @@ export function WorkspaceManager({ currentWorkspaceId, workspaces, userGlobalRol
 
     return (
         <div className="space-y-4">
-            <div className="flex gap-2 mb-4">
-                {/* canCreate logic kept for future or admin, but removed from sidebar if desired, 
-                         however instructions say "In the sidebar remove the create workspace button". 
-                         The screenshot showed it at the bottom. The code had it as a toggle.
-                         I will CONDITINALLY render it only if the user has NO workspaces or if they are admin/owner?
-                         User said "In the sidebar remove the create workspace button as shown in screenshot".
-                         Screenshot shows it at the bottom.
-                         The current code has a "Create" toggle button at the TOP. 
-                         I will HIDE the "Create" toggle button here.
-                      */}
-                {/* {canCreate && (
-                        <button
-                            onClick={() => setMode("CREATE")}
-                            className="flex-1 flex items-center justify-center gap-2 h-10 text-xs font-bold bg-slate-900 text-white dark:bg-white dark:text-slate-900 rounded-xl hover:opacity-90 transition-all shadow-sm"
-                        >
-                            <Plus size={14} />
-                            Create
-                        </button>
-                    )} */}
+            <div className="flex flex-col gap-3 mb-4">
+                {/* Join Button */}
                 <button
-                    onClick={() => setMode("JOIN")}
-                    className="w-full flex items-center justify-center gap-2 h-10 text-xs font-bold bg-white border border-slate-200 text-slate-700 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-750 transition-all shadow-sm"
+                    onClick={() => router.push("?action=join")}
+                    className="group w-full flex items-center justify-center gap-2 px-4 py-3
+               bg-blue-50 dark:bg-blue-900/30
+               border border-blue-200 dark:border-blue-700
+               hover:border-blue-400 dark:hover:border-blue-500
+               rounded-xl text-sm font-bold
+               text-blue-700 dark:text-blue-300
+               transition-all shadow-sm hover:shadow-md
+               hover:text-blue-800 dark:hover:text-blue-200"
                 >
-                    <UserPlus size={14} />
-                    Join Workspace
+                    <UserPlus
+                        size={16}
+                        className="text-blue-400 group-hover:text-blue-600 transition-colors"
+                    />
+                    <span>Join Workspace</span>
                 </button>
+
+
+                {/* Create Button */}
+                {canCreate && (
+                    <button
+                        onClick={() => setMode("CREATE")}
+                        className="group w-full flex items-center justify-center gap-2 px-4 py-3 
+                   bg-emerald-50 dark:bg-emerald-900/30 
+                   border border-emerald-200 dark:border-emerald-700 
+                   hover:border-emerald-400 dark:hover:border-emerald-500 
+                   rounded-xl text-sm font-bold 
+                   text-emerald-700 dark:text-emerald-300 
+                   transition-all shadow-sm hover:shadow-md 
+                   hover:text-emerald-800 dark:hover:text-emerald-200"
+                    >
+                        <Plus
+                            size={16}
+                            className="text-emerald-400 group-hover:text-emerald-600 transition-colors"
+                        />
+                        <span>Create New Workspace</span>
+                    </button>
+                )}
             </div>
 
             <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
@@ -256,12 +271,6 @@ export function WorkspaceManager({ currentWorkspaceId, workspaces, userGlobalRol
                     <div className="text-center py-12 text-slate-500 dark:text-slate-400 bg-slate-50/50 dark:bg-slate-900/50 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
                         <Briefcase className="w-8 h-8 mx-auto mb-2 opacity-20" />
                         <p className="text-xs font-medium">No memberships yet.</p>
-                        {/* Allow create if empty? */}
-                        {canCreate && (
-                            <button onClick={() => setMode("CREATE")} className="mt-2 text-xs text-blue-600 font-bold hover:underline">
-                                Create New
-                            </button>
-                        )}
                     </div>
                 ) : (
                     workspaces.map((ws) => {

@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronsUpDown, Plus, Building2 } from "lucide-react";
+import { Check, ChevronsUpDown, Plus, Building2, Brain } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useTransition, useRef, useEffect } from "react";
 import { switchWorkspace } from "@/actions/auth-actions";
@@ -58,15 +58,15 @@ export default function WorkspaceSwitcher({
                 <div className="flex items-center gap-3 text-left min-w-0">
                     <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white shrink-0 shadow-sm shadow-blue-600/20">
                         <span className="font-bold text-sm">
-                            {activeWorkspace?.name?.charAt(0).toUpperCase() || "W"}
+                            {activeWorkspace?.name?.charAt(0).toUpperCase() || <Brain className="w-4 h-4" />}
                         </span>
                     </div>
                     <div className="flex flex-col min-w-0">
                         <span className="text-sm font-bold text-slate-900 dark:text-white truncate">
-                            {activeWorkspace?.name || "Select Workspace"}
+                            {activeWorkspace?.name || "Explore Workspaces"}
                         </span>
                         <span className="text-[10px] text-slate-500 dark:text-slate-400 capitalize bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded-md inline-flex w-fit">
-                            {activeWorkspace?.role?.toLowerCase() || "Member"}
+                            {activeWorkspace?.role?.toLowerCase() || "Welcome to NeuroScan"}
                         </span>
                     </div>
                 </div>
@@ -95,21 +95,6 @@ export default function WorkspaceSwitcher({
                             )}
                         </button>
                     ))}
-
-                    <div className="h-px bg-slate-100 dark:bg-slate-800 my-1" />
-
-                    {/* Check GLOBAL role for creation permission */}
-                    {(userRole === "ADMIN" || userRole === "OWNER") && (
-                        <button
-                            onClick={() => router.push("/onboarding?mode=create")}
-                            className="w-full flex items-center gap-2 px-2 py-2 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg transition-colors font-medium"
-                        >
-                            <div className="w-6 h-6 rounded-md flex items-center justify-center bg-blue-100 dark:bg-blue-900/40">
-                                <Plus className="h-3.5 w-3.5" />
-                            </div>
-                            Create Workspace
-                        </button>
-                    )}
                 </div>
             )}
         </div>

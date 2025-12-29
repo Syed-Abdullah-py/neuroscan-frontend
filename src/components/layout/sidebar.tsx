@@ -50,7 +50,7 @@ export function Sidebar({ role = "admin", user, workspaces = [] }: { role?: "adm
   const routes = effectiveRole === "doctor" ? doctorRoutes : adminRoutes;
 
   return (
-    <aside className="hidden md:flex flex-col w-64 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 h-screen fixed left-0 top-0 z-40">
+    <aside className="hidden md:flex flex-col w-75 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 h-screen fixed left-0 top-0 z-40">
       {/* Header with Workspace Switcher */}
       <div className="h-20 flex items-center px-4 border-b border-slate-200 dark:border-slate-800">
         <WorkspaceSwitcher items={workspaces} userRole={user?.globalRole ?? undefined} />

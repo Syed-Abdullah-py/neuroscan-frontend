@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, Clock, FileText, CheckCircle2, Upload, Calendar } from "lucide-react";
+import { Activity, Clock, FileText, CheckCircle2, Upload, Calendar, Building2, LogOut, Stethoscope } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { motion } from "framer-motion";
@@ -67,18 +67,54 @@ export function DoctorDashboardUI({ stats, recentCases, user, workspaces }: Doct
 
 
             {!user.workspaceId ? (
-                <div className="text-center py-20">
-                    <h3 className="text-xl font-semibold text-slate-900 dark:text-white">No Active Workspace</h3>
-                    <p className="text-slate-500 max-w-md mx-auto mt-2 mb-6">
-                        Please join a workspace to start viewing assignments and cases.
+                <motion.div
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.5, ease: "easeOut" }}
+                    className="relative overflow-hidden rounded-[2.5rem] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl shadow-slate-200/50 dark:shadow-black/40 min-h-[500px] flex flex-col items-center justify-center text-center p-8 md:p-16 group"
+                >
+                    {/* Decorative Background Elements */}
+                    <div className="absolute inset-0 bg-[radial(circle_at_top,var(--tw-gradient-stops))] from-blue-50/80 via-transparent to-transparent dark:from-blue-900/10 pointer-events-none" />
+                    <div className="absolute top-0 left-0 w-full h-1 bg-to-r from-blue-500 via-cyan-400 to-blue-500 opacity-50" />
+
+                    {/* Icon Animation */}
+                    <div className="relative mb-8 cursor-default">
+                        {/* Glow reacts to inner hover */}
+                        <div className="absolute inset-0 bg-blue-500/20 rounded-full blur-2xl 
+                    transition-all duration-500 peer-hover:bg-blue-500/30" />
+
+                        {/* Inner Icon Container */}
+                        <div
+                            className="peer relative w-28 h-28 bg-white dark:bg-slate-800 
+                   rounded-3xl shadow-lg border border-slate-100 
+                   dark:border-slate-700 flex items-center justify-center 
+                   transform -rotate-3 hover:rotate-3 
+                   transition-transform duration-500 ease-out"
+                        >
+                            <Stethoscope
+                                className="w-16 h-16 text-blue-600 dark:text-blue-400 drop-shadow-md"
+                                strokeWidth={1.5}
+                            />
+                        </div>
+                    </div>
+
+
+                    {/* Text Content */}
+                    <h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-4 tracking-tight max-w-lg">
+                        No Active Workspace Found
+                    </h2>
+                    <p className="text-slate-500 dark:text-slate-400 max-w-md mx-auto text-base leading-relaxed mb-10">
+                        You are currently not assigned to any medical facility. Please join a workspace to start viewing patient assignments and analyzing scans.
                     </p>
-                    <Link
-                        href="/doctor/workspaces"
-                        className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
-                    >
-                        Go to Workspaces
-                    </Link>
-                </div>
+
+                    {/* CTA Buttons */}
+                    <div className="flex flex-col sm:flex-row gap-4 w-full justify-center">
+                        <button className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-8 py-3.5 rounded-xl font-bold text-sm shadow-lg shadow-blue-600/25 transition-all">
+                            <Building2 size={18} />
+                            Browse Workspaces
+                        </button>
+                    </div>
+                </motion.div>
             ) : (
                 <>
                     {/* Stats Grid */}
