@@ -4,8 +4,9 @@ import { useState } from "react";
 import { WorkspaceManager } from "./workspace-manager";
 import { WorkspaceSettings } from "@/features/admin/components/workspace-settings";
 import { TeamManagement } from "@/features/admin/components/team-management";
-import { Building2, Settings, Users, ShieldAlert } from "lucide-react";
+import { Building2, Settings, Users, Copy, Check, LayoutDashboard, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface UnifiedWorkspaceProps {
     user: {
@@ -22,6 +23,7 @@ interface UnifiedWorkspaceProps {
 
 export function UnifiedWorkspace({ user, workspaces, currentWorkspaceName, members = [] }: UnifiedWorkspaceProps) {
     const [activeTab, setActiveTab] = useState<"overview" | "members" | "settings">("overview");
+    const [copied, setCopied] = useState(false);
 
     // Resolve permissions for the CURRENT active workspace
     const currentMembership = workspaces.find(w => w.id === user.workspaceId);
@@ -30,19 +32,24 @@ export function UnifiedWorkspace({ user, workspaces, currentWorkspaceName, membe
     const isOwner = workspaceRole === "OWNER";
     const isAdmin = workspaceRole === "ADMIN" || isOwner;
 
+    const handleCopyId = () => {
+        if (user.workspaceId) {
+            navigator.clipboard.writeText(user.workspaceId);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        }
+    };
+
     return (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 items-start">
             {/* Left Sidebar: Workspace List */}
-            <div className="lg:col-span-4 space-y-6">
-                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-                    <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/50">
-                        <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                            <Building2 className="w-4 h-4 text-blue-500" />
-                            Your Workspaces
-                        </h3>
+            <div className="xl:col-span-4 space-y-6 sticky top-6">
+                <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-black/20 overflow-hidden">
+                    <div className="p-6 pb-2">
+                        <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-1">Workspaces</h3>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">Manage your organizations</p>
                     </div>
-                    <div className="p-2">
-                        {/* Reuse existing manager for listing/joining/creating */}
+                    <div className="p-4 pt-2">
                         <WorkspaceManager
                             currentWorkspaceId={user.workspaceId}
                             workspaces={workspaces}
@@ -53,122 +60,176 @@ export function UnifiedWorkspace({ user, workspaces, currentWorkspaceName, membe
             </div>
 
             {/* Right Content: Active Workspace Details */}
-            <div className="lg:col-span-8">
-                {user.workspaceId ? (
-                    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm min-h-[500px] flex flex-col">
-
-                        {/* Header Area */}
-                        <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-start">
-                            <div>
-                                <h2 className="text-2xl font-bold text-slate-900 dark:text-white mb-1">
-                                    {currentWorkspaceName}
-                                </h2>
-                                <div className="flex items-center gap-2">
-                                    <span className={cn(
-                                        "text-xs font-bold px-2 py-0.5 rounded uppercase tracking-wider",
-                                        isOwner ? "bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400" :
-                                            isAdmin ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400" :
-                                                "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400"
-                                    )}>
-                                        {workspaceRole}
-                                    </span>
-                                    <span className="text-xs text-slate-400">ID: {user.workspaceId}</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Navigation Tabs */}
-                        <div className="px-6 border-b border-slate-200 dark:border-slate-800 flex gap-6">
-                            <button
-                                onClick={() => setActiveTab("overview")}
-                                className={cn(
-                                    "py-4 text-sm font-medium border-b-2 transition-colors flex items-center gap-2",
-                                    activeTab === "overview"
-                                        ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                                        : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-                                )}
-                            >
-                                <Building2 size={16} />
-                                Overview
-                            </button>
-
-                            {isAdmin && (
-                                <button
-                                    onClick={() => setActiveTab("members")}
-                                    className={cn(
-                                        "py-4 text-sm font-medium border-b-2 transition-colors flex items-center gap-2",
-                                        activeTab === "members"
-                                            ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                                            : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-                                    )}
-                                >
-                                    <Users size={16} />
-                                    Members
-                                </button>
-                            )}
-
-                            {isOwner && (
-                                <button
-                                    onClick={() => setActiveTab("settings")}
-                                    className={cn(
-                                        "py-4 text-sm font-medium border-b-2 transition-colors flex items-center gap-2",
-                                        activeTab === "settings"
-                                            ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                                            : "border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-                                    )}
-                                >
-                                    <Settings size={16} />
-                                    Settings
-                                </button>
-                            )}
-                        </div>
-
-                        {/* Tab Content */}
-                        <div className="p-6 flex-1">
-                            {activeTab === "overview" && (
-                                <div className="space-y-6">
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800">
-                                            <p className="text-sm text-slate-500">Total Members</p>
-                                            <p className="text-2xl font-bold text-slate-900 dark:text-white">{members.length}</p>
+            <div className="xl:col-span-8">
+                <AnimatePresence mode="wait">
+                    {user.workspaceId ? (
+                        <motion.div
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            transition={{ duration: 0.3 }}
+                            className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-black/20 min-h-[600px] flex flex-col overflow-hidden"
+                        >
+                            {/* Hero Header Area */}
+                            <div className="p-8 border-b border-slate-100 dark:border-slate-800 bg-to-r from-slate-50 via-white to-white dark:from-slate-950 dark:via-slate-900 dark:to-slate-900">
+                                <div className="flex flex-col md:flex-row md:justify-between md:items-start gap-4">
+                                    <div>
+                                        <h2 className="text-4xl font-extrabold text-slate-900 dark:text-white mb-3 tracking-tight">
+                                            {currentWorkspaceName}
+                                        </h2>
+                                        <div className="flex flex-wrap items-center gap-3">
+                                            <span className={cn(
+                                                "px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider shadow-sm",
+                                                isOwner ? "bg-purple-100 text-purple-700 dark:bg-purple-500/10 dark:text-purple-300 border border-purple-200 dark:border-purple-500/20" :
+                                                    isAdmin ? "bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300 border border-blue-200 dark:border-blue-500/20" :
+                                                        "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border border-slate-200 dark:border-slate-700"
+                                            )}>
+                                                {workspaceRole}
+                                            </span>
+                                            <button
+                                                onClick={handleCopyId}
+                                                className="group flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 text-xs font-medium transition-all"
+                                            >
+                                                <span className="font-mono">ID: {user.workspaceId.slice(0, 8)}...</span>
+                                                {copied ? <Check size={12} className="text-green-500" /> : <Copy size={12} className="group-hover:text-slate-800 dark:group-hover:text-white" />}
+                                            </button>
                                         </div>
                                     </div>
-                                    <p className="text-slate-500 text-sm">
-                                        Select "Members" to manage your team or "Settings" to configure this workspace.
-                                    </p>
                                 </div>
-                            )}
 
-                            {activeTab === "members" && isAdmin && (
-                                <TeamManagement
-                                    initialMembers={members}
-                                    currentUserEmail={user.email}
-                                    currentUserRole={workspaceRole} // Pass workspace role, not global
-                                    workspaceId={user.workspaceId!}
-                                    workspaceName={currentWorkspaceName || ""}
-                                />
-                            )}
+                                {/* Navigation Tabs - Modern Pills */}
+                                <div className="flex gap-2 mt-8 overflow-x-auto pb-1 no-scrollbar">
+                                    <button
+                                        onClick={() => setActiveTab("overview")}
+                                        className={cn(
+                                            "px-5 py-2.5 rounded-full text-sm font-semibold transition-all flex items-center gap-2 whitespace-nowrap",
+                                            activeTab === "overview"
+                                                ? "bg-slate-900 text-white shadow-lg shadow-slate-900/20 dark:bg-white dark:text-slate-900"
+                                                : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+                                        )}
+                                    >
+                                        <LayoutDashboard size={16} />
+                                        Overview
+                                    </button>
 
-                            {activeTab === "settings" && isOwner && (
-                                <WorkspaceSettings
-                                    workspaceId={user.workspaceId!}
-                                    currentName={currentWorkspaceName || ""}
-                                />
-                            )}
-                        </div>
-                    </div>
-                ) : (
-                    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm p-12 text-center h-full flex flex-col items-center justify-center">
-                        <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-4">
-                            <Building2 className="w-8 h-8 text-slate-400" />
-                        </div>
-                        <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">No Active Workspace</h3>
-                        <p className="text-slate-500 max-w-sm">
-                            Select a workspace from the list on the left, or create a new one to get started.
-                        </p>
-                    </div>
-                )}
-            </div>
-        </div>
+                                    {isAdmin && (
+                                        <button
+                                            onClick={() => setActiveTab("members")}
+                                            className={cn(
+                                                "px-5 py-2.5 rounded-full text-sm font-semibold transition-all flex items-center gap-2 whitespace-nowrap",
+                                                activeTab === "members"
+                                                    ? "bg-slate-900 text-white shadow-lg shadow-slate-900/20 dark:bg-white dark:text-slate-900"
+                                                    : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+                                            )}
+                                        >
+                                            <Users size={16} />
+                                            Members
+                                        </button>
+                                    )}
+
+                                    {isOwner && (
+                                        <button
+                                            onClick={() => setActiveTab("settings")}
+                                            className={cn(
+                                                "px-5 py-2.5 rounded-full text-sm font-semibold transition-all flex items-center gap-2 whitespace-nowrap",
+                                                activeTab === "settings"
+                                                    ? "bg-slate-900 text-white shadow-lg shadow-slate-900/20 dark:bg-white dark:text-slate-900"
+                                                    : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+                                            )}
+                                        >
+                                            <Settings size={16} />
+                                            Settings
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Tab Content */}
+                            <div className="p-8 flex-1 bg-white dark:bg-slate-900">
+                                {activeTab === "overview" && (
+                                    <motion.div
+                                        initial={{ opacity: 0, x: 20 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        transition={{ duration: 0.3 }}
+                                        className="space-y-8"
+                                    >
+                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                            <div className="group p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-lg shadow-slate-100/50 dark:shadow-black/20 hover:shadow-xl hover:border-blue-100 dark:hover:border-blue-900/30 transition-all">
+                                                <div className="flex items-start justify-between mb-4">
+                                                    <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform">
+                                                        <Users size={24} />
+                                                    </div>
+                                                    <span className="flex items-center text-xs font-medium text-green-600 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded-lg">
+                                                        Active
+                                                    </span>
+                                                </div>
+                                                <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Total Members</p>
+                                                <p className="text-4xl font-extrabold text-slate-900 dark:text-white mt-2">{members.length}</p>
+                                            </div>
+
+                                            {/* Placeholder for future stats */}
+                                            <div className="p-6 rounded-2xl bg-slate-50 dark:bg-slate-950/50 border border-dashed border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center text-center opacity-70">
+                                                <div className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-400 mb-3">
+                                                    <LayoutDashboard size={24} />
+                                                </div>
+                                                <p className="text-sm font-medium text-slate-500">More stats coming soon</p>
+                                            </div>
+                                        </div>
+
+                                        <div className="hidden"></div>
+                                    </motion.div>
+                                )}
+
+
+                                {activeTab === "members" && isAdmin && (
+                                    <motion.div
+                                        initial={{ opacity: 0, x: 20 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        transition={{ duration: 0.3 }}
+                                    >
+                                        <TeamManagement
+                                            initialMembers={members}
+                                            currentUserEmail={user.email}
+                                            currentUserRole={workspaceRole}
+                                            workspaceId={user.workspaceId!}
+                                            workspaceName={currentWorkspaceName || ""}
+                                        />
+                                    </motion.div>
+                                )}
+
+                                {activeTab === "settings" && isOwner && (
+                                    <motion.div
+                                        initial={{ opacity: 0, x: 20 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        transition={{ duration: 0.3 }}
+                                    >
+                                        <WorkspaceSettings
+                                            workspaceId={user.workspaceId!}
+                                            currentName={currentWorkspaceName || ""}
+                                        />
+                                    </motion.div>
+                                )}
+                            </div>
+                        </motion.div>
+                    ) : (
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-black/20 p-12 text-center h-[500px] flex flex-col items-center justify-center relative overflow-hidden"
+                        >
+                            <div className="absolute inset-0 bg-to-b from-blue-50/50 to-transparent dark:from-blue-900/5 pointer-events-none" />
+                            <div className="w-24 h-24 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center mb-6 shadow-lg shadow-blue-500/10">
+                                <Building2 className="w-10 h-10 text-blue-500" />
+                            </div>
+                            <h3 className="text-2xl font-extrabold text-slate-900 dark:text-white mb-3">No Active Workspace</h3>
+                            <p className="text-slate-500 max-w-sm mx-auto leading-relaxed">
+                                Select a workspace from the list on the left to view details, or create a new one to get started.
+                            </p>
+                        </motion.div>
+                    )
+                    }
+                </AnimatePresence >
+            </div >
+        </div >
     );
 }
