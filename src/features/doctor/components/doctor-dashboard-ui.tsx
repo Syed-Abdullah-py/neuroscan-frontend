@@ -50,18 +50,17 @@ export function DoctorDashboardUI({ stats, recentCases, user, workspaces }: Doct
                         Welcome back, Dr. {user.name}.
                     </p>
                 </div>
-                {user.workspaceId && (
-                    <div className="flex gap-3">
-                        <button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2.5 rounded-xl font-medium shadow-lg shadow-blue-600/20 transition-all hover:scale-105 active:scale-95">
-                            <Upload size={18} />
-                            Upload Scan
-                        </button>
-                        <button className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 px-4 py-2.5 rounded-xl font-medium transition-all hover:scale-105 active:scale-95">
-                            <Calendar size={18} />
-                            Schedule
-                        </button>
-                    </div>
-                )}
+                <div className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-4 py-2.5 rounded-xl shadow-sm">
+                    <Clock size={18} className="text-blue-500" />
+                    <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                        {new Date().toLocaleDateString('en-US', {
+                            weekday: 'long',
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                        })}
+                    </span>
+                </div>
             </div>
 
 

@@ -92,35 +92,58 @@ export function TeamManagement({ initialMembers, currentUserEmail, currentUserRo
 
     return (
         <div className="space-y-6">
-            <div className="flex items-center gap-4 border-b border-slate-200 dark:border-slate-800 mb-6">
-                <button
-                    onClick={() => setActiveTab("MEMBERS")}
-                    className={cn(
-                        "px-4 py-2 text-sm font-bold border-b-2 transition-colors",
-                        activeTab === "MEMBERS"
-                            ? "border-blue-600 text-blue-600 dark:text-blue-400"
-                            : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-300"
-                    )}
-                >
-                    Members
-                </button>
-                {currentUserRole === "OWNER" && (
-                    <button
-                        onClick={() => setActiveTab("SETTINGS")}
-                        className={cn(
-                            "px-4 py-2 text-sm font-bold border-b-2 transition-colors",
-                            activeTab === "SETTINGS"
-                                ? "border-blue-600 text-blue-600 dark:text-blue-400"
-                                : "border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-300"
-                        )}
-                    >
-                        Workspace Settings
-                    </button>
-                )}
-            </div>
+            <>
 
-            {activeTab === "MEMBERS" && (
-                <>
+                <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+                    <div className="p-6 border-b border-slate-100 dark:border-slate-800">
+                        <h2 className="text-lg font-bold text-slate-900 dark:text-white">Current Team Members</h2>
+                    </div>
+                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {members.map((member) => (
+                            <div key={member.userId} className="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                <div className="flex items-center gap-4">
+                                    <div className={cn(
+                                        "w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm",
+                                        member.role === "OWNER" ? "bg-slate-900" :
+                                            member.role === "ADMIN" ? "bg-purple-600" : "bg-blue-600"
+                                    )}>
+                                        {member.name ? member.name[0].toUpperCase() : "U"}
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-bold text-slate-900 dark:text-white">{member.name || "Unknown"}</p>
+                                        <p className="text-xs text-slate-500">{member.email}</p>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-6">
+                                    <div className="flex items-center gap-2">
+                                        {member.role === "OWNER" && <Shield className="w-4 h-4 text-slate-500" />}
+                                        {member.role === "ADMIN" && <Shield className="w-4 h-4 text-purple-500" />}
+                                        {member.role === "DOCTOR" && <Stethoscope className="w-4 h-4 text-blue-500" />}
+                                        <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">{member.role}</span>
+                                    </div>
+
+                                    {/* Only OWNER and ADMIN can remove members */}
+                                    {(currentUserRole === "OWNER" || currentUserRole === "ADMIN") &&
+                                        member.email !== currentUserEmail &&
+                                        member.role !== "OWNER" && (
+                                            <button
+                                                onClick={() => handleRemove(member.userId)}
+                                                disabled={isPending}
+                                                className="text-slate-400 hover:text-red-500 transition-colors p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20"
+                                                title="Remove Member"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                        )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Only show Add Team Member for OWNER and ADMIN */}
+                {(currentUserRole === "OWNER" || currentUserRole === "ADMIN") && (
                     <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
                         {/* ... Search UI ... */}
                         <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
@@ -170,63 +193,23 @@ export function TeamManagement({ initialMembers, currentUserEmail, currentUserRo
                             </div>
                         )}
 
+                        {/* No Results Message */}
+                        {query.length >= 2 && !isSearching && searchResults.length === 0 && (
+                            <div className="mt-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 text-center">
+                                <p className="text-sm text-slate-500 dark:text-slate-400">No users found matching "{query}"</p>
+                                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Try searching with a different name or email</p>
+                            </div>
+                        )}
+
                         {message && (
                             <div className={cn("mt-4 p-3 rounded-lg text-sm", isError ? "bg-red-50 text-red-600" : "bg-green-50 text-green-600")}>
                                 {message}
                             </div>
                         )}
                     </div>
+                )}
 
-                    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
-                        <div className="p-6 border-b border-slate-100 dark:border-slate-800">
-                            <h2 className="text-lg font-bold text-slate-900 dark:text-white">Current Team Members</h2>
-                        </div>
-                        <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                            {members.map((member) => (
-                                <div key={member.userId} className="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                                    <div className="flex items-center gap-4">
-                                        <div className={cn(
-                                            "w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm",
-                                            member.role === "OWNER" ? "bg-slate-900" :
-                                                member.role === "ADMIN" ? "bg-purple-600" : "bg-blue-600"
-                                        )}>
-                                            {member.name ? member.name[0].toUpperCase() : "U"}
-                                        </div>
-                                        <div>
-                                            <p className="text-sm font-bold text-slate-900 dark:text-white">{member.name || "Unknown"}</p>
-                                            <p className="text-xs text-slate-500">{member.email}</p>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex items-center gap-6">
-                                        <div className="flex items-center gap-2">
-                                            {member.role === "OWNER" && <Shield className="w-4 h-4 text-slate-500" />}
-                                            {member.role === "ADMIN" && <Shield className="w-4 h-4 text-purple-500" />}
-                                            {member.role === "DOCTOR" && <Stethoscope className="w-4 h-4 text-blue-500" />}
-                                            <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">{member.role}</span>
-                                        </div>
-
-                                        {member.email !== currentUserEmail && member.role !== "OWNER" && (
-                                            <button
-                                                onClick={() => handleRemove(member.userId)}
-                                                disabled={isPending}
-                                                className="text-slate-400 hover:text-red-500 transition-colors p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20"
-                                                title="Remove Member"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </>
-            )}
-
-            {activeTab === "SETTINGS" && currentUserRole === "OWNER" && (
-                <WorkspaceSettings workspaceId={workspaceId} currentName={workspaceName} />
-            )}
+            </>
         </div>
     );
 }

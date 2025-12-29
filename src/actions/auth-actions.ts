@@ -828,19 +828,22 @@ export async function searchUsers(query: string) {
 
     const memberIds = workspaceMembers.map(m => m.userId);
 
+    // Convert query to lowercase for case-insensitive matching
+    const lowerQuery = query.toLowerCase();
+
     const users = await prisma.user.findMany({
       where: {
         AND: [
           {
             OR: [
               { name: { contains: query } },
-              { email: { contains: query } }
+              { email: { contains: lowerQuery } }
             ]
           },
           { id: { notIn: memberIds } }
         ]
       },
-      take: 5,
+      take: 10,
       select: {
         id: true,
         name: true,

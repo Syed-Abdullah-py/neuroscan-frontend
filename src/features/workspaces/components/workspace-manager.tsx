@@ -5,7 +5,7 @@ import { leaveWorkspace, requestJoinWorkspace, createWorkspace, getDiscoverableW
 import { Loader2, LogOut, Plus, Search, Building2, UserPlus, CheckCircle2, AlertCircle, ArrowLeft, ChevronRight, Briefcase } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 interface WorkspaceManagerProps {
     currentWorkspaceId?: string;
@@ -33,15 +33,7 @@ export function WorkspaceManager({ currentWorkspaceId, workspaces, userGlobalRol
     // -- State --
     const [availableWorkspaces, setAvailableWorkspaces] = useState<any[]>([]);
 
-    const searchParams = useSearchParams();
-
     // -- Effects --
-    useEffect(() => {
-        if (searchParams.get("action") === "join") {
-            setMode("JOIN");
-        }
-    }, [searchParams]);
-
     useEffect(() => {
         if (mode === "JOIN") {
             getDiscoverableWorkspaces().then(setAvailableWorkspaces);
@@ -226,7 +218,7 @@ export function WorkspaceManager({ currentWorkspaceId, workspaces, userGlobalRol
             <div className="flex flex-col gap-3 mb-4">
                 {/* Join Button */}
                 <button
-                    onClick={() => router.push("?action=join")}
+                    onClick={() => setMode("JOIN")}
                     className="group w-full flex items-center justify-center gap-2 px-4 py-3
                bg-blue-50 dark:bg-blue-900/30
                border border-blue-200 dark:border-blue-700
@@ -330,8 +322,8 @@ export function WorkspaceManager({ currentWorkspaceId, workspaces, userGlobalRol
                                             e.stopPropagation();
                                             handleLeave(ws.id);
                                         }}
-                                        className="absolute top-4 right-4 p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg opacity-0 group-hover:opacity-100 transition-all z-10 cursor-pointer"
-                                        title="Leave Workspace"
+                                        className="absolute top-1/2 right-1 p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg opacity-100 transition-all z-10 cursor-pointer"
+
                                     >
                                         <LogOut size={14} />
                                     </div>

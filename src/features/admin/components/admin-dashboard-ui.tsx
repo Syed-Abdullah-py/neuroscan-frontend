@@ -57,18 +57,17 @@ export function AdminDashboardUI({ user, joinRequests, workspaces }: AdminDashbo
                         {`Welcome back, Mr. ${user.name}.`}
                     </p>
                 </div>
-                {user.workspaceId && (
-                    <div className="flex gap-3">
-                        <button className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2.5 rounded-xl font-medium shadow-lg shadow-blue-600/20 transition-all hover:scale-105 active:scale-95">
-                            <UserPlus size={18} />
-                            Invite Member
-                        </button>
-                        <button className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-750 text-slate-700 dark:text-slate-200 px-4 py-2.5 rounded-xl font-medium transition-all hover:scale-105 active:scale-95">
-                            <FileText size={18} />
-                            Reports
-                        </button>
-                    </div>
-                )}
+                <div className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-4 py-2.5 rounded-xl shadow-sm">
+                    <Clock size={18} className="text-blue-500" />
+                    <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                        {new Date().toLocaleDateString('en-US', {
+                            weekday: 'long',
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                        })}
+                    </span>
+                </div>
             </div>
 
             {!user.workspaceId ? (
@@ -147,7 +146,7 @@ export function AdminDashboardUI({ user, joinRequests, workspaces }: AdminDashbo
                         />
                     </motion.div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                         {/* Recent Activity / Content Area */}
                         <motion.div
                             variants={item}
@@ -195,34 +194,6 @@ export function AdminDashboardUI({ user, joinRequests, workspaces }: AdminDashbo
                                 <div className="p-6 text-center text-slate-500 text-sm">
                                     <Activity className="w-10 h-10 mx-auto mb-3 text-slate-300 dark:text-slate-700" />
                                     Activity logs will appear here.
-                                </div>
-                            </div>
-                        </motion.div>
-
-                        {/* Quick Actions Sidebar */}
-                        <motion.div
-                            variants={item}
-                            initial="hidden"
-                            animate="show"
-                            className="space-y-6"
-                        >
-                            <div className="bg-to-br from-blue-600 to-blue-700 rounded-3xl p-6 text-white shadow-xl shadow-blue-900/20">
-                                <h3 className="text-lg font-bold mb-2">Admin Tools</h3>
-                                <p className="text-blue-100 text-sm mb-6">Quick access to workspace settings and audit logs.</p>
-
-                                <div className="space-y-3">
-                                    <button className="w-full flex items-center justify-between p-3 bg-white/10 hover:bg-white/20 rounded-xl transition-colors backdrop-blur-sm border border-white/10">
-                                        <span className="text-sm font-medium">Workspace Settings</span>
-                                        <ChevronRight size={16} />
-                                    </button>
-                                    <button className="w-full flex items-center justify-between p-3 bg-white/10 hover:bg-white/20 rounded-xl transition-colors backdrop-blur-sm border border-white/10">
-                                        <span className="text-sm font-medium">Audit Logs</span>
-                                        <ChevronRight size={16} />
-                                    </button>
-                                    <button className="w-full flex items-center justify-between p-3 bg-white/10 hover:bg-white/20 rounded-xl transition-colors backdrop-blur-sm border border-white/10">
-                                        <span className="text-sm font-medium">User Management</span>
-                                        <ChevronRight size={16} />
-                                    </button>
                                 </div>
                             </div>
                         </motion.div>

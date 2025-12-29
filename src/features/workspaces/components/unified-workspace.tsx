@@ -4,7 +4,7 @@ import { useState } from "react";
 import { WorkspaceManager } from "./workspace-manager";
 import { WorkspaceSettings } from "@/features/admin/components/workspace-settings";
 import { TeamManagement } from "@/features/admin/components/team-management";
-import { Building2, Settings, Users, Copy, Check, LayoutDashboard, ChevronRight, RefreshCw } from "lucide-react";
+import { Building2, Settings, Users, Copy, Check, LayoutDashboard, ChevronRight, RefreshCw, Shield, Stethoscope } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { JoinRequestsList } from "@/features/admin/components/join-requests-list";
@@ -34,6 +34,8 @@ export function UnifiedWorkspace({ user, workspaces, currentWorkspaceName, membe
 
     // Resolve permissions for the CURRENT active workspace
     const currentMembership = workspaces.find(w => w.id === user.workspaceId);
+    // User has an active workspace only if they have both a workspaceId AND a membership in that workspace
+    const hasActiveWorkspace = !!(user.workspaceId && currentMembership);
     // If user has a workspace membership, use that role; otherwise default to their global role
     const workspaceRole = currentMembership?.role || user.globalRole || "[ERROR] Please Debug";
 
@@ -75,7 +77,7 @@ export function UnifiedWorkspace({ user, workspaces, currentWorkspaceName, membe
             {/* Center Content: Active Workspace Details */}
             <div className="xl:col-span-5 order-last xl:order-0">
                 <AnimatePresence mode="wait">
-                    {user.workspaceId ? (
+                    {hasActiveWorkspace ? (
                         <motion.div
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
@@ -103,7 +105,7 @@ export function UnifiedWorkspace({ user, workspaces, currentWorkspaceName, membe
                                                 onClick={handleCopyId}
                                                 className="group flex items-center gap-2 px-3 py-1 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 text-xs font-medium transition-all"
                                             >
-                                                <span className="font-mono">ID: {user.workspaceId.slice(0, 8)}...</span>
+                                                <span className="font-mono">ID: {user.workspaceId?.slice(0, 8) ?? ""}...</span>
                                                 {copied ? <Check size={12} className="text-green-500" /> : <Copy size={12} className="group-hover:text-slate-800 dark:group-hover:text-white" />}
                                             </button>
                                         </div>
@@ -164,32 +166,92 @@ export function UnifiedWorkspace({ user, workspaces, currentWorkspaceName, membe
                                         transition={{ duration: 0.3 }}
                                         className="space-y-8"
                                     >
-                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                            <div className="group p-6 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-lg shadow-slate-100/50 dark:shadow-black/20 hover:shadow-xl hover:border-blue-100 dark:hover:border-blue-900/30 transition-all">
-                                                <div className="flex items-start justify-between mb-4">
-                                                    <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform">
-                                                        <Users size={24} />
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                                            {/* Admins */}
+                                            <div className="group p-6 rounded-2xl bg-white dark:bg-slate-800/60
+                            border border-slate-200 dark:border-slate-700
+                            hover:shadow-lg hover:border-purple-300
+                            dark:hover:border-purple-700 transition-all">
+                                                <div className="grid grid-cols-[auto_1fr] items-center gap-6 h-full">
+                                                    {/* Left: Icon + Label */}
+                                                    <div className="flex flex-col gap-2">
+                                                        <div className="p-3 w-fit rounded-xl bg-purple-100
+                                        dark:bg-purple-900/30 text-purple-600
+                                        dark:text-purple-400">
+                                                            <Shield size={20} />
+                                                        </div>
+                                                        <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+                                                            Admins
+                                                        </p>
                                                     </div>
-                                                    <span className="flex items-center text-xs font-medium text-green-600 bg-green-50 dark:bg-green-900/20 px-2 py-1 rounded-lg">
-                                                        Active
-                                                    </span>
+
+                                                    {/* Center: Count */}
+                                                    <div className="flex justify-center">
+                                                        <p className="text-4xl font-extrabold text-slate-900 dark:text-white">
+                                                            {members.filter((m: any) => m.role === "OWNER" || m.role === "ADMIN").length}
+                                                        </p>
+                                                    </div>
                                                 </div>
-                                                <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Total Members</p>
-                                                <p className="text-4xl font-extrabold text-slate-900 dark:text-white mt-2">{members.length}</p>
                                             </div>
 
-                                            {/* Placeholder for future stats */}
-                                            <div className="p-6 rounded-2xl bg-slate-50 dark:bg-slate-950/50 border border-dashed border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center text-center opacity-70">
-                                                <div className="p-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-400 mb-3">
-                                                    <LayoutDashboard size={24} />
+                                            {/* Doctors */}
+                                            <div className="group p-6 rounded-2xl bg-white dark:bg-slate-800/60
+                            border border-slate-200 dark:border-slate-700
+                            hover:shadow-lg hover:border-emerald-300
+                            dark:hover:border-emerald-700 transition-all">
+                                                <div className="grid grid-cols-[auto_1fr] items-center gap-6 h-full">
+                                                    {/* Left: Icon + Label */}
+                                                    <div className="flex flex-col gap-2">
+                                                        <div className="p-3 w-fit rounded-xl bg-emerald-100
+                                        dark:bg-emerald-900/30 text-emerald-600
+                                        dark:text-emerald-400">
+                                                            <Stethoscope size={20} />
+                                                        </div>
+                                                        <p className="text-sm font-semibold text-slate-500 dark:text-slate-400">
+                                                            Doctors
+                                                        </p>
+                                                    </div>
+
+                                                    {/* Center: Count */}
+                                                    <div className="flex justify-center">
+                                                        <p className="text-4xl font-extrabold text-slate-900 dark:text-white">
+                                                            {members.filter((m: any) => m.role === "DOCTOR").length}
+                                                        </p>
+                                                    </div>
                                                 </div>
-                                                <p className="text-sm font-medium text-slate-500">More stats coming soon</p>
+                                            </div>
+
+                                            {/* Total Members */}
+                                            <div className="sm:col-span-2 group p-7 rounded-2xl
+                            bg-to-br from-blue-50 to-white
+                            dark:from-blue-950/40 dark:to-slate-800/60
+                            border border-blue-200 dark:border-blue-800
+                            hover:shadow-xl transition-all">
+                                                <div className="grid grid-cols-[auto_1fr] items-center gap-8">
+                                                    {/* Left: Icon + Label */}
+                                                    <div className="flex flex-col gap-2">
+                                                        <div className="p-3 w-fit rounded-xl bg-blue-100
+                                        dark:bg-blue-900/30 text-blue-600
+                                        dark:text-blue-400">
+                                                            <Users size={22} />
+                                                        </div>
+                                                        <p className="text-sm font-semibold text-slate-600 dark:text-slate-400">
+                                                            Total Members
+                                                        </p>
+                                                    </div>
+
+                                                    {/* Center: Count */}
+                                                    <div className="flex justify-center">
+                                                        <p className="text-5xl font-extrabold text-slate-900 dark:text-white">
+                                                            {members.length}
+                                                        </p>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
-
-                                        <div className="hidden"></div>
                                     </motion.div>
                                 )}
+
 
 
                                 {activeTab === "members" && (
