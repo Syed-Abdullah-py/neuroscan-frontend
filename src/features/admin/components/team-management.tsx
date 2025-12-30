@@ -36,6 +36,9 @@ export function TeamManagement({ initialMembers, currentUserEmail, currentUserRo
     const [searchResults, setSearchResults] = useState<any[]>([]);
     const [isSearching, startSearch] = useTransition();
 
+    // Invite Role State
+    const [inviteRole, setInviteRole] = useState<"DOCTOR" | "ADMIN">("DOCTOR");
+
     // Debounce search (inline implementation instead of hook for simplicity if hook missing)
     useEffect(() => {
         if (query.length < 2) {
@@ -60,7 +63,7 @@ export function TeamManagement({ initialMembers, currentUserEmail, currentUserRo
         setIsError(false);
 
         startTransition(async () => {
-            const result = await inviteUser(userId);
+            const result = await inviteUser(userId, inviteRole);
             if (result.success) {
                 setMessage(result.message || "Invitation sent.");
                 setQuery("");
@@ -165,6 +168,37 @@ export function TeamManagement({ initialMembers, currentUserEmail, currentUserRo
                                     <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
                                 </div>
                             )}
+                        </div>
+
+                        {/* Invite Role Toggle */}
+                        <div className="flex items-center gap-3 mt-4 mb-2">
+                            <span className="text-sm text-slate-500 dark:text-slate-400 font-medium">Invite as:</span>
+                            <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
+                                <button
+                                    onClick={() => setInviteRole("DOCTOR")}
+                                    className={cn(
+                                        "px-3 py-1.5 text-xs font-bold rounded-md transition-all flex items-center gap-2",
+                                        inviteRole === "DOCTOR"
+                                            ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm"
+                                            : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                                    )}
+                                >
+                                    <Stethoscope size={14} />
+                                    Doctor
+                                </button>
+                                <button
+                                    onClick={() => setInviteRole("ADMIN")}
+                                    className={cn(
+                                        "px-3 py-1.5 text-xs font-bold rounded-md transition-all flex items-center gap-2",
+                                        inviteRole === "ADMIN"
+                                            ? "bg-white dark:bg-slate-700 text-purple-600 dark:text-purple-400 shadow-sm"
+                                            : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                                    )}
+                                >
+                                    <Shield size={14} />
+                                    Admin
+                                </button>
+                            </div>
                         </div>
 
                         {/* Search Results */}

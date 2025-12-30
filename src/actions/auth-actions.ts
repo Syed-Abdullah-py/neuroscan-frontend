@@ -700,15 +700,14 @@ export async function resolveJoinRequest(requestId: string, action: "ACCEPT" | "
 
     if (action === "ACCEPT") {
       await prisma.$transaction(async (tx) => {
-        // Add as Doctor by default? Or Admin?
-        // Let's default to DOCTOR for safety, Owner can promote later if we impl that.
-        // Or maybe the request should specify? Schema doesn't have it.
-        // Default to DOCTOR.
+        // Infer role from global role
+        const role = request.user.role === "ADMIN" ? "ADMIN" : "DOCTOR";
+
         await tx.workspaceMember.create({
           data: {
             userId: request.userId,
             workspaceId: request.workspaceId,
-            role: "DOCTOR"
+            role: role
           }
         });
         await tx.joinRequest.delete({ where: { id: requestId } });
@@ -991,7 +990,7 @@ export async function getDiscoverableWorkspaces() {
  * Invite a user to the current workspace.
  * Creates an Invitation record.
  */
-export async function inviteUser(targetUserId: string) {
+export async function inviteUser(targetUserId: string, role?: "ADMIN" | "DOCTOR") {
   try {
     const currentUser = await getCurrentUser();
     if (!currentUser?.workspaceId || (currentUser.role !== "owner" && currentUser.role !== "admin")) {
@@ -1013,12 +1012,15 @@ export async function inviteUser(targetUserId: string) {
     });
     if (existingInvite) return { success: false, message: "Invitation already sent." };
 
-    // Determine Workspace Role based on Global Role
-    // Global ADMIN -> Workspace ADMIN
-    // Global RADIOLOGIST -> Workspace DOCTOR
-    // If not set, default to DOCTOR
-    let workspaceRole = "DOCTOR";
-    if (targetUser.role === "ADMIN") workspaceRole = "ADMIN";
+    // Determine Workspace Role
+    // If role is provided, use it.
+    // Otherwise, infer from Global Role (Legacy behavior fallback)
+    let workspaceRole = role || "DOCTOR";
+
+    // Explicit validation just in case
+    if (workspaceRole !== "ADMIN" && workspaceRole !== "DOCTOR") {
+      workspaceRole = "DOCTOR";
+    }
 
     // Create Invitation
     await prisma.invitation.create({

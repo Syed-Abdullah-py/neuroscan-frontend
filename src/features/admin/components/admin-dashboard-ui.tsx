@@ -1,5 +1,5 @@
 "use client";
-
+import { useState } from "react";
 import {
     Users,
     FileText,
@@ -14,8 +14,10 @@ import {
     Brain
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { JoinRequestsList } from "@/features/admin/components/join-requests-list";
+import { CreateCaseWizard } from "@/features/cases/components/create-case-wizard";
+import { PatientManagement } from "@/features/admin/components/patient-management";
 import Link from "next/link";
 
 interface AdminDashboardUIProps {
@@ -48,8 +50,36 @@ export function AdminDashboardUI({ user, joinRequests, workspaces }: AdminDashbo
         show: { opacity: 1, y: 0 }
     };
 
+    const [showCreateWizard, setShowCreateWizard] = useState(false);
+
     return (
-        <div className="space-y-8 p-6 md:p-8 max-w-7xl mx-auto">
+        <div className="space-y-8 p-6 md:p-8 max-w-7xl mx-auto relative">
+
+            {/* Overlay for Wizard */}
+            <AnimatePresence>
+                {showCreateWizard && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+                    >
+                        <div className="relative w-full max-w-2xl">
+                            <button
+                                onClick={() => setShowCreateWizard(false)}
+                                className="absolute -top-12 right-0 text-white hover:text-slate-200"
+                            >
+                                Close
+                            </button>
+                            <CreateCaseWizard
+                                workspaceId={user.workspaceId!}
+                                onSuccess={() => setShowCreateWizard(false)}
+                            />
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
@@ -58,16 +88,28 @@ export function AdminDashboardUI({ user, joinRequests, workspaces }: AdminDashbo
                         {`Welcome back, Mr. ${user.name}.`}
                     </p>
                 </div>
-                <div className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-4 py-2.5 rounded-xl shadow-sm">
-                    <Clock size={18} className="text-blue-500" />
-                    <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
-                        {new Date().toLocaleDateString('en-US', {
-                            weekday: 'long',
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric'
-                        })}
-                    </span>
+                <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-4 py-2.5 rounded-xl shadow-sm">
+                        <Clock size={18} className="text-blue-500" />
+                        <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
+                            {new Date().toLocaleDateString('en-US', {
+                                weekday: 'long',
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric'
+                            })}
+                        </span>
+                    </div>
+
+                    {user.workspaceId && (
+                        <button
+                            onClick={() => setShowCreateWizard(true)}
+                            className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 shadow-lg shadow-blue-600/25 transition-all"
+                        >
+                            <UserPlus size={18} />
+                            Register Case
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -148,55 +190,47 @@ export function AdminDashboardUI({ user, joinRequests, workspaces }: AdminDashbo
                     </motion.div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                        {/* Recent Activity / Content Area */}
+                        {/* Left Column: Access Requests */}
                         <motion.div
                             variants={item}
                             initial="hidden"
                             animate="show"
-                            className="lg:col-span-2 space-y-8"
+                            className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden"
                         >
-                            {/* Access Requests Section */}
-                            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-                                <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
-                                    <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                                        <ShieldCheck className="w-5 h-5 text-blue-500" />
-                                        Access Requests
-                                    </h2>
-                                    {joinRequests.length > 0 && (
-                                        <span className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 text-xs font-bold px-2 py-1 rounded-full">
-                                            {joinRequests.length} Pending
-                                        </span>
-                                    )}
-                                </div>
-
-                                {joinRequests.length === 0 ? (
-                                    <div className="p-12 text-center">
-                                        <div className="w-12 h-12 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto mb-3">
-                                            <CheckCircle2 className="w-6 h-6 text-green-600 dark:text-green-400" />
-                                        </div>
-                                        <h3 className="text-sm font-semibold text-slate-900 dark:text-white">All Caught Up</h3>
-                                        <p className="text-xs text-slate-500 mt-1">No pending access requests at the moment.</p>
-                                    </div>
-                                ) : (
-                                    <div className="p-2">
-                                        <JoinRequestsList requests={joinRequests} currentUserEmail={user.email || ""} />
-                                    </div>
+                            <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+                                <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                                    <ShieldCheck className="w-5 h-5 text-blue-500" />
+                                    Access Requests
+                                </h2>
+                                {joinRequests.length > 0 && (
+                                    <span className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 text-xs font-bold px-2 py-1 rounded-full">
+                                        {joinRequests.length} Pending
+                                    </span>
                                 )}
                             </div>
 
-                            {/* Recent Activity Placeholder */}
-                            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-                                <div className="p-6 border-b border-slate-200 dark:border-slate-800">
-                                    <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                                        <Clock className="w-5 h-5 text-slate-400" />
-                                        System Activity
-                                    </h2>
+                            {joinRequests.length === 0 ? (
+                                <div className="p-12 text-center">
+                                    <div className="w-12 h-12 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                                        <CheckCircle2 className="w-6 h-6 text-green-600 dark:text-green-400" />
+                                    </div>
+                                    <h3 className="text-sm font-semibold text-slate-900 dark:text-white">All Caught Up</h3>
+                                    <p className="text-xs text-slate-500 mt-1">No pending access requests at the moment.</p>
                                 </div>
-                                <div className="p-6 text-center text-slate-500 text-sm">
-                                    <Brain className="w-10 h-10 mx-auto mb-3 text-slate-300 dark:text-slate-700" />
-                                    Activity logs will appear here.
+                            ) : (
+                                <div className="p-2">
+                                    <JoinRequestsList requests={joinRequests} currentUserEmail={user.email || ""} />
                                 </div>
-                            </div>
+                            )}
+                        </motion.div>
+
+                        {/* Right Column: Placeholder or something else */}
+                        <motion.div
+                            variants={item}
+                            initial="hidden"
+                            animate="show"
+                        >
+                            <PatientManagement workspaceId={user.workspaceId} />
                         </motion.div>
                     </div>
                 </>

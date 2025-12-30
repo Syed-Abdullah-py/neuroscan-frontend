@@ -29,7 +29,6 @@ const adminRoutes = [
 
 const doctorRoutes = [
   { name: "Overview", href: "/doctor", icon: LayoutDashboard },
-  { name: "My Cases", href: "/doctor/cases", icon: FileText },
   { name: "Workspaces", href: "/doctor/workspaces", icon: Building2 },
 ];
 

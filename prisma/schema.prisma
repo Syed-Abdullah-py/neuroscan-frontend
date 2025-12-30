@@ -76,6 +76,7 @@ model Patient {
   lastName    String
   dob         DateTime
   gender      String
+  phoneNumber String   @unique
   mrn         String?  
   
   createdAt   DateTime @default(now())
@@ -88,8 +89,14 @@ model Case {
   id          String     @id @default(cuid())
   status      String     @default("PENDING") 
   priority    String     @default("normal")
-  scanUrl     String     
-  maskUrl     String?
+  
+  // New file structure
+  fileReferences String     // JSON string storing list of file paths/references
+  
+  // Doctor's verdict
+  verdict        String?
+  verdictUpdatedAt DateTime?
+
   bodyPart    String     @default("BRAIN")
   notes       String?
   

@@ -3,7 +3,8 @@
 import { Activity, Clock, FileText, CheckCircle2, Upload, Calendar, Building2, LogOut, Stethoscope, Brain } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import { useState } from "react";
 
 interface DoctorDashboardUIProps {
     stats: {
@@ -40,8 +41,81 @@ export function DoctorDashboardUI({ stats, recentCases, user, workspaces }: Doct
         show: { opacity: 1, y: 0 }
     };
 
+    const [selectedCase, setSelectedCase] = useState<any>(null);
+    const [verdict, setVerdict] = useState("");
+    const [updating, setUpdating] = useState(false);
+
+    const handleUpdateVerdict = async (caseId: string) => {
+        if (!verdict) return;
+        setUpdating(true);
+        try {
+            const { updateCaseVerdict } = await import("@/features/cases/actions/case-actions");
+            await updateCaseVerdict(caseId, verdict);
+            setSelectedCase(null);
+            setVerdict("");
+            // Ideally trigger a refresh or optimistically update
+        } catch (e) {
+            console.error(e);
+            alert("Failed to update verdict");
+        } finally {
+            setUpdating(false);
+        }
+    };
+
+    const [filterStatus, setFilterStatus] = useState("ALL");
+    const [filterPriority, setFilterPriority] = useState("ALL");
+
+    const filteredCases = recentCases.filter(c => {
+        if (filterStatus !== "ALL" && c.status !== filterStatus) return false;
+        // Assuming priority is a field on case, defaulting to normal if missing. 
+        // Need to check if 'priority' exists on the case object passed in recentCases.
+        // Based on previous code, Case model has priority. 
+        if (filterPriority !== "ALL" && (c.priority || 'normal') !== filterPriority) return false;
+        return true;
+    });
+
     return (
         <div className="space-y-8 p-6 md:p-8 max-w-7xl mx-auto">
+            {/* Verdict Modal (Same as before) */}
+            <AnimatePresence>
+                {selectedCase && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+                    >
+                        <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 max-w-md w-full border border-slate-200 dark:border-slate-800 shadow-2xl">
+                            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Update Diagnostic Verdict</h3>
+                            <p className="text-sm text-slate-500 mb-4">
+                                Please provide your professional assessment for Case #{selectedCase.id.slice(-4)}.
+                            </p>
+                            <textarea
+                                value={verdict}
+                                onChange={e => setVerdict(e.target.value)}
+                                className="w-full h-32 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 mb-4 resize-none focus:ring-2 focus:ring-blue-500 outline-none"
+                                placeholder="Enter your detailed findings here..."
+                            />
+                            <div className="flex gap-2 justify-end">
+                                <button
+                                    onClick={() => setSelectedCase(null)}
+                                    className="px-4 py-2 text-slate-500 hover:text-slate-700 font-medium"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={() => handleUpdateVerdict(selectedCase.id)}
+                                    disabled={updating || !verdict}
+                                    className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold shadow-lg shadow-blue-500/25 disabled:opacity-50"
+                                >
+                                    {updating ? "Submitting..." : "Submit Verdict"}
+                                </button>
+                            </div>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
@@ -62,8 +136,6 @@ export function DoctorDashboardUI({ stats, recentCases, user, workspaces }: Doct
                     </span>
                 </div>
             </div>
-
-
 
             {!user.workspaceId ? (
                 <motion.div
@@ -146,6 +218,43 @@ export function DoctorDashboardUI({ stats, recentCases, user, workspaces }: Doct
                         />
                     </motion.div>
 
+                    {/* Filters */}
+                    <div className="flex flex-wrap gap-4 items-center">
+                        <div className="flex items-center gap-2 bg-white dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-800">
+                            {["ALL", "PENDING", "COMPLETED"].map((status) => (
+                                <button
+                                    key={status}
+                                    onClick={() => setFilterStatus(status)}
+                                    className={cn(
+                                        "px-3 py-1.5 text-xs font-bold rounded-md transition-all",
+                                        filterStatus === status
+                                            ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400"
+                                            : "text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800"
+                                    )}
+                                >
+                                    {status === "ALL" ? "All Status" : status}
+                                </button>
+                            ))}
+                        </div>
+
+                        <div className="flex items-center gap-2 bg-white dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-800">
+                            {["ALL", "urgent", "normal"].map((prio) => (
+                                <button
+                                    key={prio}
+                                    onClick={() => setFilterPriority(prio)}
+                                    className={cn(
+                                        "px-3 py-1.5 text-xs font-bold rounded-md transition-all capitalize",
+                                        filterPriority === prio
+                                            ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400"
+                                            : "text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800"
+                                    )}
+                                >
+                                    {prio === "ALL" ? "All Priority" : prio}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
                     {/* Recent Cases Section */}
                     <motion.div
                         initial={{ opacity: 0, y: 20 }}
@@ -156,11 +265,11 @@ export function DoctorDashboardUI({ stats, recentCases, user, workspaces }: Doct
                         <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
                             <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
                                 <Brain className="w-5 h-5 text-blue-500" />
-                                Recent Assigned Cases
+                                Assigned Cases
                             </h2>
-                            <Link href="/cases" className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline">
+                            {/* <Link href="/cases" className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline">
                                 View All
-                            </Link>
+                            </Link> */}
                         </div>
 
                         <div className="overflow-x-auto">
@@ -169,20 +278,21 @@ export function DoctorDashboardUI({ stats, recentCases, user, workspaces }: Doct
                                     <tr>
                                         <th className="text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider py-4 px-6">Patient</th>
                                         <th className="text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider py-4 px-6">Scan Type</th>
+                                        <th className="text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider py-4 px-6">Priority</th>
                                         <th className="text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider py-4 px-6">Status</th>
                                         <th className="text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider py-4 px-6">Date</th>
-                                        <th className="text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider py-4 px-6">Action</th>
+                                        <th className="text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider py-4 px-6">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                                    {recentCases.length === 0 ? (
+                                    {filteredCases.length === 0 ? (
                                         <tr>
-                                            <td colSpan={5} className="py-12 text-center text-slate-500 dark:text-slate-400">
-                                                No active cases found. You're all caught up!
+                                            <td colSpan={6} className="py-12 text-center text-slate-500 dark:text-slate-400">
+                                                No cases match your filters.
                                             </td>
                                         </tr>
                                     ) : (
-                                        recentCases.map((c) => (
+                                        filteredCases.map((c) => (
                                             <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                                                 <td className="py-4 px-6">
                                                     <div className="flex flex-col">
@@ -198,18 +308,43 @@ export function DoctorDashboardUI({ stats, recentCases, user, workspaces }: Doct
                                                     </span>
                                                 </td>
                                                 <td className="py-4 px-6">
+                                                    <span className={cn("text-xs font-bold uppercase", c.priority === 'urgent' ? 'text-red-500' : 'text-slate-500')}>
+                                                        {c.priority || 'Normal'}
+                                                    </span>
+                                                </td>
+                                                <td className="py-4 px-6">
                                                     <StatusBadge status={c.status} />
                                                 </td>
                                                 <td className="py-4 px-6 text-sm text-slate-500">
                                                     {new Date(c.updatedAt).toLocaleDateString()}
                                                 </td>
                                                 <td className="py-4 px-6 text-right">
-                                                    <Link
-                                                        href={`/scan/${c.id}`}
-                                                        className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
-                                                    >
-                                                        Open Scan &rarr;
-                                                    </Link>
+                                                    <div className="flex items-center justify-end gap-2">
+                                                        <button
+                                                            className="p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                                                            title="View Scans"
+                                                        >
+                                                            <Upload size={16} /> {/* Should be Eye or Activity but using Upload as placeholder icon */}
+                                                        </button>
+                                                        <button
+                                                            className="p-1.5 text-slate-400 hover:text-purple-600 dark:hover:text-purple-400 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors"
+                                                            title="Generate Report"
+                                                        >
+                                                            <FileText size={16} />
+                                                        </button>
+                                                        {c.status !== 'COMPLETED' ? (
+                                                            <button
+                                                                onClick={() => setSelectedCase(c)}
+                                                                className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg shadow-sm"
+                                                            >
+                                                                Verdict
+                                                            </button>
+                                                        ) : (
+                                                            <span className="text-xs font-bold text-green-600 flex items-center gap-1">
+                                                                <CheckCircle2 size={14} /> Done
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 </td>
                                             </tr>
                                         ))
