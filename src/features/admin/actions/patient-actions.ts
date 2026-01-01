@@ -5,16 +5,17 @@ import { getCurrentUser } from "@/actions/auth-actions"
 import { revalidatePath } from "next/cache"
 
 export async function checkPatientByPhone(phoneNumber: string, workspaceId: string) {
-    if (!phoneNumber || !workspaceId) return null
+    if (!phoneNumber || !workspaceId) return []
 
-    const patient = await prisma.patient.findFirst({
+    const patients = await prisma.patient.findMany({
         where: {
             phoneNumber,
             workspaceId
-        }
+        },
+        orderBy: { updatedAt: 'desc' }
     })
 
-    return patient
+    return patients
 }
 
 export async function createPatient(data: {
@@ -24,6 +25,9 @@ export async function createPatient(data: {
     gender: string
     phoneNumber: string
     mrn?: string
+    cnic?: string
+    address?: string
+    city?: string
     workspaceId: string
 }) {
     const user = await getCurrentUser()
@@ -39,6 +43,9 @@ export async function createPatient(data: {
             gender: data.gender,
             phoneNumber: data.phoneNumber,
             mrn: data.mrn,
+            cnic: data.cnic,
+            address: data.address,
+            city: data.city,
             workspaceId: data.workspaceId
         }
     })
@@ -53,6 +60,9 @@ export async function updatePatient(id: string, data: Partial<{
     dob: Date
     gender: string
     mrn: string
+    cnic: string
+    address: string
+    city: string
 }>) {
     const user = await getCurrentUser()
     if (!user || (user.role !== 'admin' && user.role !== 'owner')) {
@@ -78,4 +88,17 @@ export async function getAllPatients(workspaceId: string) {
         where: { workspaceId },
         orderBy: { updatedAt: 'desc' }
     })
+}
+
+export async function deletePatient(id: string) {
+    const user = await getCurrentUser()
+    if (!user || (user.role !== 'admin' && user.role !== 'owner')) {
+        throw new Error("Unauthorized")
+    }
+
+    await prisma.patient.delete({
+        where: { id }
+    })
+
+    revalidatePath(`/admin`)
 }

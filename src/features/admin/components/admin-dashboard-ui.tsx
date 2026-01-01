@@ -16,7 +16,6 @@ import {
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { JoinRequestsList } from "@/features/admin/components/join-requests-list";
-import { CreateCaseWizard } from "@/features/cases/components/create-case-wizard";
 import { PatientManagement } from "@/features/admin/components/patient-management";
 import Link from "next/link";
 
@@ -50,35 +49,8 @@ export function AdminDashboardUI({ user, joinRequests, workspaces }: AdminDashbo
         show: { opacity: 1, y: 0 }
     };
 
-    const [showCreateWizard, setShowCreateWizard] = useState(false);
-
     return (
         <div className="space-y-8 p-6 md:p-8 max-w-7xl mx-auto relative">
-
-            {/* Overlay for Wizard */}
-            <AnimatePresence>
-                {showCreateWizard && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
-                    >
-                        <div className="relative w-full max-w-2xl">
-                            <button
-                                onClick={() => setShowCreateWizard(false)}
-                                className="absolute -top-12 right-0 text-white hover:text-slate-200"
-                            >
-                                Close
-                            </button>
-                            <CreateCaseWizard
-                                workspaceId={user.workspaceId!}
-                                onSuccess={() => setShowCreateWizard(false)}
-                            />
-                        </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
 
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -102,13 +74,22 @@ export function AdminDashboardUI({ user, joinRequests, workspaces }: AdminDashbo
                     </div>
 
                     {user.workspaceId && (
-                        <button
-                            onClick={() => setShowCreateWizard(true)}
-                            className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 shadow-lg shadow-blue-600/25 transition-all"
-                        >
-                            <UserPlus size={18} />
-                            Register Case
-                        </button>
+                        <div className="flex gap-2">
+                            <Link
+                                href="/admin/patients/new"
+                                className="bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 transition-all"
+                            >
+                                <UserPlus size={18} />
+                                Add Patient
+                            </Link>
+                            <Link
+                                href="/admin/cases/new"
+                                className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 shadow-lg shadow-blue-600/25 transition-all"
+                            >
+                                <FileText size={18} />
+                                Register New Case
+                            </Link>
+                        </div>
                     )}
                 </div>
             </div>

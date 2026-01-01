@@ -113,7 +113,7 @@ export default function LandingPage() {
           className="text-5xl sm:text-6xl md:text-7xl font-extrabold tracking-tight text-slate-900 dark:text-white max-w-5xl mb-6 leading-[1.1]"
         >
           The Future of <br className="hidden md:block" />
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-cyan-500">Neuro-Imaging</span> Intelligence
+          <span className="text-transparent bg-clip-text bg-linear-to-r from-blue-600 to-cyan-500">Neuro-Imaging</span> Intelligence
         </motion.h1>
 
         <motion.p
