@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Search, Upload, User, UserPlus, FileText, CheckCircle2, AlertCircle, X, Stethoscope, ChevronRight, ChevronLeft } from "lucide-react"
+import { Search, Upload, User, UserPlus, FileText, CheckCircle2, AlertCircle, X, Stethoscope, ChevronRight, ChevronLeft, ChevronDown } from "lucide-react"
 import { checkPatientByPhone, createPatient } from "@/features/admin/actions/patient-actions"
 import { createCase, getDoctorsForDropdown } from "@/features/cases/actions/case-actions"
 import { cn } from "@/lib/utils"
@@ -13,7 +13,22 @@ export function CreateCaseWizard({ workspaceId, onSuccess, mode = 'case' }: { wo
     const [error, setError] = useState<string | null>(null)
 
     // Data State
-    const [phoneNumber, setPhoneNumber] = useState("")
+    // Phone State
+    const [countryCode, setCountryCode] = useState("+92")
+    const [localNumber, setLocalNumber] = useState("")
+    // Derived full number for logic compatibility
+    const phoneNumber = countryCode + localNumber
+
+    const COUNTRY_CODES = [
+        { code: "+92", country: "PK", flag: "🇵🇰" },
+        { code: "+1", country: "US", flag: "🇺🇸" },
+        { code: "+44", country: "UK", flag: "🇬🇧" },
+        { code: "+971", country: "AE", flag: "🇦🇪" },
+        { code: "+91", country: "IN", flag: "🇮🇳" },
+        { code: "+1", country: "CA", flag: "🇨🇦" },
+        { code: "+61", country: "AU", flag: "🇦🇺" },
+        { code: "+49", country: "DE", flag: "🇩🇪" },
+    ]
     const [patient, setPatient] = useState<any>(null)
     const [matchingPatients, setMatchingPatients] = useState<any[]>([])
     const [isNewPatient, setIsNewPatient] = useState(false)
@@ -36,7 +51,6 @@ export function CreateCaseWizard({ workspaceId, onSuccess, mode = 'case' }: { wo
 
     // Case Details
     const [caseDetails, setCaseDetails] = useState({
-        bodyPart: "BRAIN",
         priority: "normal",
         notes: ""
     })
@@ -88,8 +102,9 @@ export function CreateCaseWizard({ workspaceId, onSuccess, mode = 'case' }: { wo
         // User requested: +92 xxx-xxx-xxxx. Let's be lenient or Strict? 
         // My schema comment: +92 3xx-xxxxxxx
         // Let's enforce standard PK format loosely: starts with +92
-        if (!phoneNumber.startsWith("+92")) {
-            setError("Phone number must start with +92")
+        // Phone Validation (Basic check)
+        if (phoneNumber.length < 8) {
+            setError("Please enter a valid phone number")
             return
         }
 
@@ -236,29 +251,60 @@ export function CreateCaseWizard({ workspaceId, onSuccess, mode = 'case' }: { wo
 
                     {step === 1 && (
                         <motion.div key="step1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="space-y-6">
-                            <div>
-                                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-2 uppercase tracking-wide">
+                            <div className="space-y-2">
+                                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
                                     Patient Phone Number
                                 </label>
                                 <div className="flex gap-3">
-                                    <input
-                                        type="tel"
-                                        value={phoneNumber}
-                                        onChange={e => setPhoneNumber(e.target.value)}
-                                        placeholder="+92 300 1234567"
-                                        className="flex-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3.5 outline-none focus:ring-2 focus:ring-blue-500 transition-all font-mono text-lg"
-                                        autoFocus
-                                    />
+                                    <div className="flex-1 flex bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-blue-500 transition-all">
+                                        {/* Country Code Dropdown */}
+                                        <div className="relative border-r border-slate-200 dark:border-slate-800">
+                                            <select
+                                                value={countryCode}
+                                                onChange={e => setCountryCode(e.target.value)}
+                                                className="appearance-none h-full bg-slate-100 dark:bg-slate-900/50 pl-4 pr-10 py-3.5 outline-none font-mono text-lg cursor-pointer hover:bg-slate-200/50 dark:hover:bg-slate-800 transition-colors text-slate-900 dark:text-white"
+                                            >
+                                                {COUNTRY_CODES.map((c, idx) => (
+                                                    <option key={`${c.code}-${c.country}-${idx}`} value={c.code}>
+                                                        {c.flag} {c.code}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-slate-500">
+                                                <ChevronDown size={14} />
+                                            </div>
+                                        </div>
+
+                                        {/* Local Number Input */}
+                                        <input
+                                            type="tel"
+                                            value={localNumber}
+                                            onChange={e => {
+                                                // Allow only numbers
+                                                const val = e.target.value.replace(/\D/g, '')
+                                                setLocalNumber(val)
+                                            }}
+                                            onKeyDown={e => {
+                                                if (e.key === 'Enter' && localNumber) {
+                                                    handlePhoneSearch()
+                                                }
+                                            }}
+                                            placeholder="300 1234567"
+                                            className="flex-1 bg-transparent px-4 py-3.5 outline-none text-lg font-mono placeholder:text-slate-400 dark:text-white"
+                                            autoFocus
+                                        />
+                                    </div>
+
                                     <button
                                         onClick={handlePhoneSearch}
-                                        disabled={loading || !phoneNumber}
+                                        disabled={loading || !localNumber}
                                         className="bg-blue-600 hover:bg-blue-500 text-white px-8 rounded-xl font-bold text-base disabled:opacity-50 transition-all shadow-lg shadow-blue-600/20"
                                     >
                                         {loading ? "Checking..." : "Next"}
                                     </button>
                                 </div>
-                                <p className="text-xs text-slate-400 mt-2">
-                                    Enter the phone number including country code (e.g., +92).
+                                <p className="text-xs text-slate-400">
+                                    Select country code and enter number (e.g. 300 1234567).
                                 </p>
                             </div>
 
@@ -431,6 +477,49 @@ export function CreateCaseWizard({ workspaceId, onSuccess, mode = 'case' }: { wo
                                     <p className="font-bold text-slate-900 dark:text-white text-lg">{patient?.firstName} {patient?.lastName}</p>
                                     <p className="text-sm text-slate-500 dark:text-slate-400">Patient ID: {patient?.id?.slice(0, 8)}...</p>
                                 </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Priority / Urgency</label>
+                                <select
+                                    value={caseDetails.priority}
+                                    onChange={e => setCaseDetails({ ...caseDetails, priority: e.target.value })}
+                                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 transition-all dark:text-white"
+                                >
+                                    <option value="low">Low - Routine</option>
+                                    <option value="normal">Normal - Standard</option>
+                                    <option value="high">High - Urgent</option>
+                                    <option value="critical">Critical - Emergency</option>
+                                </select>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Assigned To</label>
+                                <select
+                                    value={assignedDoctorId}
+                                    onChange={e => setAssignedDoctorId(e.target.value)}
+                                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 transition-all dark:text-white"
+                                >
+                                    {doctors.map(doc => (
+                                        <option key={doc.id} value={doc.id}>
+                                            Dr. {doc.user.name || 'Unknown'} ({doc._count.assignedCases} pending cases)
+                                        </option>
+                                    ))}
+                                </select>
+                                <p className="text-xs text-slate-400 mt-1">
+                                    {doctors.find(d => d.id === assignedDoctorId) ? "Auto-selected: Least busy doctor" : "Select a doctor to assign this case"}
+                                </p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wide">Notes for Doctor (Optional)</label>
+                                <textarea
+                                    value={caseDetails.notes}
+                                    onChange={e => setCaseDetails({ ...caseDetails, notes: e.target.value })}
+                                    rows={3}
+                                    placeholder="Add any specific instructions or observations for the assigned doctor..."
+                                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 transition-all dark:text-white resize-none"
+                                />
                             </div>
 
                             <div className="space-y-4">

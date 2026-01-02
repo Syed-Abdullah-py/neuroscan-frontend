@@ -6,7 +6,6 @@ import { revalidatePath } from "next/cache"
 
 export async function createCase(data: {
     patientId: string
-    bodyPart: string
     notes?: string
     fileReferences: string // JSON string
     priority?: string
@@ -45,7 +44,6 @@ export async function createCase(data: {
     const newCase = await prisma.case.create({
         data: {
             patientId: data.patientId,
-            bodyPart: data.bodyPart,
             notes: data.notes,
             fileReferences: data.fileReferences,
             priority: data.priority || 'normal',
@@ -152,3 +150,30 @@ export async function getDoctorsForDropdown(workspaceId: string) {
     // Sort logic to put least busy first
     return doctors.sort((a, b) => a._count.assignedCases - b._count.assignedCases)
 }
+
+export async function getAllCasesForWorkspace(workspaceId: string) {
+    const user = await getCurrentUser()
+    if (!user || (user.role !== 'admin' && user.role !== 'owner')) {
+        throw new Error("Unauthorized")
+    }
+
+    return await prisma.case.findMany({
+        where: {
+            patient: {
+                workspaceId: workspaceId
+            }
+        },
+        include: {
+            patient: true,
+            assignedTo: {
+                include: {
+                    user: true
+                }
+            }
+        },
+        orderBy: {
+            createdAt: 'desc'
+        }
+    })
+}
+

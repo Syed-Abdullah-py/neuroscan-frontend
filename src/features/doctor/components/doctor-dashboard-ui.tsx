@@ -1,6 +1,6 @@
 "use client";
 
-import { Activity, Clock, FileText, CheckCircle2, Upload, Calendar, Building2, LogOut, Stethoscope, Brain } from "lucide-react";
+import { Activity, Clock, FileText, CheckCircle2, Upload, Calendar, Building2, LogOut, Stethoscope, Brain, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
@@ -67,11 +67,23 @@ export function DoctorDashboardUI({ stats, recentCases, user, workspaces }: Doct
 
     const filteredCases = recentCases.filter(c => {
         if (filterStatus !== "ALL" && c.status !== filterStatus) return false;
-        // Assuming priority is a field on case, defaulting to normal if missing. 
-        // Need to check if 'priority' exists on the case object passed in recentCases.
-        // Based on previous code, Case model has priority. 
         if (filterPriority !== "ALL" && (c.priority || 'normal') !== filterPriority) return false;
         return true;
+    }).sort((a, b) => {
+        const priorityOrder: Record<string, number> = {
+            'critical': 4,
+            'urgent': 3, // Handle 'urgent' as alias for high/critical if needed, or map to high
+            'high': 3,
+            'normal': 2,
+            'low': 1
+        };
+        const pA = (a.priority || 'normal').toLowerCase();
+        const pB = (b.priority || 'normal').toLowerCase();
+
+        const scoreA = priorityOrder[pA] || 0;
+        const scoreB = priorityOrder[pB] || 0;
+
+        return scoreB - scoreA;
     });
 
     return (
@@ -237,21 +249,21 @@ export function DoctorDashboardUI({ stats, recentCases, user, workspaces }: Doct
                             ))}
                         </div>
 
-                        <div className="flex items-center gap-2 bg-white dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-800">
-                            {["ALL", "urgent", "normal"].map((prio) => (
-                                <button
-                                    key={prio}
-                                    onClick={() => setFilterPriority(prio)}
-                                    className={cn(
-                                        "px-3 py-1.5 text-xs font-bold rounded-md transition-all capitalize",
-                                        filterPriority === prio
-                                            ? "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400"
-                                            : "text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800"
-                                    )}
-                                >
-                                    {prio === "ALL" ? "All Priority" : prio}
-                                </button>
-                            ))}
+                        <div className="relative group">
+                            <select
+                                value={filterPriority}
+                                onChange={(e) => setFilterPriority(e.target.value)}
+                                className="appearance-none bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-blue-400 dark:hover:border-blue-500 text-slate-700 dark:text-slate-300 rounded-xl pl-4 pr-10 py-2.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all cursor-pointer shadow-sm min-w-[180px]"
+                            >
+                                <option value="ALL">All Priorities</option>
+                                <option value="low">Low - Routine</option>
+                                <option value="normal">Normal - Standard</option>
+                                <option value="high">High - Urgent</option>
+                                <option value="critical">Critical - Emergency</option>
+                            </select>
+                            <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-slate-500 group-hover:text-blue-500 transition-colors">
+                                <ChevronDown size={14} />
+                            </div>
                         </div>
                     </div>
 
@@ -277,7 +289,6 @@ export function DoctorDashboardUI({ stats, recentCases, user, workspaces }: Doct
                                 <thead className="bg-slate-50 dark:bg-slate-950/50">
                                     <tr>
                                         <th className="text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider py-4 px-6">Patient</th>
-                                        <th className="text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider py-4 px-6">Scan Type</th>
                                         <th className="text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider py-4 px-6">Priority</th>
                                         <th className="text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider py-4 px-6">Status</th>
                                         <th className="text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider py-4 px-6">Date</th>
@@ -303,14 +314,23 @@ export function DoctorDashboardUI({ stats, recentCases, user, workspaces }: Doct
                                                     </div>
                                                 </td>
                                                 <td className="py-4 px-6">
-                                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
-                                                        {c.bodyPart}
-                                                    </span>
-                                                </td>
-                                                <td className="py-4 px-6">
-                                                    <span className={cn("text-xs font-bold uppercase", c.priority === 'urgent' ? 'text-red-500' : 'text-slate-500')}>
-                                                        {c.priority || 'Normal'}
-                                                    </span>
+                                                    {(() => {
+                                                        const p = (c.priority || 'normal').toLowerCase();
+                                                        const isCritical = p === 'critical' || p === 'urgent' || p === 'high';
+                                                        const isNormal = p === 'normal';
+
+                                                        let className = "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400";
+                                                        if (p === 'critical' || p === 'urgent') className = "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-900/30";
+                                                        else if (p === 'high') className = "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 border border-orange-200 dark:border-orange-900/30";
+                                                        else if (p === 'normal') className = "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 border border-blue-100 dark:border-blue-900/20";
+                                                        else if (p === 'low') className = "bg-slate-50 text-slate-600 dark:bg-slate-800/50 dark:text-slate-400 border border-slate-200 dark:border-slate-800";
+
+                                                        return (
+                                                            <span className={cn("px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wide", className)}>
+                                                                {p}
+                                                            </span>
+                                                        );
+                                                    })()}
                                                 </td>
                                                 <td className="py-4 px-6">
                                                     <StatusBadge status={c.status} />

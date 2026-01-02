@@ -100,7 +100,6 @@ model Case {
   verdict        String?
   verdictUpdatedAt DateTime?
 
-  bodyPart    String     @default("BRAIN")
   notes       String?
   
   patientId   String
