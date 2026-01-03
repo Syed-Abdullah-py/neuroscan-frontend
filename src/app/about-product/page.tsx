@@ -25,7 +25,8 @@ export default function LandingPage() {
       name: "Mr. Faizadullah",
       role: "Project Supervisor",
       bio: "Distinguished faculty member and project supervisor, guiding the team with expertise in medical imaging and AI applications in healthcare.",
-      color: "from-blue-500 to-purple-600"
+      color: "from-blue-500 to-purple-600",
+      image: "file.jpg"
     },
     developers: [
       {
@@ -374,7 +375,11 @@ export default function LandingPage() {
           >
             <div className="w-full p-8 md:p-12 bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl hover:shadow-2xl transition-all duration-300 flex flex-col md:flex-row items-center gap-10">
               <div className={`shrink-0 w-40 h-40 md:w-48 md:h-48 bg-linear-to-br ${teamData.supervisor.color} rounded-2xl flex items-center justify-center text-white text-5xl font-bold shadow-2xl transform md:-rotate-3 transition-transform duration-500`}>
-                {teamData.supervisor.initials}
+                <img
+                  src={teamData.supervisor.image}
+                  alt={teamData.supervisor.name}
+                  className="w-full h-full object-cover rounded-2xl"
+                />
               </div>
               <div className="flex-1 text-center md:text-left">
                 <div className="mb-6">

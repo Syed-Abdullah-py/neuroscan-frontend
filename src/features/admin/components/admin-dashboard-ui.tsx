@@ -4,7 +4,6 @@ import {
     Users,
     FileText,
     Activity,
-    AlertCircle,
     UserPlus,
     Building2,
     ShieldCheck,
@@ -74,21 +73,8 @@ export function AdminDashboardUI({ user, joinRequests, workspaces }: AdminDashbo
                     </div>
 
                     {user.workspaceId && (
-                        <div className="flex gap-2">
-                            <Link
-                                href="/admin/patients/new"
-                                className="bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 transition-all"
-                            >
-                                <UserPlus size={18} />
-                                Add Patient
-                            </Link>
-                            <Link
-                                href="/admin/cases/new"
-                                className="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 shadow-lg shadow-blue-600/25 transition-all"
-                            >
-                                <FileText size={18} />
-                                Register New Case
-                            </Link>
+                        <div className="hidden md:flex">
+                            {/* Buttons moved to Patient Directory */}
                         </div>
                     )}
                 </div>
@@ -139,14 +125,14 @@ export function AdminDashboardUI({ user, joinRequests, workspaces }: AdminDashbo
                 </motion.div>
             ) : (
                 <>
-                    {/* Stats Grid */}
+                    {/* Stats & Access Requests Grid */}
                     <motion.div
                         variants={container}
                         initial="hidden"
                         animate="show"
                         className="grid grid-cols-1 md:grid-cols-3 gap-6"
                     >
-                        {/* Example Stats - You can plug real data here later */}
+                        {/* Stat: Total Members */}
                         <StatCard
                             title="Total Members"
                             value="14"
@@ -154,13 +140,8 @@ export function AdminDashboardUI({ user, joinRequests, workspaces }: AdminDashbo
                             color="blue"
                             trend="+2 this month"
                         />
-                        <StatCard
-                            title="Access Requests"
-                            value={joinRequests.length}
-                            icon={AlertCircle}
-                            color={joinRequests.length > 0 ? "amber" : "green"}
-                            trend={joinRequests.length > 0 ? "Action Required" : "All clear"}
-                        />
+
+                        {/* Stat: System Health */}
                         <StatCard
                             title="System Health"
                             value="99.9%"
@@ -168,15 +149,11 @@ export function AdminDashboardUI({ user, joinRequests, workspaces }: AdminDashbo
                             color="green"
                             trend="Operational"
                         />
-                    </motion.div>
 
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                        {/* Left Column: Access Requests */}
+                        {/* Access Requests Card - Now in the top row */}
                         <motion.div
                             variants={item}
-                            initial="hidden"
-                            animate="show"
-                            className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden"
+                            className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col h-full"
                         >
                             <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
                                 <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -185,35 +162,91 @@ export function AdminDashboardUI({ user, joinRequests, workspaces }: AdminDashbo
                                 </h2>
                                 {joinRequests.length > 0 && (
                                     <span className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 text-xs font-bold px-2 py-1 rounded-full">
-                                        {joinRequests.length} Pending
+                                        {joinRequests.length}
                                     </span>
                                 )}
                             </div>
 
-                            {joinRequests.length === 0 ? (
-                                <div className="p-12 text-center">
-                                    <div className="w-12 h-12 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto mb-3">
-                                        <CheckCircle2 className="w-6 h-6 text-green-600 dark:text-green-400" />
+                            <div className="flex-1 overflow-auto max-h-[200px] md:max-h-[160px]">
+                                {joinRequests.length === 0 ? (
+                                    <div className="h-full flex flex-col items-center justify-center p-6 text-center">
+                                        <div className="w-10 h-10 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto mb-2">
+                                            <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
+                                        </div>
+                                        <h3 className="text-sm font-semibold text-slate-900 dark:text-white">All Caught Up</h3>
+                                        <p className="text-[10px] text-slate-500">No pending requests.</p>
                                     </div>
-                                    <h3 className="text-sm font-semibold text-slate-900 dark:text-white">All Caught Up</h3>
-                                    <p className="text-xs text-slate-500 mt-1">No pending access requests at the moment.</p>
-                                </div>
-                            ) : (
-                                <div className="p-2">
-                                    <JoinRequestsList requests={joinRequests} currentUserEmail={user.email || ""} />
-                                </div>
-                            )}
+                                ) : (
+                                    <div className="p-2">
+                                        <JoinRequestsList requests={joinRequests} currentUserEmail={user.email || ""} />
+                                    </div>
+                                )}
+                            </div>
                         </motion.div>
+                    </motion.div>
 
-                        {/* Right Column: Placeholder or something else */}
-                        <motion.div
-                            variants={item}
-                            initial="hidden"
-                            animate="show"
-                        >
-                            <PatientManagement workspaceId={user.workspaceId} />
-                        </motion.div>
-                    </div>
+                    {/* Patient Management - Full Width Below */}
+                    <motion.div
+                        variants={item}
+                        initial="hidden"
+                        animate="show"
+                    >
+                        <PatientManagement
+                            workspaceId={user.workspaceId}
+                            headerActions={
+                                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between w-full">
+
+                                    {/* Left: Title + Search */}
+                                    <div className="flex items-center gap-4 w-full md:w-auto">
+                                        {/* Search */}
+                                        <input
+                                            type="text"
+                                            placeholder="Search patients..."
+                                            className="w-full md:w-72 px-4 py-2 rounded-xl
+                               border border-slate-200 dark:border-slate-700
+                               bg-white dark:bg-slate-800
+                               text-sm text-slate-700 dark:text-slate-200
+                               placeholder:text-slate-400
+                               focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                        />
+                                    </div>
+
+                                    {/* Right: Action Buttons */}
+                                    <div className="flex gap-2 w-full md:w-auto md:ml-auto">
+                                        <Link
+                                            href="/admin/patients/new"
+                                            className="bg-white dark:bg-slate-800 
+                               text-slate-700 dark:text-slate-200 
+                               border border-slate-200 dark:border-slate-700 
+                               hover:bg-slate-50 dark:hover:bg-slate-700 
+                               px-3 py-2 md:px-4 md:py-2 
+                               rounded-xl font-bold text-xs md:text-sm 
+                               flex items-center gap-2 transition-all 
+                               justify-center flex-1 md:flex-none ml-80"
+                                        >
+                                            <UserPlus size={16} />
+                                            <span className="hidden sm:inline">Add Patient</span>
+                                            <span className="sm:hidden">Add</span>
+                                        </Link>
+
+                                        <Link
+                                            href="/admin/cases/new"
+                                            className="bg-blue-600 hover:bg-blue-500 
+                               text-white px-3 py-2 md:px-4 md:py-2 
+                               rounded-xl font-bold text-xs md:text-sm 
+                               flex items-center gap-2 shadow-lg 
+                               shadow-blue-600/25 transition-all 
+                               justify-center flex-1 md:flex-none"
+                                        >
+                                            <FileText size={16} />
+                                            <span className="hidden sm:inline">Register Case</span>
+                                            <span className="sm:hidden">New Case</span>
+                                        </Link>
+                                    </div>
+                                </div>
+                            }
+                        />
+                    </motion.div>
                 </>
             )}
         </div>

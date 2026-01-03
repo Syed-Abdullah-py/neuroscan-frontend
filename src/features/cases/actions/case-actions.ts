@@ -177,3 +177,56 @@ export async function getAllCasesForWorkspace(workspaceId: string) {
     })
 }
 
+export async function getCaseById(caseId: string) {
+    const user = await getCurrentUser()
+    if (!user) {
+        throw new Error("Unauthorized")
+    }
+
+    // Determine access:
+    // Admin/Owner: Can view any case in their workspace (implied by patient.workspaceId check?)
+    // Doctor: Can view cases assigned to them? Or any case in their workspace?
+    // Requirement says "The view button should appear infront of both admin and doctor's page"
+    // Usually doctors can view cases in their workspace, or at least assigned ones.
+    // For now, let's allow if they are in the same workspace as the patient.
+
+    // We need to fetch the case and check permissions.
+    const caseItem = await prisma.case.findUnique({
+        where: { id: caseId },
+        include: {
+            patient: true,
+            assignedTo: {
+                include: {
+                    user: true
+                }
+            }
+        }
+    })
+
+    if (!caseItem) return null;
+
+    // derived workspace check
+    // If Admin/Owner: must be case's patient's workspace (or just be an admin of that workspace)
+    // If Doctor: must be in the same workspace.
+
+    // If global admin/owner, maybe skips? Assuming standard workspace logic.
+    if (user.role === 'admin' || user.role === 'owner') {
+        // Check if user manages the workspace this case belongs to
+        // We don't have direct workspaceId on Case, but on Patient.
+        // And User has workspaceId.
+        if (caseItem.patient.workspaceId !== user.workspaceId) {
+            throw new Error("Unauthorized access to case in another workspace")
+        }
+    } else {
+        // Doctor
+        // Check if doctor is in the same workspace
+        // Ideally we check if doctor is assigned or just has read access.
+        // For now, align with workspaceId.
+        // user.workspaceId must match.
+        if (caseItem.patient.workspaceId !== user.workspaceId) {
+            throw new Error("Unauthorized access to case in another workspace")
+        }
+    }
+
+    return caseItem;
+}

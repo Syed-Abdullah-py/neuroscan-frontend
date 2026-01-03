@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
+import { p } from "framer-motion/client";
 
 interface DoctorDashboardUIProps {
     stats: {
@@ -23,7 +24,6 @@ interface DoctorDashboardUIProps {
     workspaces: any[];
 }
 
-import { WorkspaceManager } from "@/features/workspaces/components/workspace-manager";
 
 export function DoctorDashboardUI({ stats, recentCases, user, workspaces }: DoctorDashboardUIProps) {
     const container = {
@@ -36,32 +36,10 @@ export function DoctorDashboardUI({ stats, recentCases, user, workspaces }: Doct
         }
     };
 
-    const item = {
-        hidden: { opacity: 0, y: 20 },
-        show: { opacity: 1, y: 0 }
-    };
 
-    const [selectedCase, setSelectedCase] = useState<any>(null);
-    const [verdict, setVerdict] = useState("");
-    const [updating, setUpdating] = useState(false);
 
-    const handleUpdateVerdict = async (caseId: string) => {
-        if (!verdict) return;
-        setUpdating(true);
-        try {
-            const { updateCaseVerdict } = await import("@/features/cases/actions/case-actions");
-            await updateCaseVerdict(caseId, verdict);
-            setSelectedCase(null);
-            setVerdict("");
-            // Ideally trigger a refresh or optimistically update
-        } catch (e) {
-            console.error(e);
-            alert("Failed to update verdict");
-        } finally {
-            setUpdating(false);
-        }
-    };
 
+    // Verdict update logic removed, moved to detailed page.
     const [filterStatus, setFilterStatus] = useState("ALL");
     const [filterPriority, setFilterPriority] = useState("ALL");
 
@@ -88,46 +66,6 @@ export function DoctorDashboardUI({ stats, recentCases, user, workspaces }: Doct
 
     return (
         <div className="space-y-8 p-6 md:p-8 max-w-7xl mx-auto">
-            {/* Verdict Modal (Same as before) */}
-            <AnimatePresence>
-                {selectedCase && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
-                    >
-                        <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 max-w-md w-full border border-slate-200 dark:border-slate-800 shadow-2xl">
-                            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-4">Update Diagnostic Verdict</h3>
-                            <p className="text-sm text-slate-500 mb-4">
-                                Please provide your professional assessment for Case #{selectedCase.id.slice(-4)}.
-                            </p>
-                            <textarea
-                                value={verdict}
-                                onChange={e => setVerdict(e.target.value)}
-                                className="w-full h-32 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 mb-4 resize-none focus:ring-2 focus:ring-blue-500 outline-none"
-                                placeholder="Enter your detailed findings here..."
-                            />
-                            <div className="flex gap-2 justify-end">
-                                <button
-                                    onClick={() => setSelectedCase(null)}
-                                    className="px-4 py-2 text-slate-500 hover:text-slate-700 font-medium"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    onClick={() => handleUpdateVerdict(selectedCase.id)}
-                                    disabled={updating || !verdict}
-                                    className="px-6 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold shadow-lg shadow-blue-500/25 disabled:opacity-50"
-                                >
-                                    {updating ? "Submitting..." : "Submit Verdict"}
-                                </button>
-                            </div>
-                        </div>
-                    </motion.div>
-                )}
-            </AnimatePresence>
-
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
@@ -303,71 +241,48 @@ export function DoctorDashboardUI({ stats, recentCases, user, workspaces }: Doct
                                             </td>
                                         </tr>
                                     ) : (
-                                        filteredCases.map((c) => (
-                                            <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                                                <td className="py-4 px-6">
-                                                    <div className="flex flex-col">
-                                                        <span className="font-medium text-slate-900 dark:text-white">
-                                                            {c.patient.firstName} {c.patient.lastName}
-                                                        </span>
-                                                        <span className="text-xs text-slate-500">MRN: {c.patient.mrn || "N/A"}</span>
-                                                    </div>
-                                                </td>
-                                                <td className="py-4 px-6">
-                                                    {(() => {
-                                                        const p = (c.priority || 'normal').toLowerCase();
-                                                        const isCritical = p === 'critical' || p === 'urgent' || p === 'high';
-                                                        const isNormal = p === 'normal';
+                                        filteredCases.map((c) => {
+                                            const p = (c.priority || 'normal').toLowerCase();
+                                            let priorityClass = "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400";
+                                            if (p === 'critical' || p === 'urgent') priorityClass = "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-900/30";
+                                            else if (p === 'high') priorityClass = "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 border border-orange-200 dark:border-orange-900/30";
+                                            else if (p === 'normal') priorityClass = "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 border border-blue-100 dark:border-blue-900/20";
+                                            else if (p === 'low') priorityClass = "bg-slate-50 text-slate-600 dark:bg-slate-800/50 dark:text-slate-400 border border-slate-200 dark:border-slate-800";
 
-                                                        let className = "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400";
-                                                        if (p === 'critical' || p === 'urgent') className = "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-900/30";
-                                                        else if (p === 'high') className = "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 border border-orange-200 dark:border-orange-900/30";
-                                                        else if (p === 'normal') className = "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 border border-blue-100 dark:border-blue-900/20";
-                                                        else if (p === 'low') className = "bg-slate-50 text-slate-600 dark:bg-slate-800/50 dark:text-slate-400 border border-slate-200 dark:border-slate-800";
-
-                                                        return (
-                                                            <span className={cn("px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wide", className)}>
-                                                                {p}
+                                            return (
+                                                <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                                    <td className="py-4 px-6">
+                                                        <div className="flex flex-col">
+                                                            <span className="font-medium text-slate-900 dark:text-white">
+                                                                {c.patient.firstName} {c.patient.lastName}
                                                             </span>
-                                                        );
-                                                    })()}
-                                                </td>
-                                                <td className="py-4 px-6">
-                                                    <StatusBadge status={c.status} />
-                                                </td>
-                                                <td className="py-4 px-6 text-sm text-slate-500">
-                                                    {new Date(c.updatedAt).toLocaleDateString()}
-                                                </td>
-                                                <td className="py-4 px-6 text-right">
-                                                    <div className="flex items-center justify-end gap-2">
-                                                        <button
-                                                            className="p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
-                                                            title="View Scans"
-                                                        >
-                                                            <Upload size={16} /> {/* Should be Eye or Activity but using Upload as placeholder icon */}
-                                                        </button>
-                                                        <button
-                                                            className="p-1.5 text-slate-400 hover:text-purple-600 dark:hover:text-purple-400 rounded-lg hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors"
-                                                            title="Generate Report"
-                                                        >
-                                                            <FileText size={16} />
-                                                        </button>
-                                                        {c.status !== 'COMPLETED' ? (
-                                                            <button
-                                                                onClick={() => setSelectedCase(c)}
+                                                            <span className="text-xs text-slate-500">MRN: {c.patient.mrn || "N/A"}</span>
+                                                        </div>
+                                                    </td>
+                                                    <td className="py-4 px-6">
+                                                        <span className={cn("px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wide", priorityClass)}>
+                                                            {p}
+                                                        </span>
+                                                    </td>
+                                                    <td className="py-4 px-6">
+                                                        <StatusBadge status={c.status} />
+                                                    </td>
+                                                    <td className="py-4 px-6 text-sm text-slate-500">
+                                                        {new Date(c.updatedAt).toLocaleDateString()}
+                                                    </td>
+                                                    <td className="py-4 px-6 text-right">
+                                                        <div className="flex items-center justify-end gap-2">
+                                                            <Link
+                                                                href={`/cases/${c.id}`}
                                                                 className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg shadow-sm"
                                                             >
-                                                                Verdict
-                                                            </button>
-                                                        ) : (
-                                                            <span className="text-xs font-bold text-green-600 flex items-center gap-1">
-                                                                <CheckCircle2 size={14} /> Done
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        ))
+                                                                View
+                                                            </Link>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
                                     )}
                                 </tbody>
                             </table>
@@ -379,7 +294,7 @@ export function DoctorDashboardUI({ stats, recentCases, user, workspaces }: Doct
     );
 }
 
-function StatCard({ title, value, icon: Icon, color, trend }: any) {
+function StatCard({ title, value, icon: Icon, color, trend }: { title: string, value: number, icon: any, color: string, trend: string }) {
     const colors: any = {
         blue: "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400",
         green: "bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400",

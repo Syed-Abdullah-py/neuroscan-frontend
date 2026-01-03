@@ -120,6 +120,7 @@ export function CasesView({ workspaceId }: { workspaceId: string }) {
                                     <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
                                     <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Assigned To</th>
                                     <th className="px-6 py-4 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Created</th>
+                                    <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -161,6 +162,14 @@ export function CasesView({ workspaceId }: { workspaceId: string }) {
                                                 <Calendar size={14} />
                                                 {new Date(caseItem.createdAt).toLocaleDateString()}
                                             </div>
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <Link
+                                                href={`/cases/${caseItem.id}`}
+                                                className="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm transition-colors inline-block"
+                                            >
+                                                View
+                                            </Link>
                                         </td>
                                     </tr>
                                 ))}
