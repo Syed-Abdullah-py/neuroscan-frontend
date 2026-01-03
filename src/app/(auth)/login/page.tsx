@@ -2,7 +2,7 @@ import { Metadata } from "next";
 import { Suspense } from "react";
 import Link from "next/link";
 import { Activity, ArrowRight, ShieldCheck, Loader2, Brain } from "lucide-react";
-import { BiometricScanner } from "@/features/auth/components/biometric-scanner";
+
 import { LoginForm } from "@/features/auth/components/login-form";
 
 export const metadata: Metadata = {
@@ -57,20 +57,7 @@ export default function LoginPage() {
                             <LoginForm />
                         </Suspense>
 
-                        <div className="relative py-2">
-                            <div className="absolute inset-0 flex items-center">
-                                <span className="w-full border-t border-slate-200 dark:border-slate-800" />
-                            </div>
-                            <div className="relative flex justify-center text-[10px] uppercase tracking-widest font-bold">
-                                <span className="bg-transparent px-3 text-slate-400 dark:text-slate-500">
-                                    Or verify with
-                                </span>
-                            </div>
-                        </div>
 
-                        <div className="bg-slate-50 dark:bg-black/20 rounded-2xl border border-slate-100 dark:border-white/5 p-5">
-                            <BiometricScanner />
-                        </div>
                     </div>
 
                     <div className="bg-slate-50/80 dark:bg-black/20 p-4 text-center border-t border-slate-100 dark:border-white/5">

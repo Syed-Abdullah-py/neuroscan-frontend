@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useActionState, startTransition } from "react";
-import { loginUser, loginUserWithFace } from "@/actions/auth-actions";
+import { loginUser, loginUserWithFace, verifyPinAndLogin } from "@/actions/auth-actions";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Mail, Lock, ArrowRight, Loader2, AlertCircle, ScanFace } from "lucide-react";
+import { Mail, Lock, ArrowRight, Loader2, AlertCircle, ScanFace, KeyRound } from "lucide-react";
 import { FaceCapture } from "./face-capture";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -27,8 +27,10 @@ const initialState = {
 export function LoginForm() {
     // Standard Login
     const [state, formAction, isPending] = useActionState(loginUser, initialState);
-    // Face Login
+    // Face Login (Step 1: Identify)
     const [faceState, faceAction, isFacePending] = useActionState(loginUserWithFace, initialState);
+    // Face Login (Step 2: Verify PIN)
+    const [pinState, pinAction, isPinPending] = useActionState(verifyPinAndLogin, initialState);
 
     // Toggle Mode
     const [mode, setMode] = useState<"email" | "face">("email");
@@ -39,6 +41,7 @@ export function LoginForm() {
     // Client-side state for validation
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [pin, setPin] = useState(""); // For Step 2
     const [errors, setErrors] = useState({ email: "", password: "" });
 
     // Real-time validation function
@@ -77,6 +80,12 @@ export function LoginForm() {
         }
     };
 
+    // Derived state: Are we waiting for PIN?
+    // Check both faceState (initial identify) and pinState (tried pin but failed)
+    // Note: Our modified server action returns `pendingPin: true` along with userId/userName
+    const isPinStep = (faceState as any)?.pendingPin || (pinState as any)?.pendingPin;
+    const identifiedUser = (pinState as any)?.userId ? { userId: (pinState as any).userId, userName: (pinState as any).userName } : (faceState as any)?.userId ? { userId: (faceState as any).userId, userName: (faceState as any).userName } : null;
+
     return (
         <div className="space-y-6">
             {isSuccess && (
@@ -92,38 +101,46 @@ export function LoginForm() {
                 </div>
             )}
 
-            {faceState?.message && mode === "face" && (
-                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-600 dark:text-red-400 text-sm flex items-center gap-2">
+            {/* Show errors from Face or PIN actions */}
+            {(faceState?.message || pinState?.message) && mode === "face" && (
+                <div className={`p-3 border rounded-lg text-sm flex items-center gap-2 ${
+                    // If it's a "success" message (like "Please enter PIN"), show blue/info style
+                    (faceState as any)?.pendingPin && !pinState?.message
+                        ? "bg-blue-500/10 border-blue-500/20 text-blue-600 dark:text-blue-400"
+                        : "bg-red-500/10 dark:text-red-400"
+                    }`}>
                     <AlertCircle className="w-4 h-4" />
-                    {faceState.message}
+                    {pinState?.message || faceState?.message}
                 </div>
             )}
 
-            {/* Mode Toggles */}
-            <div className="flex p-1 bg-slate-100 dark:bg-slate-900 rounded-xl">
-                <button
-                    type="button"
-                    onClick={() => setMode("email")}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-xs font-semibold rounded-lg transition-all ${mode === "email"
-                        ? "bg-white dark:bg-slate-800 text-blue-600 shadow-sm"
-                        : "text-slate-500 dark:text-slate-400 hover:text-slate-700"
-                        }`}
-                >
-                    <Mail className="w-3.5 h-3.5" />
-                    Email Login
-                </button>
-                <button
-                    type="button"
-                    onClick={() => setMode("face")}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-xs font-semibold rounded-lg transition-all ${mode === "face"
-                        ? "bg-white dark:bg-slate-800 text-blue-600 shadow-sm"
-                        : "text-slate-500 dark:text-slate-400 hover:text-slate-700"
-                        }`}
-                >
-                    <ScanFace className="w-3.5 h-3.5" />
-                    Face Login
-                </button>
-            </div>
+            {/* Mode Toggles - Hide when in PIN step to prevent confusion */}
+            {!isPinStep && (
+                <div className="flex p-1 bg-slate-100 dark:bg-slate-900 rounded-xl">
+                    <button
+                        type="button"
+                        onClick={() => setMode("email")}
+                        className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-xs font-semibold rounded-lg transition-all ${mode === "email"
+                            ? "bg-white dark:bg-slate-800 text-blue-600 shadow-sm"
+                            : "text-slate-500 dark:text-slate-400 hover:text-slate-700"
+                            }`}
+                    >
+                        <Mail className="w-3.5 h-3.5" />
+                        Email Login
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setMode("face")}
+                        className={`flex-1 flex items-center justify-center gap-2 py-2.5 text-xs font-semibold rounded-lg transition-all ${mode === "face"
+                            ? "bg-white dark:bg-slate-800 text-blue-600 shadow-sm"
+                            : "text-slate-500 dark:text-slate-400 hover:text-slate-700"
+                            }`}
+                    >
+                        <ScanFace className="w-3.5 h-3.5" />
+                        Face Login
+                    </button>
+                </div>
+            )}
 
             {mode === "email" ? (
                 <form action={handleSubmit} className="space-y-6">
@@ -187,10 +204,6 @@ export function LoginForm() {
                         )}
                     </div>
 
-                    {/* 
-           We can now use the `isPending` from useActionState directly 
-           instead of the complex separate component with useFormStatus 
-        */}
                     <Button
                         type="submit"
                         disabled={isPending}
@@ -203,32 +216,99 @@ export function LoginForm() {
                 </form>
             ) : (
                 <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
-                    <div className="text-center space-y-2">
-                        <h3 className="font-semibold text-slate-900 dark:text-white">Authenticate with Face ID</h3>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">
-                            Look at the camera to verify your identity.
-                        </p>
-                    </div>
+                    {!isPinStep ? (
+                        // Step 1: Face Scan
+                        <>
+                            <div className="text-center space-y-2">
+                                <h3 className="font-semibold text-slate-900 dark:text-white">Authenticate with Face ID</h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">
+                                    Look at the camera to verify your identity.
+                                </p>
+                            </div>
 
-                    {!isFacePending ? (
-                        <FaceCapture
-                            label="Scan Face to Login"
-                            shouldStop={isFacePending}
-                            onCapture={(file) => {
-                                const fd = new FormData();
-                                fd.append("faceImage", file);
-                                startTransition(() => {
-                                    faceAction(fd);
-                                });
-                            }}
-                        />
-                    ) : null}
+                            {!isFacePending ? (
+                                <FaceCapture
+                                    label="Scan Face to Login"
+                                    shouldStop={isFacePending}
+                                    onCapture={(file) => {
+                                        const fd = new FormData();
+                                        fd.append("faceImage", file);
+                                        startTransition(() => {
+                                            faceAction(fd);
+                                        });
+                                    }}
+                                />
+                            ) : null}
 
-                    {isFacePending && (
-                        <div className="flex items-center justify-center gap-2 text-blue-600 text-sm font-medium">
-                            <Loader2 className="w-4 h-4 animate-spin" />
-                            Verifying Biometrics...
-                        </div>
+                            {isFacePending && (
+                                <div className="flex items-center justify-center gap-2 text-blue-600 text-sm font-medium">
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                    Verifying Biometrics...
+                                </div>
+                            )}
+                        </>
+                    ) : (
+                        // Step 2: PIN Verification
+                        <form action={pinAction} className="space-y-4 animate-in slide-in-from-bottom-4 fade-in">
+                            <div className="text-center space-y-2 mb-6">
+                                <div className="mx-auto w-12 h-12 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mb-3">
+                                    <ScanFace className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                                </div>
+                                <h3 className="font-bold text-lg text-slate-900 dark:text-white">
+                                    Welcome back, {identifiedUser?.userName}!
+                                </h3>
+                                <p className="text-sm text-slate-500 dark:text-slate-400">
+                                    Please enter your security PIN to continue.
+                                </p>
+                            </div>
+
+                            <input type="hidden" name="userId" value={identifiedUser?.userId} />
+
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-center">
+                                    <Input
+                                        name="pin"
+                                        type="text"
+                                        inputMode="numeric"
+                                        pattern="[0-9]*"
+                                        autoComplete="off"
+                                        maxLength={6}
+                                        value={pin}
+                                        onChange={(e) => {
+                                            // Only allow numbers
+                                            if (e.target.value === '' || /^\d+$/.test(e.target.value)) {
+                                                setPin(e.target.value);
+                                            }
+                                        }}
+                                        style={{ WebkitTextSecurity: 'disc' } as React.CSSProperties}
+                                        className="text-center text-3xl tracking-[0.5em] font-bold h-16 w-60 mx-auto bg-slate-50 dark:bg-slate-950 border-slate-200 dark:border-slate-800 focus:ring-blue-500 rounded-xl"
+                                        autoFocus
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex gap-3">
+                                <Button
+                                    type="button"
+                                    onClick={() => {
+                                        // Reset everything to start over
+                                        window.location.reload();
+                                    }}
+                                    variant="outline"
+                                    className="flex-1"
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    type="submit"
+                                    disabled={isPinPending || pin.length < 4}
+                                    className="flex-2 bg-blue-600 hover:bg-blue-500 text-white"
+                                >
+                                    {isPinPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                                    Verify & Login
+                                </Button>
+                            </div>
+                        </form>
                     )}
                 </div>
             )}

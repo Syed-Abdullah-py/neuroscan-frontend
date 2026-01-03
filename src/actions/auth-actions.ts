@@ -328,10 +328,61 @@ export async function loginUserWithFace(prevState: any, formData: FormData) {
       return { message: "Face not recognized." };
     }
 
-    // 4. Log the user in
+    // 4. Return user for PIN verification (DO NOT LOGIN YET)
     const user = usersWithFace.find(u => u.id === result.userId);
     if (!user) return { message: "User not found locally." };
 
+    // Need full user for name
+    const fullUser = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { name: true, pin: true }
+    });
+
+    if (!fullUser) return { message: "User details unavailable." };
+
+    return {
+      success: true,
+      pendingPin: true,
+      userId: user.id,
+      userName: fullUser.name || "User",
+      message: "Face verified. Please enter your PIN."
+    };
+
+  } catch (error) {
+    if ((error as Error).message === "NEXT_REDIRECT") {
+      throw error;
+    }
+    console.error("Face Login Error:", error);
+    return { message: "System error during face login." };
+  }
+}
+
+/**
+ * Verifies the PIN for a user and completes the login.
+ */
+export async function verifyPinAndLogin(prevState: any, formData: FormData) {
+  const userId = formData.get("userId") as string;
+  const pin = formData.get("pin") as string;
+
+  if (!userId || !pin) {
+    return { message: "User ID and PIN are required." };
+  }
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { memberships: true }
+    });
+
+    if (!user) {
+      return { message: "User not found." };
+    }
+
+    if (user.pin !== pin) {
+      return { message: "Invalid PIN.", pendingPin: true, userId, userName: user.name };
+    }
+
+    // --- LOGIN LOGIC (Copied from loginUser) ---
     let redirectPath = "/doctor";
     let sessionPayload: { sub: string; workspaceId?: string; role?: string } = { sub: user.id };
 
@@ -350,17 +401,8 @@ export async function loginUserWithFace(prevState: any, formData: FormData) {
         redirectPath = "/doctor";
       }
     } else {
-      // User has no workspace. Check GLOBAL role to determine redirect path.
-      // Global ADMIN should go to /admin to access onboarding/workspace creation.
-      // Global RADIOLOGIST/DOCTOR should go to /doctor.
-
-      // Need to fetch user's global role since we only have face data
-      const fullUser = await prisma.user.findUnique({
-        where: { id: user.id },
-        select: { role: true }
-      });
-
-      if (fullUser?.role === "ADMIN") {
+      // Global Role Fallback
+      if (user.role === "ADMIN") {
         redirectPath = "/admin";
         sessionPayload.role = "ADMIN";
       } else {
@@ -389,15 +431,10 @@ export async function loginUserWithFace(prevState: any, formData: FormData) {
 
   } catch (error) {
     if ((error as Error).message === "NEXT_REDIRECT") {
-      throw error;
+      throw error; // Let redirect happen
     }
-    console.error("Face Login Error:", error);
-    // Since we called redirect, we might verify expected behavior. Next.js redirect throws error?
-    // "NEXT_REDIRECT" error type.
-    if (String(error).includes("NEXT_REDIRECT")) {
-      throw error;
-    }
-    return { message: "System error during face login." };
+    console.error("PIN Verification Error:", error);
+    return { message: "Authentication failed." };
   }
 }
 
