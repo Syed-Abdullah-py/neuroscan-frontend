@@ -19,6 +19,14 @@ model User {
   faceEncoding  String? // Stored as JSON string of the list
   role          String?   // "ADMIN" or "RADIOLOGIST" (Global role)
 
+  // Extended Profile
+  cnic          String?
+  phoneNumber   String?
+  city          String?
+  pin           String?
+  gender        String?
+  termsAccepted Boolean   @default(false)
+
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 

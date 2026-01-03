@@ -5,6 +5,8 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
+import { writeFile } from "fs/promises";
+import { join } from "path";
 import { SignJWT, jwtVerify } from "jose";
 
 const secret = new TextEncoder().encode(process.env.AUTH_SECRET);
@@ -17,7 +19,17 @@ const SignupSchema = z.object({
   email: z.email("Invalid email address"),
   password: z.string().min(8, "Password must be at least 8 characters"),
   role: z.enum(["radiologist", "admin"]),
-  faceImage: z.any().optional(), // File object
+  faceImage: z.any().optional(), // File object for Face Login encoding
+  profileImage: z.any().optional(), // File object for Avatar display
+
+  // Extended Profile Fields
+  cnic: z.string().optional(),
+  phoneNumber: z.string().optional(),
+  city: z.string().optional(),
+  pin: z.string().optional(), // Only for face login users really
+  gender: z.string().optional(),
+  medicalLicenseId: z.string().optional(),
+  termsAccepted: z.string().optional(), // Checkbox sends "on" or undefined/null
 });
 
 const LoginSchema = z.object({
@@ -39,6 +51,14 @@ export async function registerUser(prevState: any, formData: FormData) {
     email: rawData.email,
     password: rawData.password,
     role: rawData.role,
+    cnic: rawData.cnic,
+    phoneNumber: rawData.phoneNumber,
+    city: rawData.city,
+    pin: rawData.pin,
+    gender: rawData.gender,
+    medicalLicenseId: rawData.medicalLicenseId,
+    termsAccepted: rawData.termsAccepted,
+    profileImage: rawData.profileImage,
   });
 
   if (!validated.success) {
@@ -47,11 +67,51 @@ export async function registerUser(prevState: any, formData: FormData) {
     };
   }
 
-  const { email, password, firstName, lastName, role } = validated.data;
-  const faceImage = rawData.faceImage as File;
-  let faceEncodingString: string | null = null;
+  const { email, password, firstName, lastName, role, cnic, phoneNumber, city, pin, gender, medicalLicenseId, termsAccepted } = validated.data;
 
+  // Validation Logic
+  if (termsAccepted !== "on") {
+    return { message: "You must accept the terms and conditions." };
+  }
+
+  if (role === "radiologist" && !medicalLicenseId) {
+    return { message: "Medical License Number is required for doctors." };
+  }
+
+  const faceImage = rawData.faceImage as File;
+  const profileImage = rawData.profileImage as File;
+  let faceEncodingString: string | null = null;
+  let avatarUrl: string | null = null;
+  let finalPin = pin;
+
+  // PIN validation
+  if (faceImage && faceImage.size > 0 && (!finalPin || finalPin.length < 4)) {
+    return { message: "PIN (4+ chars) is required when setting up Face Login." };
+  }
+
+  // Handle Profile Picture Upload (Avatar)
+  if (profileImage && profileImage.size > 0) {
+    try {
+      const bytes = await profileImage.arrayBuffer();
+      const buffer = Buffer.from(bytes);
+      const safeName = profileImage.name.replace(/[^a-z0-9.]/gi, '_').toLowerCase();
+      const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
+      const filename = `profile-${uniqueSuffix}-${safeName}`;
+
+      const uploadDir = join(process.cwd(), "public/uploads/profiles");
+      // Ensure dir exists if not handled elsewhere (it was created in previous step)
+      const filepath = join(uploadDir, filename);
+
+      await writeFile(filepath, buffer);
+      avatarUrl = `/uploads/profiles/${filename}`;
+    } catch (e) {
+      console.error("Failed to save profile image", e);
+    }
+  }
+
+  // Handle Face Login Image (Encoding)
   if (faceImage && faceImage.size > 0) {
+    // 2. Get Encoding
     try {
       const uploadData = new FormData();
       uploadData.append("file", faceImage);
@@ -93,6 +153,16 @@ export async function registerUser(prevState: any, formData: FormData) {
           name: `${firstName} ${lastName}`,
           faceEncoding: faceEncodingString,
           role: role === "admin" ? "ADMIN" : "RADIOLOGIST",
+
+          // New Fields
+          cnic,
+          phoneNumber,
+          city,
+          pin: finalPin,
+          gender,
+          medicalLicenseId,
+          avatarUrl,
+          termsAccepted: true,
         },
       });
       // Workspace creation is deferred to the dashboard.
