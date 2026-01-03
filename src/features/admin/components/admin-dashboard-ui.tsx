@@ -1,4 +1,5 @@
 "use client";
+
 import { useState } from "react";
 import {
     Users,
@@ -10,10 +11,11 @@ import {
     CheckCircle2,
     Clock,
     ChevronRight,
-    Brain
+    Brain,
+    Search
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, Variants } from "framer-motion";
 import { JoinRequestsList } from "@/features/admin/components/join-requests-list";
 import { PatientManagement } from "@/features/admin/components/patient-management";
 import Link from "next/link";
@@ -30,33 +32,48 @@ interface AdminDashboardUIProps {
     workspaces: any[];
 }
 
+// --- Animation Variants ---
+const containerVariants: Variants = {
+    hidden: { opacity: 0 },
+    show: {
+        opacity: 1,
+        transition: {
+            staggerChildren: 0.1,
+            delayChildren: 0.1
+        }
+    }
+};
+
+const itemVariants: Variants = {
+    hidden: { opacity: 0, y: 20 },
+    show: {
+        opacity: 1,
+        y: 0,
+        transition: {
+            type: "spring",
+            stiffness: 260,
+            damping: 20
+        }
+    }
+};
+
 export function AdminDashboardUI({ user, joinRequests, workspaces }: AdminDashboardUIProps) {
+    const [searchQuery, setSearchQuery] = useState("");
     if (!user) return null;
 
-    const container = {
-        hidden: { opacity: 0 },
-        show: {
-            opacity: 1,
-            transition: {
-                staggerChildren: 0.1
-            }
-        }
-    };
-
-    const item = {
-        hidden: { opacity: 0, y: 20 },
-        show: { opacity: 1, y: 0 }
-    };
-
     return (
-        <div className="space-y-8 p-6 md:p-8 max-w-7xl mx-auto relative">
-
+        <motion.div
+            variants={containerVariants}
+            initial="hidden"
+            animate="show"
+            className="space-y-8 p-6 md:p-8 max-w-7xl mx-auto relative"
+        >
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Admin Dashboard</h1>
                     <p className="text-slate-500 dark:text-slate-400 mt-1">
-                        {`Welcome back, Mr. ${user.name}.`}
+                        {`Welcome back, ${user.name}.`}
                     </p>
                 </div>
                 <div className="flex items-center gap-4">
@@ -71,28 +88,20 @@ export function AdminDashboardUI({ user, joinRequests, workspaces }: AdminDashbo
                             })}
                         </span>
                     </div>
-
-                    {user.workspaceId && (
-                        <div className="hidden md:flex">
-                            {/* Buttons moved to Patient Directory */}
-                        </div>
-                    )}
                 </div>
-            </div>
+            </motion.div>
 
             {!user.workspaceId ? (
                 // ==========================================
                 // EMPTY STATE (Matches Doctor Dashboard)
                 // ==========================================
                 <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, ease: "easeOut" }}
+                    variants={itemVariants}
                     className="relative overflow-hidden rounded-[2.5rem] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl shadow-slate-200/50 dark:shadow-black/40 min-h-[500px] flex flex-col items-center justify-center text-center p-8 md:p-16 group"
                 >
                     {/* Decorative Background Elements */}
-                    <div className="absolute inset-0 bg-[radial(circle_at_top,var(--tw-gradient-stops))] from-blue-50/80 via-transparent to-transparent dark:from-blue-900/10 pointer-events-none" />
-                    <div className="absolute top-0 left-0 w-full h-1 bg-to-r from-blue-500 via-cyan-400 to-blue-500 opacity-50" />
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,var(--tw-gradient-stops))] from-blue-50/80 via-transparent to-transparent dark:from-blue-900/10 pointer-events-none" />
+                    <div className="absolute top-0 left-0 w-full h-1" />
 
                     {/* Icon Animation */}
                     <div className="relative mb-8 cursor-default">
@@ -116,7 +125,7 @@ export function AdminDashboardUI({ user, joinRequests, workspaces }: AdminDashbo
                     {/* CTA Buttons */}
                     <div className="flex flex-col sm:flex-row gap-4 w-full justify-center">
                         <Link href="/admin/workspaces">
-                            <button className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-8 py-3.5 rounded-xl font-bold text-sm shadow-lg shadow-blue-600/25">
+                            <button className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-8 py-3.5 rounded-xl font-bold text-sm shadow-lg shadow-blue-600/25 transition-all hover:scale-105 active:scale-95">
                                 <Building2 size={18} />
                                 Manage Workspaces
                             </button>
@@ -127,9 +136,7 @@ export function AdminDashboardUI({ user, joinRequests, workspaces }: AdminDashbo
                 <>
                     {/* Stats & Access Requests Grid */}
                     <motion.div
-                        variants={container}
-                        initial="hidden"
-                        animate="show"
+                        variants={containerVariants}
                         className="grid grid-cols-1 md:grid-cols-3 gap-6"
                     >
                         {/* Stat: Total Members */}
@@ -150,11 +157,12 @@ export function AdminDashboardUI({ user, joinRequests, workspaces }: AdminDashbo
                             trend="Operational"
                         />
 
-                        {/* Access Requests Card - Now in the top row */}
+                        {/* Access Requests Card */}
                         <motion.div
-                            variants={item}
-                            className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col h-full"
+                            variants={itemVariants}
+                            className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden flex flex-col h-full"
                         >
+
                             <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
                                 <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
                                     <ShieldCheck className="w-5 h-5 text-blue-500" />
@@ -187,28 +195,32 @@ export function AdminDashboardUI({ user, joinRequests, workspaces }: AdminDashbo
 
                     {/* Patient Management - Full Width Below */}
                     <motion.div
-                        variants={item}
-                        initial="hidden"
-                        animate="show"
+                        variants={itemVariants}
                     >
                         <PatientManagement
                             workspaceId={user.workspaceId}
+                            searchQuery={searchQuery}
                             headerActions={
                                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between w-full">
 
-                                    {/* Left: Title + Search */}
+                                    {/* Left: Search Placeholder (Handled inside PatientManagement usually, but structure kept) */}
                                     <div className="flex items-center gap-4 w-full md:w-auto">
-                                        {/* Search */}
-                                        <input
-                                            type="text"
-                                            placeholder="Search patients..."
-                                            className="w-full md:w-72 px-4 py-2 rounded-xl
-                               border border-slate-200 dark:border-slate-700
-                               bg-white dark:bg-slate-800
-                               text-sm text-slate-700 dark:text-slate-200
-                               placeholder:text-slate-400
-                               focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                        />
+                                        <div className="relative w-full md:w-72">
+                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+                                            <input
+                                                type="text"
+                                                placeholder="Search patients..."
+                                                value={searchQuery}
+                                                onChange={(e) => setSearchQuery(e.target.value)}
+                                                className="w-full pl-10 pr-4 py-2 rounded-xl
+                                                border border-slate-200 dark:border-slate-700
+                                                bg-slate-50 dark:bg-slate-800
+                                                text-sm text-slate-700 dark:text-slate-200
+                                                placeholder:text-slate-400
+                                                focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500
+                                                transition-all"
+                                            />
+                                        </div>
                                     </div>
 
                                     {/* Right: Action Buttons */}
@@ -231,7 +243,7 @@ export function AdminDashboardUI({ user, joinRequests, workspaces }: AdminDashbo
 
                                         <Link
                                             href="/admin/cases/new"
-                                            className="bg-blue-600 hover:bg-blue-500 
+                                            className="bg-blue-600 hover:bg-blue-600 
                                text-white px-3 py-2 md:px-4 md:py-2 
                                rounded-xl font-bold text-xs md:text-sm 
                                flex items-center gap-2 shadow-lg 
@@ -249,11 +261,11 @@ export function AdminDashboardUI({ user, joinRequests, workspaces }: AdminDashbo
                     </motion.div>
                 </>
             )}
-        </div>
+        </motion.div>
     );
 }
 
-function StatCard({ title, value, icon: Icon, color, trend }: any) {
+function StatCard({ title, value, icon: Icon, color, trend }: { title: string, value: string, icon: any, color: string, trend: string }) {
     const colors: any = {
         blue: "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400",
         green: "bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400",
@@ -262,11 +274,8 @@ function StatCard({ title, value, icon: Icon, color, trend }: any) {
 
     return (
         <motion.div
-            variants={{
-                hidden: { opacity: 0, y: 20 },
-                show: { opacity: 1, y: 0 }
-            }}
-            className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition-shadow"
+            variants={itemVariants}
+            className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-lg transition-all duration-300"
         >
             <div className="flex justify-between items-start mb-4">
                 <div className={cn("p-3 rounded-xl", colors[color])}>

@@ -31,7 +31,9 @@ export async function createPatient(data: {
     workspaceId: string
 }) {
     const user = await getCurrentUser()
+    console.log("createPatient: User checked:", user?.id, user?.role, user?.globalRole)
     if (!user || (user.role !== 'admin' && user.role !== 'owner')) {
+        console.error("createPatient: Unauthorized access attempt", { user })
         throw new Error("Unauthorized")
     }
 
@@ -65,7 +67,9 @@ export async function updatePatient(id: string, data: Partial<{
     city: string
 }>) {
     const user = await getCurrentUser()
+    console.log("updatePatient: User checked:", user?.id, user?.role, user?.globalRole)
     if (!user || (user.role !== 'admin' && user.role !== 'owner')) {
+        console.error("updatePatient: Unauthorized access attempt", { user })
         throw new Error("Unauthorized")
     }
 
@@ -92,7 +96,9 @@ export async function getAllPatients(workspaceId: string) {
 
 export async function deletePatient(id: string) {
     const user = await getCurrentUser()
+    console.log("deletePatient: User checked:", user?.id, user?.role, user?.globalRole)
     if (!user || (user.role !== 'admin' && user.role !== 'owner')) {
+        console.error("deletePatient: Unauthorized access attempt", { user })
         throw new Error("Unauthorized")
     }
 

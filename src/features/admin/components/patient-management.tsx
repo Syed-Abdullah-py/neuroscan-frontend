@@ -3,9 +3,9 @@ import { useState, useEffect } from "react"
 import { Search, User, MoreHorizontal, Pencil, Trash2, X } from "lucide-react"
 import { getAllPatients, deletePatient, updatePatient } from "@/features/admin/actions/patient-actions"
 import { cn } from "@/lib/utils"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion, AnimatePresence, Variants } from "framer-motion"
 
-export function PatientManagement({ workspaceId, headerActions }: { workspaceId: string, headerActions?: React.ReactNode }) {
+export function PatientManagement({ workspaceId, headerActions, searchQuery }: { workspaceId: string, headerActions?: React.ReactNode, searchQuery?: string }) {
     const [patients, setPatients] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [search, setSearch] = useState("")
@@ -34,21 +34,54 @@ export function PatientManagement({ workspaceId, headerActions }: { workspaceId:
             await deletePatient(id)
             setPatients(patients.filter(p => p.id !== id))
         } catch (e) {
-            alert("Failed to delete patient")
+            console.error("Delete failed:", e)
+            alert("Failed to delete patient: " + (e instanceof Error ? e.message : String(e)))
         } finally {
             setActionLoading(false)
         }
     }
 
+    const activeSearch = searchQuery ?? search;
+
     const filtered = patients.filter(p =>
-        p.firstName.toLowerCase().includes(search.toLowerCase()) ||
-        p.lastName.toLowerCase().includes(search.toLowerCase()) ||
-        p.phoneNumber.includes(search)
+        p.firstName.toLowerCase().includes(activeSearch.toLowerCase()) ||
+        p.lastName.toLowerCase().includes(activeSearch.toLowerCase()) ||
+        p.phoneNumber.includes(activeSearch)
     )
 
+    // --- Animation Variants ---
+    const containerVariants: Variants = {
+        hidden: { opacity: 0 },
+        show: {
+            opacity: 1,
+            transition: {
+                staggerChildren: 0.1,
+                delayChildren: 0.1
+            }
+        }
+    };
+
+    const itemVariants: Variants = {
+        hidden: { opacity: 0, y: 20 },
+        show: {
+            opacity: 1,
+            y: 0,
+            transition: {
+                type: "spring",
+                stiffness: 260,
+                damping: 20
+            }
+        }
+    };
+
     return (
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-            <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <motion.div
+            variants={containerVariants}
+            initial="hidden"
+            animate="show"
+            className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden"
+        >
+            <motion.div variants={itemVariants} className="p-6 border-b border-slate-200 dark:border-slate-800 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div className="flex items-center gap-4 w-full md:w-auto">
                     <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2 whitespace-nowrap">
                         <User className="w-5 h-5 text-blue-500" />
@@ -61,9 +94,9 @@ export function PatientManagement({ workspaceId, headerActions }: { workspaceId:
                         </div>
                     )}
                 </div>
-            </div>
+            </motion.div>
 
-            <div className="overflow-x-auto">
+            <motion.div variants={itemVariants} className="overflow-x-auto">
                 <table className="w-full">
                     <thead className="bg-slate-50 dark:bg-slate-950/50">
                         <tr>
@@ -110,7 +143,7 @@ export function PatientManagement({ workspaceId, headerActions }: { workspaceId:
                         )}
                     </tbody>
                 </table>
-            </div>
+            </motion.div>
 
             {/* Edit Modal */}
             <AnimatePresence>
@@ -142,7 +175,8 @@ export function PatientManagement({ workspaceId, headerActions }: { workspaceId:
                                     setPatients(patients.map(p => p.id === updated.id ? updated : p))
                                     setEditingPatient(null)
                                 } catch (err) {
-                                    alert("Failed to update")
+                                    console.error("Update failed:", err)
+                                    alert("Failed to update: " + (err instanceof Error ? err.message : String(err)))
                                 } finally {
                                     setActionLoading(false)
                                 }
@@ -163,6 +197,6 @@ export function PatientManagement({ workspaceId, headerActions }: { workspaceId:
                     </motion.div>
                 )}
             </AnimatePresence>
-        </div>
+        </motion.div>
     )
 }

@@ -5,6 +5,7 @@ import { FileText, Plus, User, Stethoscope, Calendar, AlertCircle, CheckCircle2,
 import { getAllCasesForWorkspace } from "@/features/cases/actions/case-actions";
 import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { motion, Variants } from "framer-motion";
 
 type Case = {
     id: string;
@@ -25,6 +26,31 @@ type Case = {
             name: string;
         };
     } | null;
+};
+
+// --- Animation Variants ---
+const containerVariants: Variants = {
+    hidden: { opacity: 0 },
+    show: {
+        opacity: 1,
+        transition: {
+            staggerChildren: 0.1,
+            delayChildren: 0.1
+        }
+    }
+};
+
+const itemVariants: Variants = {
+    hidden: { opacity: 0, y: 20 },
+    show: {
+        opacity: 1,
+        y: 0,
+        transition: {
+            type: "spring",
+            stiffness: 260,
+            damping: 20
+        }
+    }
 };
 
 export function CasesView({ workspaceId }: { workspaceId: string }) {
@@ -79,8 +105,13 @@ export function CasesView({ workspaceId }: { workspaceId: string }) {
     };
 
     return (
-        <div className="space-y-8">
-            <div className="flex justify-between items-center">
+        <motion.div
+            variants={containerVariants}
+            initial="hidden"
+            animate="show"
+            className="space-y-8"
+        >
+            <motion.div variants={itemVariants} className="flex justify-between items-center">
                 <div>
                     <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Case Management</h1>
                     <p className="text-slate-500 mt-1">Manage diagnostic cases and assignments.</p>
@@ -92,15 +123,15 @@ export function CasesView({ workspaceId }: { workspaceId: string }) {
                     <Plus size={18} />
                     Register New Case
                 </Link>
-            </div>
+            </motion.div>
 
             {loading ? (
-                <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-12 text-center">
+                <motion.div variants={itemVariants} className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-12 text-center">
                     <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4" />
                     <p className="text-slate-500">Loading cases...</p>
-                </div>
+                </motion.div>
             ) : cases.length === 0 ? (
-                <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-8 text-center">
+                <motion.div variants={itemVariants} className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-8 text-center">
                     <div className="mx-auto w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-4">
                         <FileText className="text-slate-400" />
                     </div>
@@ -108,9 +139,9 @@ export function CasesView({ workspaceId }: { workspaceId: string }) {
                     <p className="text-slate-500 max-w-sm mx-auto mt-2">
                         Get started by registering your first case. Click the button above to begin.
                     </p>
-                </div>
+                </motion.div>
             ) : (
-                <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+                <motion.div variants={itemVariants} className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
                     <div className="overflow-x-auto">
                         <table className="w-full">
                             <thead className="bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800">
@@ -176,8 +207,8 @@ export function CasesView({ workspaceId }: { workspaceId: string }) {
                             </tbody>
                         </table>
                     </div>
-                </div>
+                </motion.div>
             )}
-        </div>
+        </motion.div>
     );
 }
