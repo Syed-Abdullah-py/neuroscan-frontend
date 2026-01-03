@@ -13,11 +13,20 @@ export default async function RootPage() {
   // If user is logged in, redirect based on role
   if (user) {
     // Check if user has workspace membership with OWNER or ADMIN role
-    if (user.role === "owner" || user.role === "admin") {
-      redirect("/admin");
+    if (user.workspaceId) {
+      if (user.role === "owner" || user.role === "admin") {
+        redirect("/admin");
+      } else {
+        redirect("/doctor");
+      }
     } else {
-      // Default to doctor dashboard for other roles
-      redirect("/doctor");
+      // No workspace: Redirect based on GLOBAL role
+      // Global ADMINs go to /admin to create workspaces
+      if (user.globalRole === "ADMIN") {
+        redirect("/admin");
+      } else {
+        redirect("/doctor");
+      }
     }
   }
 

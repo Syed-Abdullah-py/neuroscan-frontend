@@ -652,9 +652,12 @@ export async function createWorkspace(prevState: any, formData: FormData) {
     const userRole = (payload.role as string)?.toUpperCase();
 
     // AUTHORIZATION CHECK
-    // Only 'ADMIN' or 'OWNER' (if that even exists globally) can create workspaces.
+    // Only 'ADMIN' or 'OWNER' (session role) OR Global Admin can create workspaces.
     // Doctors/Radiologists cannot.
-    if (userRole !== "ADMIN" && userRole !== "OWNER") {
+
+    const isGlobalAdmin = currentUser?.globalRole === "ADMIN";
+
+    if (userRole !== "ADMIN" && userRole !== "OWNER" && !isGlobalAdmin) {
       return { success: false, message: "Unauthorized. Doctors cannot create workspaces." };
     }
 

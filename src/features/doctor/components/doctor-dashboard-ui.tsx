@@ -3,9 +3,8 @@
 import { Activity, Clock, FileText, CheckCircle2, Upload, Calendar, Building2, LogOut, Stethoscope, Brain, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, Variants } from "framer-motion";
 import { useState } from "react";
-import { p } from "framer-motion/client";
 
 interface DoctorDashboardUIProps {
     stats: {
@@ -24,22 +23,34 @@ interface DoctorDashboardUIProps {
     workspaces: any[];
 }
 
+// --- Animation Variants (Moved outside for performance) ---
+const containerVariants: Variants = {
+    hidden: { opacity: 0 },
+    show: {
+        opacity: 1,
+        transition: {
+            staggerChildren: 0.1,
+            delayChildren: 0.1
+        }
+    }
+};
+
+const itemVariants: Variants = {
+    hidden: { opacity: 0, y: 20 },
+    show: {
+        opacity: 1,
+        y: 0,
+        transition: {
+            type: "spring",
+            stiffness: 260,
+            damping: 20
+        }
+    }
+};
 
 export function DoctorDashboardUI({ stats, recentCases, user, workspaces }: DoctorDashboardUIProps) {
-    const container = {
-        hidden: { opacity: 0 },
-        show: {
-            opacity: 1,
-            transition: {
-                staggerChildren: 0.1
-            }
-        }
-    };
 
-
-
-
-    // Verdict update logic removed, moved to detailed page.
+    // Logic: Filter & Sort Cases
     const [filterStatus, setFilterStatus] = useState("ALL");
     const [filterPriority, setFilterPriority] = useState("ALL");
 
@@ -50,24 +61,25 @@ export function DoctorDashboardUI({ stats, recentCases, user, workspaces }: Doct
     }).sort((a, b) => {
         const priorityOrder: Record<string, number> = {
             'critical': 4,
-            'urgent': 3, // Handle 'urgent' as alias for high/critical if needed, or map to high
+            'urgent': 3,
             'high': 3,
             'normal': 2,
             'low': 1
         };
         const pA = (a.priority || 'normal').toLowerCase();
         const pB = (b.priority || 'normal').toLowerCase();
-
-        const scoreA = priorityOrder[pA] || 0;
-        const scoreB = priorityOrder[pB] || 0;
-
-        return scoreB - scoreA;
+        return (priorityOrder[pB] || 0) - (priorityOrder[pA] || 0);
     });
 
     return (
-        <div className="space-y-8 p-6 md:p-8 max-w-7xl mx-auto">
+        <motion.div
+            variants={containerVariants}
+            initial="hidden"
+            animate="show"
+            className="space-y-8 p-6 md:p-8 max-w-7xl mx-auto"
+        >
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Doctor Dashboard</h1>
                     <p className="text-slate-500 dark:text-slate-400 mt-1">
@@ -85,42 +97,24 @@ export function DoctorDashboardUI({ stats, recentCases, user, workspaces }: Doct
                         })}
                     </span>
                 </div>
-            </div>
+            </motion.div>
 
             {!user.workspaceId ? (
+                // Empty State
                 <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.5, ease: "easeOut" }}
+                    variants={itemVariants}
                     className="relative overflow-hidden rounded-[2.5rem] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl shadow-slate-200/50 dark:shadow-black/40 min-h-[500px] flex flex-col items-center justify-center text-center p-8 md:p-16 group"
                 >
-                    {/* Decorative Background Elements */}
-                    <div className="absolute inset-0 bg-[radial(circle_at_top,var(--tw-gradient-stops))] from-blue-50/80 via-transparent to-transparent dark:from-blue-900/10 pointer-events-none" />
-                    <div className="absolute top-0 left-0 w-full h-1 bg-to-r from-blue-500 via-cyan-400 to-blue-500 opacity-50" />
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,var(--tw-gradient-stops))] from-blue-50/80 via-transparent to-transparent dark:from-blue-900/10 pointer-events-none" />
+                    <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-blue-500 via-cyan-400 to-blue-500 opacity-0" />
 
-                    {/* Icon Animation */}
                     <div className="relative mb-8 cursor-default">
-                        {/* Glow reacts to inner hover */}
-                        <div className="absolute inset-0 bg-blue-500/20 rounded-full blur-2xl 
-                    transition-all duration-500 peer-hover:bg-blue-500/30" />
-
-                        {/* Inner Icon Container */}
-                        <div
-                            className="peer relative w-28 h-28 bg-white dark:bg-slate-800 
-                   rounded-3xl shadow-lg border border-slate-100 
-                   dark:border-slate-700 flex items-center justify-center 
-                   transform -rotate-3 hover:rotate-3 
-                   transition-transform duration-500 ease-out"
-                        >
-                            <Stethoscope
-                                className="w-16 h-16 text-blue-600 dark:text-blue-400 drop-shadow-md"
-                                strokeWidth={1.5}
-                            />
+                        <div className="absolute inset-0 bg-blue-500/20 rounded-full blur-2xl transition-all duration-500 peer-hover:bg-blue-500/30" />
+                        <div className="peer relative w-28 h-28 bg-white dark:bg-slate-800 rounded-3xl shadow-lg border border-slate-100 dark:border-slate-700 flex items-center justify-center transform -rotate-3 hover:rotate-3 transition-transform duration-500 ease-out">
+                            <Stethoscope className="w-16 h-16 text-blue-600 dark:text-blue-400 drop-shadow-md" strokeWidth={1.5} />
                         </div>
                     </div>
 
-
-                    {/* Text Content */}
                     <h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-4 tracking-tight max-w-lg">
                         No Active Workspace Found
                     </h2>
@@ -128,21 +122,21 @@ export function DoctorDashboardUI({ stats, recentCases, user, workspaces }: Doct
                         You are currently not assigned to any medical facility. Please join a workspace to start viewing patient assignments and analyzing scans.
                     </p>
 
-                    {/* CTA Buttons */}
                     <div className="flex flex-col sm:flex-row gap-4 w-full justify-center">
-                        <button className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-8 py-3.5 rounded-xl font-bold text-sm shadow-lg shadow-blue-600/25 transition-all">
+                        <Link
+                            href="/doctor/workspaces"
+                            className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-8 py-3.5 rounded-xl font-bold text-sm shadow-lg shadow-blue-600/25 transition-all hover:scale-105 active:scale-95"
+                        >
                             <Building2 size={18} />
                             Browse Workspaces
-                        </button>
+                        </Link>
                     </div>
                 </motion.div>
             ) : (
                 <>
                     {/* Stats Grid */}
                     <motion.div
-                        variants={container}
-                        initial="hidden"
-                        animate="show"
+                        variants={containerVariants}
                         className="grid grid-cols-1 md:grid-cols-3 gap-6"
                     >
                         <StatCard
@@ -169,8 +163,8 @@ export function DoctorDashboardUI({ stats, recentCases, user, workspaces }: Doct
                     </motion.div>
 
                     {/* Filters */}
-                    <div className="flex flex-wrap gap-4 items-center">
-                        <div className="flex items-center gap-2 bg-white dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-800">
+                    <motion.div variants={itemVariants} className="flex flex-wrap gap-4 items-center">
+                        <div className="flex items-center gap-2 bg-white dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm">
                             {["ALL", "PENDING", "COMPLETED"].map((status) => (
                                 <button
                                     key={status}
@@ -178,7 +172,7 @@ export function DoctorDashboardUI({ stats, recentCases, user, workspaces }: Doct
                                     className={cn(
                                         "px-3 py-1.5 text-xs font-bold rounded-md transition-all",
                                         filterStatus === status
-                                            ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400"
+                                            ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400 shadow-sm"
                                             : "text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800"
                                     )}
                                 >
@@ -203,23 +197,18 @@ export function DoctorDashboardUI({ stats, recentCases, user, workspaces }: Doct
                                 <ChevronDown size={14} />
                             </div>
                         </div>
-                    </div>
+                    </motion.div>
 
                     {/* Recent Cases Section */}
                     <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.4 }}
+                        variants={itemVariants}
                         className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden"
                     >
-                        <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
+                        <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900">
                             <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
                                 <Brain className="w-5 h-5 text-blue-500" />
                                 Assigned Cases
                             </h2>
-                            {/* <Link href="/cases" className="text-sm font-medium text-blue-600 dark:text-blue-400 hover:underline">
-                                View All
-                            </Link> */}
                         </div>
 
                         <div className="overflow-x-auto">
@@ -250,7 +239,7 @@ export function DoctorDashboardUI({ stats, recentCases, user, workspaces }: Doct
                                             else if (p === 'low') priorityClass = "bg-slate-50 text-slate-600 dark:bg-slate-800/50 dark:text-slate-400 border border-slate-200 dark:border-slate-800";
 
                                             return (
-                                                <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                                <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
                                                     <td className="py-4 px-6">
                                                         <div className="flex flex-col">
                                                             <span className="font-medium text-slate-900 dark:text-white">
@@ -274,7 +263,7 @@ export function DoctorDashboardUI({ stats, recentCases, user, workspaces }: Doct
                                                         <div className="flex items-center justify-end gap-2">
                                                             <Link
                                                                 href={`/cases/${c.id}`}
-                                                                className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg shadow-sm"
+                                                                className="px-4 py-2 bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-slate-900 text-xs font-bold rounded-xl shadow-md hover:shadow-lg transition-all active:scale-95"
                                                             >
                                                                 View
                                                             </Link>
@@ -290,7 +279,7 @@ export function DoctorDashboardUI({ stats, recentCases, user, workspaces }: Doct
                     </motion.div>
                 </>
             )}
-        </div>
+        </motion.div>
     );
 }
 
@@ -303,19 +292,13 @@ function StatCard({ title, value, icon: Icon, color, trend }: { title: string, v
 
     return (
         <motion.div
-            variants={{
-                hidden: { opacity: 0, y: 20 },
-                show: { opacity: 1, y: 0 }
-            }}
-            className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition-shadow"
+            variants={itemVariants}
+            className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-lg transition-all duration-300"
         >
             <div className="flex justify-between items-start mb-4">
                 <div className={cn("p-3 rounded-xl", colors[color])}>
                     <Icon size={24} />
                 </div>
-                {/* <span className="text-xs font-medium text-green-600 bg-green-100 dark:bg-green-900/30 dark:text-green-400 px-2 py-1 rounded-full">
-                    {trend}
-                </span> */}
             </div>
             <div>
                 <h3 className="text-3xl font-bold text-slate-900 dark:text-white mb-1">{value}</h3>

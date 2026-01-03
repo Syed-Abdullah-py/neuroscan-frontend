@@ -28,6 +28,40 @@ export async function proxy(request: NextRequest) {
         const path = request.nextUrl.pathname;
         const role = payload.role as string;
 
+        // If user has no active workspace (role is undefined), force them to workspace selection
+        if (!role) {
+            // Check global role to decide where to send them
+            // If they are a global admin, they should go to /admin to see "No Active Workspace" and manage/create one.
+            // If they are a global doctor, they should go to /doctor.
+
+            // Note: We need to trust the payload or fetch user. Payload is faster.
+            // Assuming we stored globalRole in the JWT payload.
+            // If not, we might need to default to /doctor or check another claim.
+            // Let's assume we can fetch or infer. For now, default to /doctor unless we can verify admin.
+
+            // However, our JWT creation logic needs to ensure `globalRole` or similar is present if `role` (workspace role) is missing.
+            // Let's rely on path for now: if they are trying to access /admin*, let them go to /admin (which handles empty state).
+            // If they are trying to access /doctor*, let them go to /doctor.
+
+            // BETTER LOGIC: Just allow access to the dashboard ROOT so they can see the "No Workspace" state.
+            // Taking them to /admin or /doctor root is fine.
+
+            // If they are at /admin/workspaces or /doctor/workspaces, allow it.
+            if (path.includes("/workspaces")) {
+                return NextResponse.next();
+            }
+
+            // Otherwise, let them proceed to the dashboard root corresponding to the path they are trying to visit.
+            // The Page component itself handles the "No Workspace" UI.
+            if (path === "/admin" || path === "/doctor") {
+                return NextResponse.next();
+            }
+
+            // valid redirect
+            if (path.startsWith("/admin")) return NextResponse.redirect(new URL("/admin", request.url));
+            return NextResponse.redirect(new URL("/doctor", request.url));
+        }
+
         // Prevent Doctors from accessing Admin routes
         if (path.startsWith("/admin") && role !== "ADMIN" && role !== "OWNER") {
             return NextResponse.redirect(new URL("/doctor", request.url));

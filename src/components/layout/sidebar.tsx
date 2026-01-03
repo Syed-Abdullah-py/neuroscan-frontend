@@ -45,7 +45,24 @@ type UserSummary = {
 // Add workspaces prop
 export function Sidebar({ role = "admin", user, workspaces = [] }: { role?: "admin" | "doctor", user?: UserSummary | null, workspaces?: any[] }) {
   const pathname = usePathname();
-  const effectiveRole = user?.role === "radiologist" || user?.role === "doctor" ? "doctor" : "admin";
+  // Determine role: Prefer workspace role, fallback to global role
+  // If user has no workspace role (undefined), check globalRole.
+  // user.role is from the session (workspace role), which is "doctor" default in getCurrentUser if missing? 
+  // Wait, getCurrentUser defaults role to "doctor" OR user.role?
+  // Let's rely on checking if `user.role` matches known admin strings OR if `user.globalRole` matches admin strings.
+
+  const isWorkspaceAdmin = user?.role === "owner" || user?.role === "admin" || user?.role === "ADMIN";
+  const isGlobalAdmin = user?.globalRole === "ADMIN";
+
+  // If no workspace role is present (or default "doctor" from my previous guess), but global role is ADMIN, treat as admin.
+  // Actually, getCurrentUser returns role: role?.toLowerCase() || "doctor". So it is never undefined.
+
+  // We need to fix the logic:
+  // If user.workspaceId is missing, rely entirely on globalRole.
+  const effectiveRole = user?.workspaceId
+    ? (isWorkspaceAdmin ? "admin" : "doctor")
+    : (isGlobalAdmin ? "admin" : "doctor");
+
   const routes = effectiveRole === "doctor" ? doctorRoutes : adminRoutes;
 
   return (

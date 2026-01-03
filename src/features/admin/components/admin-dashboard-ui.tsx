@@ -135,10 +135,10 @@ export function AdminDashboardUI({ user, joinRequests, workspaces }: AdminDashbo
                         {/* Stat: Total Members */}
                         <StatCard
                             title="Total Members"
-                            value="14"
+                            value={workspaces.find(w => w.id === user.workspaceId)?.members?.length?.toString() || "0"}
                             icon={Users}
                             color="blue"
-                            trend="+2 this month"
+                            trend="Active members"
                         />
 
                         {/* Stat: System Health */}

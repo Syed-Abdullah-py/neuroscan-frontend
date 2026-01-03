@@ -33,7 +33,7 @@ export function WorkspaceSettings({ workspaceId, currentName }: { workspaceId: s
         startTransition(async () => {
             const res = await deleteWorkspace(workspaceId);
             if (res.success) {
-                window.location.href = '/onboarding'; // Redirect to onboarding
+                window.location.href = '/admin/workspaces'; // Redirect to workspaces list
             } else {
                 setMessage(res.message || "Failed to delete.");
             }
