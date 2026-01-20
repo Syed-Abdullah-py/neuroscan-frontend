@@ -143,7 +143,7 @@ export function CreateCaseWizard({ workspaceId, onSuccess, mode = 'case' }: { wo
 
             try {
                 // Call Python Backend
-                const response = await fetch("http://127.0.0.1:8000/validate-case-files", {
+                const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/validate-case-files`, {
                     method: "POST",
                     body: formData
                 })

@@ -10,7 +10,7 @@ import { join } from "path";
 import { SignJWT, jwtVerify } from "jose";
 
 const secret = new TextEncoder().encode(process.env.AUTH_SECRET);
-const FACE_SERVICE_URL = "http://127.0.0.1:8000";
+const FACE_SERVICE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:8000";
 
 // --- SCHEMAS ---
 const SignupSchema = z.object({
