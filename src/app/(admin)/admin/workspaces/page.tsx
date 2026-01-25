@@ -1,5 +1,5 @@
 import { getCurrentUser, getUserWorkspaces, getTeamMembers, getJoinRequests, getMyInvitations, getWorkspaceInvitations } from "@/actions/auth-actions"; // Added getJoinRequests
-import { UnifiedWorkspace } from "@/features/workspaces/components/unified-workspace";
+import { UnifiedWorkspace } from "@/features/workspaces/unified-workspace";
 
 export default async function AdminWorkspacesPage() {
     const user = await getCurrentUser();

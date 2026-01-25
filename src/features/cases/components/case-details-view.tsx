@@ -4,7 +4,7 @@ import { ArrowLeft, FileText, Phone, User, Activity, Brain, ShieldAlert, Calenda
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { VerdictForm } from "@/features/cases/components/verdict-form";
-import { ThreeDViewerContainer } from "@/components/three-d-viewer-container";
+import { ThreeDViewerContainer } from "@/components/ux/three-d-viewer-container";
 import { motion, Variants } from "framer-motion";
 
 // --- Animation Variants ---

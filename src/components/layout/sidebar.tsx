@@ -16,7 +16,7 @@ import WorkspaceSwitcher from "@/components/layout/workspace-switcher";
 
 // ... existing imports ...
 
-import { LogoutButton } from "@/features/auth/components/logout-button";
+import { LogoutButton } from "@/features/auth/logout-button";
 
 const adminRoutes = [
   { name: "Overview", href: "/admin", icon: LayoutDashboard },

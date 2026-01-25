@@ -1,6 +1,6 @@
 import { getCurrentUser, getUserWorkspaces, getMyInvitations } from "@/actions/auth-actions";
 import { getDoctorDashboardStats, getRecentAssignedCases } from "@/actions/doctor-actions";
-import { DoctorDashboardUI } from "@/features/doctor/components/doctor-dashboard-ui";
+import { DoctorDashboardUI } from "@/features/doctor/doctor-dashboard-ui";
 
 export default async function DoctorDashboard() {
     const user = await getCurrentUser();

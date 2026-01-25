@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Check, ArrowRight, Lock, Activity, Brain } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { SignupForm } from "@/features/auth/components/signup-form";
+import { SignupForm } from "@/features/auth/signup-form";
 import { useState } from "react";
 
 // Types

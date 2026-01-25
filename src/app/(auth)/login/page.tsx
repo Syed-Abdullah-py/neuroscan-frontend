@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import Link from "next/link";
 import { Activity, ArrowRight, ShieldCheck, Loader2, Brain } from "lucide-react";
 
-import { LoginForm } from "@/features/auth/components/login-form";
+import { LoginForm } from "@/features/auth/login-form";
 
 export const metadata: Metadata = {
     title: "Login | NeuroScan Admin Portal",
