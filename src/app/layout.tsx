@@ -10,6 +10,9 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 export const metadata: Metadata = {
   title: "NeuroScan",
   description: "Professional Imaging Analytics Platform",
+  icons: {
+    icon: '/favicon.svg',
+  },
 };
 
 /**
