@@ -24,7 +24,7 @@ export function JoinRequestsList({ requests, currentUserEmail }: JoinRequestsLis
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
 
-    const handleResolve = (id: string, action: "ACCEPT" | "REJECT") => {
+    const handleResolve = (id: string, action: "approve" | "reject") => {
         startTransition(async () => {
             await resolveJoinRequest(id, action);
             router.refresh();
@@ -60,7 +60,7 @@ export function JoinRequestsList({ requests, currentUserEmail }: JoinRequestsLis
                     </div>
                     <div className="flex items-center gap-2">
                         <button
-                            onClick={() => handleResolve(req.id, "REJECT")}
+                            onClick={() => handleResolve(req.id, "reject")}
                             disabled={isPending}
                             className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors"
                             title="Reject"
@@ -68,7 +68,7 @@ export function JoinRequestsList({ requests, currentUserEmail }: JoinRequestsLis
                             <X size={16} />
                         </button>
                         <button
-                            onClick={() => handleResolve(req.id, "ACCEPT")}
+                            onClick={() => handleResolve(req.id, "approve")}
                             disabled={isPending}
                             className="p-1.5 text-blue-600 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 rounded-md transition-colors"
                             title="Accept"

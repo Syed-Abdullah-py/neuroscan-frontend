@@ -5,17 +5,19 @@ export default async function DoctorWorkspacesPage() {
     const user = await getCurrentUser();
     const workspaces = await getUserWorkspaces();
 
-    // Doctors might see members (read only) or just list. Component handles this.
-    // We pass members so they see the count or list if allowed.
-    const members = user?.workspaceId ? await getTeamMembers() : [];
+    // Determine active workspace from the list (which handles cookie + fallback)
+    const activeWorkspace = workspaces.find((w: any) => w.active);
+    const activeWorkspaceId = activeWorkspace?.id || null;
 
-    // Fetch join requests in case the doctor is an admin of this workspace
-    // (A user can be Global Doctor but Workspace Admin)
-    const joinRequests = user?.workspaceId ? await getJoinRequests() : [];
+    // Fetch members if active workspace
+    const members = activeWorkspaceId ? await getTeamMembers(activeWorkspaceId) : [];
+
+    // Fetch join requests/invitations
+    const joinRequests = activeWorkspaceId ? await getJoinRequests(activeWorkspaceId) : [];
     const invitations = await getMyInvitations();
-    const sentInvitations = user?.workspaceId ? await getWorkspaceInvitations() : [];
+    const sentInvitations = activeWorkspaceId ? await getWorkspaceInvitations(activeWorkspaceId) : [];
 
-    const currentWorkspaceName = workspaces.find(w => w.id === user?.workspaceId)?.name;
+    const currentWorkspaceName = activeWorkspace?.name;
 
     if (!user) return null;
 
@@ -29,7 +31,7 @@ export default async function DoctorWorkspacesPage() {
             </div>
 
             <UnifiedWorkspace
-                user={user as any}
+                user={{ ...user, workspaceId: activeWorkspaceId || undefined } as any}
                 workspaces={workspaces}
                 currentWorkspaceName={currentWorkspaceName}
                 members={members}

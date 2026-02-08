@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useActionState, useEffect, useTransition } from "react";
-import { leaveWorkspace, requestJoinWorkspace, createWorkspace, getDiscoverableWorkspaces, switchWorkspace } from "@/actions/auth-actions";
+import { leaveWorkspace, requestJoinWorkspaceFromForm, createWorkspaceFromForm, getDiscoverableWorkspaces, switchWorkspace } from "@/actions/auth-actions";
 import { Loader2, LogOut, Plus, Search, Building2, UserPlus, CheckCircle2, AlertCircle, ArrowLeft, ChevronRight, Briefcase } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
@@ -27,8 +27,8 @@ export function WorkspaceManager({ currentWorkspaceId, workspaces, userGlobalRol
     const [pendingSwitchId, setPendingSwitchId] = useState<string | null>(null);
 
     // -- Actions --
-    const [joinState, joinAction, isJoinPending] = useActionState(requestJoinWorkspace, initialState);
-    const [createState, createAction, isCreatePending] = useActionState(createWorkspace, initialState);
+    const [joinState, joinAction, isJoinPending] = useActionState(requestJoinWorkspaceFromForm, initialState);
+    const [createState, createAction, isCreatePending] = useActionState(createWorkspaceFromForm, initialState);
 
     // -- State --
     const [availableWorkspaces, setAvailableWorkspaces] = useState<any[]>([]);

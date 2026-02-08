@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, useEffect } from "react";
-import { addTeamMember, removeTeamMember, searchUsers, inviteUser } from "@/actions/auth-actions";
+import { addWorkspaceMember as addTeamMember, removeWorkspaceMember, searchUsers, inviteUser } from "@/actions/auth-actions";
 import { Loader2, Trash2, Shield, Stethoscope, UserPlus, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { WorkspaceSettings } from "@/features/admin/components/workspace-settings";
@@ -63,7 +63,7 @@ export function TeamManagement({ initialMembers, currentUserEmail, currentUserRo
         setIsError(false);
 
         startTransition(async () => {
-            const result = await inviteUser(userId, inviteRole);
+            const result = await inviteUser(userId, inviteRole, workspaceId); // Pass workspaceId if needed by inviteUser
             if (result.success) {
                 setMessage(result.message || "Invitation sent.");
                 setQuery("");
@@ -81,7 +81,7 @@ export function TeamManagement({ initialMembers, currentUserEmail, currentUserRo
         if (!confirm("Are you sure you want to remove this member?")) return;
 
         startTransition(async () => {
-            const result = await removeTeamMember(userId);
+            const result = await removeWorkspaceMember(workspaceId, userId);
             if (result.success) {
                 setMembers(prev => prev.filter(m => m.userId !== userId));
                 setMessage("Member removed.");
@@ -146,94 +146,67 @@ export function TeamManagement({ initialMembers, currentUserEmail, currentUserRo
                 </div>
 
                 {/* Only show Add Team Member for OWNER and ADMIN */}
+                {/* Only show Add Team Member for OWNER and ADMIN */}
                 {(currentUserRole === "OWNER" || currentUserRole === "ADMIN") && (
                     <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-6 shadow-sm">
-                        {/* ... Search UI ... */}
+
                         <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-4 flex items-center gap-2">
                             <UserPlus className="w-5 h-5 text-blue-600" />
-                            Add Team Member
+                            Invite Team Member
                         </h2>
 
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-                            <input
-                                type="text"
-                                value={query}
-                                onChange={(e) => setQuery(e.target.value)}
-                                placeholder="Search by name or email..."
-                                className="w-full h-11 pl-10 pr-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-sm outline-none focus:ring-2 focus:ring-blue-600 transition-all"
-                            />
-                            {isSearching && (
-                                <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                                    <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
+                        <div className="flex flex-col gap-4">
+                            <div className="flex gap-2">
+                                <div className="relative flex-1">
+                                    <input
+                                        type="email"
+                                        value={query} // Reusing query state for email input
+                                        onChange={(e) => setQuery(e.target.value)}
+                                        placeholder="Enter email address..."
+                                        className="w-full h-11 px-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-sm outline-none focus:ring-2 focus:ring-blue-600 transition-all"
+                                    />
                                 </div>
-                            )}
-                        </div>
 
-                        {/* Invite Role Toggle */}
-                        <div className="flex items-center gap-3 mt-4 mb-2">
-                            <span className="text-sm text-slate-500 dark:text-slate-400 font-medium">Invite as:</span>
-                            <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
                                 <button
-                                    onClick={() => setInviteRole("DOCTOR")}
-                                    className={cn(
-                                        "px-3 py-1.5 text-xs font-bold rounded-md transition-all flex items-center gap-2",
-                                        inviteRole === "DOCTOR"
-                                            ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm"
-                                            : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-                                    )}
+                                    onClick={() => handleInvite(query)}
+                                    disabled={isPending || !query.includes("@")}
+                                    className="h-11 px-6 bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm rounded-xl shadow-lg shadow-blue-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                                 >
-                                    <Stethoscope size={14} />
-                                    Doctor
-                                </button>
-                                <button
-                                    onClick={() => setInviteRole("ADMIN")}
-                                    className={cn(
-                                        "px-3 py-1.5 text-xs font-bold rounded-md transition-all flex items-center gap-2",
-                                        inviteRole === "ADMIN"
-                                            ? "bg-white dark:bg-slate-700 text-purple-600 dark:text-purple-400 shadow-sm"
-                                            : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
-                                    )}
-                                >
-                                    <Shield size={14} />
-                                    Admin
+                                    {isPending ? <Loader2 className="animate-spin" size={18} /> : <span>Invite</span>}
                                 </button>
                             </div>
+
+                            {/* Invite Role Toggle */}
+                            <div className="flex items-center gap-3">
+                                <span className="text-sm text-slate-500 dark:text-slate-400 font-medium">Role:</span>
+                                <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
+                                    <button
+                                        onClick={() => setInviteRole("DOCTOR")}
+                                        className={cn(
+                                            "px-3 py-1.5 text-xs font-bold rounded-md transition-all flex items-center gap-2",
+                                            inviteRole === "DOCTOR"
+                                                ? "bg-white dark:bg-slate-700 text-blue-600 dark:text-blue-400 shadow-sm"
+                                                : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                                        )}
+                                    >
+                                        <Stethoscope size={14} />
+                                        Doctor
+                                    </button>
+                                    <button
+                                        onClick={() => setInviteRole("ADMIN")}
+                                        className={cn(
+                                            "px-3 py-1.5 text-xs font-bold rounded-md transition-all flex items-center gap-2",
+                                            inviteRole === "ADMIN"
+                                                ? "bg-white dark:bg-slate-700 text-purple-600 dark:text-purple-400 shadow-sm"
+                                                : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-300"
+                                        )}
+                                    >
+                                        <Shield size={14} />
+                                        Admin
+                                    </button>
+                                </div>
+                            </div>
                         </div>
-
-                        {/* Search Results */}
-                        {searchResults.length > 0 && (
-                            <div className="mt-2 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-white dark:bg-state-900 shadow-lg">
-                                {searchResults.map((user) => (
-                                    <div key={user.id} className="p-3 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors border-b last:border-0 border-slate-100 dark:border-slate-800">
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-600 dark:text-slate-400">
-                                                {user.name?.[0]?.toUpperCase() || "U"}
-                                            </div>
-                                            <div>
-                                                <p className="text-sm font-bold text-slate-900 dark:text-white">{user.name}</p>
-                                                <p className="text-xs text-slate-500">{user.email}</p>
-                                            </div>
-                                        </div>
-                                        <button
-                                            onClick={() => handleInvite(user.id)}
-                                            disabled={isPending}
-                                            className="text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg transition-colors"
-                                        >
-                                            Invite
-                                        </button>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-
-                        {/* No Results Message */}
-                        {query.length >= 2 && !isSearching && searchResults.length === 0 && (
-                            <div className="mt-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800/50 text-center">
-                                <p className="text-sm text-slate-500 dark:text-slate-400">No users found matching "{query}"</p>
-                                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">Try searching with a different name or email</p>
-                            </div>
-                        )}
 
                         {message && (
                             <div className={cn("mt-4 p-3 rounded-lg text-sm", isError ? "bg-red-50 text-red-600" : "bg-green-50 text-green-600")}>

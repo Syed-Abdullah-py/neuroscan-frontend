@@ -1,25 +1,25 @@
-import { getCurrentUser, getJoinRequests, getUserWorkspaces } from "@/actions/auth-actions";
+import { getCurrentUser, getJoinRequests, getUserWorkspaces, getTeamMembers } from "@/actions/auth-actions";
 import { AdminDashboardUI } from "@/features/admin/components/admin-dashboard-ui";
 
 export default async function AdminDashboard() {
     const user = await getCurrentUser();
-
-    // Fetch invitations for user (even if they have no workspace yet)
-    // const invitations = await getMyInvitations(); // Moved to WorkspaceManager or handle differently? 
-    // Actually we keep invitations logic but maybe we don't force wizard.
-
-    // Fetch workspaces for the manager
     const workspaces = await getUserWorkspaces();
 
-    // Only fetch requests if we have a workspace
-    const joinRequests = user?.workspaceId ? await getJoinRequests() : [];
+    // Determine active workspace from the list (which handles cookie + fallback)
+    const activeWorkspace = workspaces.find((w: any) => w.active);
+    const activeWorkspaceId = activeWorkspace?.id || null;
+
+    // Fetch data for the resolved active workspace
+    const joinRequests = activeWorkspaceId ? await getJoinRequests(activeWorkspaceId) : [];
+    const members = activeWorkspaceId ? await getTeamMembers(activeWorkspaceId) : [];
 
     return (
         <>
             <AdminDashboardUI
-                user={user}
+                user={user ? { ...user, workspaceId: activeWorkspaceId || undefined } : null}
                 joinRequests={joinRequests}
                 workspaces={workspaces}
+                members={members}
             />
         </>
     );

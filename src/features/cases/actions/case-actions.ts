@@ -1,8 +1,9 @@
 'use server'
 
-import { prisma } from "@/lib/prisma"
-import { getCurrentUser } from "@/actions/auth-actions"
+import { getAuthToken, getCurrentUser } from "@/actions/auth-actions"
 import { revalidatePath } from "next/cache"
+
+const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || "http://localhost:8000";
 
 export async function createCase(data: {
     patientId: string
@@ -12,221 +13,189 @@ export async function createCase(data: {
     workspaceId: string
     assignedToMemberId?: string // Optional, if manual override
 }) {
-    const user = await getCurrentUser()
-    if (!user || (user.role !== 'admin' && user.role !== 'owner')) {
-        throw new Error("Unauthorized")
-    }
+    const token = await getAuthToken();
+    if (!token) throw new Error("Unauthorized");
 
-    let assignedDocId = data.assignedToMemberId
-
-    // Auto-assign if not provided
-    if (!assignedDocId) {
-        // Find doctor with the least pending cases in this workspace
-        const doctors = await prisma.workspaceMember.findMany({
-            where: {
-                workspaceId: data.workspaceId,
-                role: 'DOCTOR'
+    try {
+        const response = await fetch(`${AUTH_SERVICE_URL}/cases`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+                "X-Workspace-Id": data.workspaceId
             },
-            include: {
-                _count: {
-                    select: { assignedCases: { where: { status: 'PENDING' } } }
-                }
-            }
-        })
+            body: JSON.stringify({
+                patient_id: data.patientId,
+                notes: data.notes,
+                file_references: data.fileReferences,
+                priority: data.priority,
+                assigned_to_member_id: data.assignedToMemberId
+            })
+        });
 
-        if (doctors.length > 0) {
-            // Sort by case count ascending
-            doctors.sort((a, b) => a._count.assignedCases - b._count.assignedCases)
-            assignedDocId = doctors[0].id
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.detail || "Failed to create case");
         }
+
+        const newCase = await response.json();
+        revalidatePath(`/admin`);
+        revalidatePath(`/doctor`);
+        return newCase;
+    } catch (error) {
+        console.error("Create Case Error:", error);
+        throw error;
     }
-
-    const newCase = await prisma.case.create({
-        data: {
-            patientId: data.patientId,
-            notes: data.notes,
-            fileReferences: data.fileReferences,
-            priority: data.priority || 'normal',
-            assignedToMemberId: assignedDocId,
-            status: 'PENDING'
-        }
-    })
-
-    revalidatePath(`/admin`)
-    revalidatePath(`/doctor`)
-    return newCase
 }
 
 export async function updateCaseVerdict(caseId: string, verdict: string) {
-    const user = await getCurrentUser()
+    const token = await getAuthToken();
+    const user = await getCurrentUser();
 
-    // Check if user is the assigned doctor or admin (but requirement says admin cannot give final verdict? 
-    // "Only the admin/owner can do CRUD operations, however they cannot give the final verdict ... 
-    // The doctors cannot perform CRUD operation ... but can update their verdict")
+    if (!token || !user) throw new Error("Unauthorized");
 
-    // So we need to check if the user is a doctor and assigned to this case?
-    // Or just any doctor in the workspace? Requirement says "view and give verdict of the ones assigned to them"
+    // We need workspaceId for the header. Ideally passed in or derived.
+    // However, the backend update endpoint checks if user has access.
+    // If we don't pass workspaceId, backend might fail strict check if validation logic requires it.
+    // Logic in cases.py: `if workspace_id and case.patient.workspace_id != workspace_id: ...`
+    // So if we DON'T pass workspaceId, it might skip that check or rely on db access?
+    // Let's passed user.workspaceId if available.
 
-    const caseItem = await prisma.case.findUnique({
-        where: { id: caseId },
-        include: { assignedTo: true }
-    })
+    const workspaceId = user?.workspaceId;
 
-    if (!caseItem) throw new Error("Case not found")
+    try {
+        const headers: Record<string, string> = {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+        };
+        if (workspaceId) headers["X-Workspace-Id"] = workspaceId;
 
-    // We verify the user is the assigned doctor
-    // This requires fetching the user's workspace member record
-    // Optimization: We can just check permission based on logic.
+        const response = await fetch(`${AUTH_SERVICE_URL}/cases/${caseId}`, {
+            method: "PUT",
+            headers,
+            body: JSON.stringify({
+                verdict: verdict,
+                status: 'COMPLETED'
+            })
+        });
 
-    // For now strict check: Must be the assigned member user.
-    if (caseItem.assignedTo?.userId !== user?.id) {
-        // Admins can VIEW, but not give final verdict.
-        // So if admin tries this, it should fail? 
-        // "Admin/owner ... cannot give the final verdict that the AI response is correct or incorrect."
-        // So we explicitly block non-assigned doctors.
-        throw new Error("Only the assigned doctor can submit a verdict.")
-    }
-
-    const updatedCase = await prisma.case.update({
-        where: { id: caseId },
-        data: {
-            verdict,
-            verdictUpdatedAt: new Date(),
-            status: 'COMPLETED' // Assume verdict means completion
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.detail || "Failed to update verdict");
         }
-    })
 
-    revalidatePath(`/doctor`)
-    revalidatePath(`/admin`)
-    return updatedCase
+        const updatedCase = await response.json();
+        revalidatePath(`/doctor`);
+        revalidatePath(`/admin`);
+        return updatedCase;
+    } catch (error) {
+        console.error("Update Verdict Error:", error);
+        throw error;
+    }
 }
 
 export async function getAssignedCases() {
-    const user = await getCurrentUser()
-    if (!user) return []
+    const token = await getAuthToken();
+    const user = await getCurrentUser();
 
-    // Find the workspace member record for this user in the active context? 
-    // The user object might not have workspaceId if not selected. 
-    // Assuming user context has workspaceId or we find the member record.
+    if (!token || !user?.workspaceId) return [];
 
-    if (!user.workspaceId) return []
+    try {
+        const response = await fetch(`${AUTH_SERVICE_URL}/cases?assigned_to=me`, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "X-Workspace-Id": user.workspaceId
+            }
+        });
 
-    const member = await prisma.workspaceMember.findFirst({
-        where: {
-            userId: user.id,
-            workspaceId: user.workspaceId
-        }
-    })
+        if (!response.ok) return [];
 
-    if (!member) return []
-
-    return await prisma.case.findMany({
-        where: {
-            assignedToMemberId: member.id
-        },
-        include: {
-            patient: true
-        },
-        orderBy: {
-            updatedAt: 'desc'
-        }
-    })
+        return await response.json();
+    } catch (error) {
+        console.error("Get Assigned Cases Error:", error);
+        return [];
+    }
 }
 
 export async function getDoctorsForDropdown(workspaceId: string) {
-    const doctors = await prisma.workspaceMember.findMany({
-        where: {
-            workspaceId: workspaceId,
-            role: 'DOCTOR'
-        },
-        include: {
-            user: true,
-            _count: {
-                select: { assignedCases: { where: { status: 'PENDING' } } }
-            }
-        }
-    })
+    const token = await getAuthToken();
+    if (!token) return [];
 
-    // Sort logic to put least busy first
-    return doctors.sort((a, b) => a._count.assignedCases - b._count.assignedCases)
+    try {
+        const response = await fetch(`${AUTH_SERVICE_URL}/workspaces/${workspaceId}/members`, {
+            headers: {
+                Authorization: `Bearer ${token}`
+            }
+        });
+
+        if (!response.ok) return [];
+
+        const members = await response.json();
+        // Filter for DOCTORS and transform
+        // Note: Backend MemberSchema now includes 'user' object.
+        // We need to map it to what frontend expects.
+        // Frontend likely expects objects with 'user' property.
+
+        return members
+            .filter((m: any) => m.role === 'DOCTOR')
+            .map((m: any) => ({
+                id: m.id,
+                user: m.user,
+                _count: { assignedCases: 0 } // Stats not yet available in members list. 
+                // TODO: Add stats to members endpoint or separate stats call.
+                // For now, sorting might break if we rely on _count.
+                // Let's mock _count or return 0.
+            }));
+    } catch (error) {
+        console.error("Get Doctors Error:", error);
+        return [];
+    }
 }
 
 export async function getAllCasesForWorkspace(workspaceId: string) {
-    const user = await getCurrentUser()
-    if (!user || (user.role !== 'admin' && user.role !== 'owner')) {
-        throw new Error("Unauthorized")
-    }
+    const token = await getAuthToken();
+    if (!token) throw new Error("Unauthorized");
 
-    return await prisma.case.findMany({
-        where: {
-            patient: {
-                workspaceId: workspaceId
+    try {
+        const response = await fetch(`${AUTH_SERVICE_URL}/cases`, {
+            headers: {
+                Authorization: `Bearer ${token}`,
+                "X-Workspace-Id": workspaceId
             }
-        },
-        include: {
-            patient: true,
-            assignedTo: {
-                include: {
-                    user: true
-                }
-            }
-        },
-        orderBy: {
-            createdAt: 'desc'
-        }
-    })
+        });
+
+        if (!response.ok) throw new Error("Failed to fetch cases");
+
+        return await response.json();
+    } catch (error) {
+        console.error("Get All Cases Error:", error);
+        throw error;
+    }
 }
 
 export async function getCaseById(caseId: string) {
-    const user = await getCurrentUser()
-    if (!user) {
-        throw new Error("Unauthorized")
+    const token = await getAuthToken();
+    const user = await getCurrentUser();
+
+    if (!token) return null;
+
+    const workspaceId = user?.workspaceId;
+
+    try {
+        const headers: Record<string, string> = {
+            Authorization: `Bearer ${token}`,
+        };
+        if (workspaceId) headers["X-Workspace-Id"] = workspaceId;
+
+        const response = await fetch(`${AUTH_SERVICE_URL}/cases/${caseId}`, {
+            headers
+        });
+
+        if (!response.ok) return null;
+
+        return await response.json();
+    } catch (error) {
+        console.error("Get Case By ID Error:", error);
+        return null;
     }
-
-    // Determine access:
-    // Admin/Owner: Can view any case in their workspace (implied by patient.workspaceId check?)
-    // Doctor: Can view cases assigned to them? Or any case in their workspace?
-    // Requirement says "The view button should appear infront of both admin and doctor's page"
-    // Usually doctors can view cases in their workspace, or at least assigned ones.
-    // For now, let's allow if they are in the same workspace as the patient.
-
-    // We need to fetch the case and check permissions.
-    const caseItem = await prisma.case.findUnique({
-        where: { id: caseId },
-        include: {
-            patient: true,
-            assignedTo: {
-                include: {
-                    user: true
-                }
-            }
-        }
-    })
-
-    if (!caseItem) return null;
-
-    // derived workspace check
-    // If Admin/Owner: must be case's patient's workspace (or just be an admin of that workspace)
-    // If Doctor: must be in the same workspace.
-
-    // If global admin/owner, maybe skips? Assuming standard workspace logic.
-    if (user.role === 'admin' || user.role === 'owner') {
-        // Check if user manages the workspace this case belongs to
-        // We don't have direct workspaceId on Case, but on Patient.
-        // And User has workspaceId.
-        if (caseItem.patient.workspaceId !== user.workspaceId) {
-            throw new Error("Unauthorized access to case in another workspace")
-        }
-    } else {
-        // Doctor
-        // Check if doctor is in the same workspace
-        // Ideally we check if doctor is assigned or just has read access.
-        // For now, align with workspaceId.
-        // user.workspaceId must match.
-        if (caseItem.patient.workspaceId !== user.workspaceId) {
-            throw new Error("Unauthorized access to case in another workspace")
-        }
-    }
-
-    return caseItem;
 }

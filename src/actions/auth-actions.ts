@@ -204,6 +204,10 @@ export async function getCurrentUser() {
 
     console.log(`[Auth] getCurrentUser: User ${payload.email}, GlobalRole: ${globalRoleRaw}, MappedRole: ${role}`);
 
+    // Add active workspaceId from cookie if present
+    const cookieStore = await cookies();
+    const activeWorkspaceId = cookieStore.get("active_workspace")?.value;
+
     return {
       id: payload.sub,
       email: payload.email,
@@ -211,6 +215,7 @@ export async function getCurrentUser() {
       role: role,
       globalRole: globalRoleRaw, // Keep original uppercase for RBAC checks
       avatar: payload.email?.charAt(0).toUpperCase() || "U",
+      workspaceId: activeWorkspaceId || undefined,
     };
   } catch (error) {
     console.error("Error decoding token:", error);
@@ -247,23 +252,20 @@ export async function getUserWorkspaces() {
     }
 
     const memberships = await response.json();
+    const cookieStore = await cookies();
+    const activeWorkspaceId = cookieStore.get("active_workspace")?.value;
 
-    // Map to expected format if needed, or return as is
-    // The UI expects: { id, name, ... } or similar for workspace?
-    // The API returns MembershipResponse: { id, workspace_id, role, joined_at, workspace_name }
-
-    // Let's interpret what the UI likely needs.
-    // DoctorDashboardUI likely uses workspaces to show a switcher or list.
-    // It's safer to return a structure similar to what Prisma used to return if possible,
-    // OR update the UI. But since I can't easily see UI usage deep in components without lookups,
-    // I'll return a mapped object that covers bases.
+    // Resolve which one is actually active: Cookie (if valid) > First available
+    const activeMember = memberships.find((m: any) => m.workspace_id === activeWorkspaceId) || memberships[0];
+    const resolvedActiveId = activeMember?.workspace_id;
 
     return memberships.map((m: any) => ({
       id: m.workspace_id,
       name: m.workspace_name,
       role: m.role,
       membershipId: m.id,
-      joinedAt: m.joined_at
+      joinedAt: m.joined_at,
+      active: m.workspace_id === resolvedActiveId
     }));
 
   } catch (error) {
@@ -272,21 +274,13 @@ export async function getUserWorkspaces() {
   }
 }
 
-/**
- * Retrieves the current user's invitations.
- * Placeholder: Returns empty list until backend endpoint is available.
- */
-export async function getMyInvitations() {
-  // const token = await getAuthToken();
-  // Call API...
-  return [];
-}
+
 
 /**
  * Switches the active workspace for the current user.
  * Stores the active workspace ID in a cookie.
  */
-export async function switchWorkspace(workspaceId: string): Promise<{ success: boolean }> {
+export async function switchWorkspace(workspaceId: string): Promise<{ success: boolean, message?: string }> {
   try {
     const cookieStore = await cookies();
     cookieStore.set("active_workspace", workspaceId, {
@@ -299,29 +293,482 @@ export async function switchWorkspace(workspaceId: string): Promise<{ success: b
     return { success: true };
   } catch (error) {
     console.error("Switch Workspace Error:", error);
-    return { success: false };
+    return { success: false, message: "Failed to switch workspace" };
+  }
+}
+
+
+
+/**
+ * Retrieves join requests for the current workspace.
+ */
+export async function getJoinRequests(workspaceId?: string) {
+  const token = await getAuthToken();
+  if (!token) return [];
+
+  if (!workspaceId) {
+    const cookieStore = await cookies();
+    workspaceId = cookieStore.get("active_workspace")?.value;
+  }
+
+  if (!workspaceId) return [];
+
+  try {
+    const response = await fetch(`${AUTH_SERVICE_URL}/workspaces/${workspaceId}/join-requests`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    });
+    if (!response.ok) return [];
+    return await response.json();
+  } catch (error) {
+    console.error("Get Join Requests Error:", error);
+    return [];
   }
 }
 
 /**
- * Retrieves join requests for the current workspace.
+ * Resolves a join request (approve or reject).
+ */
+export async function resolveJoinRequest(requestId: string, action: "approve" | "reject"): Promise<{ success: boolean, message?: string }> {
+  const token = await getAuthToken();
+  if (!token) return { success: false, message: "Not authenticated" };
+
+  try {
+    const response = await fetch(`${AUTH_SERVICE_URL}/join-requests/${requestId}/${action}`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      return { success: false, message: error.detail || `Failed to ${action} request` };
+    }
+    return { success: true };
+  } catch (error) {
+    console.error(`Resolve Join Request (${action}) Error:`, error);
+    return { success: false, message: "Network error" };
+  }
+}
+
+// --- HELPER ---
+function getErrorMessage(errorData: any, defaultMsg: string) {
+  if (errorData?.detail) {
+    if (typeof errorData.detail === 'string') return errorData.detail;
+    if (Array.isArray(errorData.detail)) {
+      return errorData.detail.map((e: any) => e.msg || JSON.stringify(e)).join(", ");
+    }
+    return JSON.stringify(errorData.detail);
+  }
+  return defaultMsg;
+}
+
+/**
+ * Creates a new workspace (Global Admin only).
+ */
+export async function createWorkspace(name: string) {
+  const token = await getAuthToken();
+  if (!token) return { success: false, message: "Not authenticated" };
+
+  try {
+    const response = await fetch(`${AUTH_SERVICE_URL}/workspaces`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ name }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return { success: false, message: getErrorMessage(errorData, "Failed to create workspace") };
+    }
+
+    const newWorkspace = await response.json();
+
+    // Auto-switch to the new workspace
+    await switchWorkspace(newWorkspace.id);
+
+    return { success: true, message: "" };
+  } catch (error) {
+    console.error("Create Workspace Error:", error);
+    return { success: false, message: "Network error" };
+  }
+}
+
+/**
+ * Updates a workspace name (Owner only).
+ */
+export async function updateWorkspace(workspaceId: string, name: string) {
+  const token = await getAuthToken();
+  if (!token) return { success: false, message: "Not authenticated" };
+
+  try {
+    const response = await fetch(`${AUTH_SERVICE_URL}/workspaces/${workspaceId}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ name }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return { success: false, message: getErrorMessage(errorData, "Failed to update workspace") };
+    }
+
+    return { success: true, message: "" };
+  } catch (error) {
+    console.error("Update Workspace Error:", error);
+    return { success: false, message: "Network error" };
+  }
+}
+
+/**
+ * Deletes a workspace (Owner only).
+ */
+export async function deleteWorkspace(workspaceId: string) {
+  const token = await getAuthToken();
+  if (!token) return { success: false, message: "Not authenticated" };
+
+  try {
+    const response = await fetch(`${AUTH_SERVICE_URL}/workspaces/${workspaceId}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      try {
+        const errorData = await response.json();
+        return { success: false, message: getErrorMessage(errorData, "Failed to delete workspace") };
+      } catch {
+        return { success: false, message: "Failed to delete workspace" };
+      }
+    }
+
+    // Clear active_workspace cookie if it matches the deleted one
+    const cookieStore = await cookies();
+    const activeWorkspaceId = cookieStore.get("active_workspace")?.value;
+    if (activeWorkspaceId === workspaceId) {
+      cookieStore.delete("active_workspace");
+    }
+
+    return { success: true, message: "" };
+  } catch (error) {
+    console.error("Delete Workspace Error:", error);
+    return { success: false, message: "Network error" };
+  }
+}
+
+/**
+ * Adds a member to a workspace (Owner or Admin).
+ */
+export async function addWorkspaceMember(workspaceId: string, email: string, role: string) {
+  const token = await getAuthToken();
+  if (!token) return { success: false, message: "Not authenticated" };
+
+  try {
+    // The backend `add_member` definition uses query parameters:
+    // def add_member(workspace_id: str, email: str, role: WorkspaceRoleEnum...)
+    const params = new URLSearchParams({
+      email: email,
+      role: role.toUpperCase()
+    });
+
+    const response = await fetch(`${AUTH_SERVICE_URL}/workspaces/${workspaceId}/members?${params.toString()}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      return { success: false, message: errorData.detail || "Failed to add member" };
+    }
+
+    return { success: true, message: "" };
+  } catch (error) {
+    console.error("Add Member Error:", error);
+    return { success: false, message: "Network error" };
+  }
+}
+
+/**
+ * Removes a member from a workspace (Owner or Admin).
+ */
+export async function removeWorkspaceMember(workspaceId: string, userId: string) {
+  const token = await getAuthToken();
+  if (!token) return { success: false, message: "Not authenticated" };
+
+  try {
+    const response = await fetch(`${AUTH_SERVICE_URL}/workspaces/${workspaceId}/members/${userId}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      try {
+        const errorData = await response.json();
+        return { success: false, message: errorData.detail || "Failed to remove member" };
+      } catch {
+        return { success: false, message: "Failed to remove member" };
+      }
+    }
+
+    return { success: true, message: "" };
+  } catch (error) {
+    console.error("Remove Member Error:", error);
+    return { success: false, message: "Network error" };
+  }
+}
+
+/**
+ * Retrieves team members for the current workspace.
+ */
+export async function getTeamMembers(workspaceId?: string) {
+  const token = await getAuthToken();
+  if (!token) return [];
+
+  if (!workspaceId) {
+    const cookieStore = await cookies();
+    workspaceId = cookieStore.get("active_workspace")?.value;
+  }
+
+  if (!workspaceId) return [];
+
+  try {
+    const response = await fetch(`${AUTH_SERVICE_URL}/workspaces/${workspaceId}/members`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    });
+
+    if (!response.ok) return [];
+
+    const memberships = await response.json();
+    // Return in format expected by TeamManagement.tsx
+    return memberships.map((m: any) => ({
+      membershipId: m.id,
+      userId: m.user?.id || m.user_id,
+      email: m.user?.email || "Unknown",
+      name: m.user?.name || "Unknown",
+      role: m.role,
+      joinedAt: m.joined_at
+    }));
+  } catch (error) {
+    console.error("Get Team Members Error:", error);
+    return [];
+  }
+}
+
+// --- INVITATION & DISCOVERY ACTIONS ---
+
+export async function getMyInvitations() {
+  const token = await getAuthToken();
+  if (!token) return [];
+
+  try {
+    const response = await fetch(`${AUTH_SERVICE_URL}/invitations`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) return [];
+    return await response.json();
+  } catch {
+    return [];
+  }
+}
+
+export async function getWorkspaceInvitations(workspaceId: string) {
+  const token = await getAuthToken();
+  if (!token) return [];
+
+  try {
+    const response = await fetch(`${AUTH_SERVICE_URL}/workspaces/${workspaceId}/invitations`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) return [];
+    return await response.json();
+  } catch {
+    return [];
+  }
+}
+
+export async function inviteUser(email: string, role: string, workspaceId?: string) {
+  const token = await getAuthToken();
+  if (!token) return { success: false, message: "Not authenticated" };
+
+  if (!workspaceId) {
+    const cookieStore = await cookies();
+    workspaceId = cookieStore.get("active_workspace")?.value;
+  }
+
+  if (!workspaceId) return { success: false, message: "No active workspace" };
+
+  try {
+    const response = await fetch(`${AUTH_SERVICE_URL}/workspaces/${workspaceId}/invitations`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ email, role: role.toUpperCase() }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      return { success: false, message: errorData.detail || "Failed to invite user" };
+    }
+
+    return { success: true, message: "" };
+  } catch (error) {
+    return { success: false, message: "Network error" };
+  }
+}
+
+export async function acceptInvitation(invitationId: string) {
+  const token = await getAuthToken();
+  if (!token) return { success: false, message: "Not authenticated" };
+
+  try {
+    const response = await fetch(`${AUTH_SERVICE_URL}/invitations/${invitationId}/accept`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      return { success: false, message: errorData.detail || "Failed" };
+    }
+    return { success: true, message: "" };
+  } catch {
+    return { success: false, message: "Network error" };
+  }
+}
+
+export async function rejectInvitation(invitationId: string) {
+  const token = await getAuthToken();
+  if (!token) return { success: false, message: "Not authenticated" };
+
+  try {
+    const response = await fetch(`${AUTH_SERVICE_URL}/invitations/${invitationId}/reject`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!response.ok) return { success: false, message: "Failed" };
+    return { success: true, message: "" };
+  } catch {
+    return { success: false, message: "Network error" };
+  }
+}
+
+export async function getDiscoverableWorkspaces() {
+  const token = await getAuthToken();
+  if (!token) return [];
+
+  try {
+    const response = await fetch(`${AUTH_SERVICE_URL}/workspaces/discover`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) return [];
+    return await response.json();
+  } catch {
+    return [];
+  }
+}
+
+export async function requestJoinWorkspace(workspaceId: string): Promise<{ success: boolean, message?: string }> {
+  const token = await getAuthToken();
+  if (!token) return { success: false, message: "Not authenticated" };
+
+  try {
+    // Assuming backend endpoint /workspaces/{id}/join-requests exists or will exist
+    const response = await fetch(`${AUTH_SERVICE_URL}/workspaces/${workspaceId}/join-requests`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      return { success: false, message: error.detail || "Failed to request join" };
+    }
+    return { success: true, message: "" };
+  } catch {
+    return { success: false, message: "Network error" };
+  }
+}
+
+
+
+/**
+ * Leaves a workspace.
+ * Placeholder: Returns success until backend endpoint is available.
+ */
+export async function leaveWorkspace(workspaceId: string): Promise<{ success: boolean, message?: string }> {
+  const token = await getAuthToken();
+  const user = await getCurrentUser();
+  if (!token || !user) return { success: false, message: "Not authenticated" };
+
+  try {
+    const response = await fetch(`${AUTH_SERVICE_URL}/workspaces/${workspaceId}/members/${user.id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      return { success: false, message: errorData.detail || "Failed to leave workspace" };
+    }
+
+    // Clear active_workspace cookie if matches
+    const cookieStore = await cookies();
+    if (cookieStore.get("active_workspace")?.value === workspaceId) {
+      cookieStore.delete("active_workspace");
+    }
+
+    return { success: true, message: "Left workspace successfully" };
+  } catch (error) {
+    console.error("Leave Workspace Error:", error);
+    return { success: false, message: "Network error" };
+  }
+}
+
+/**
+ * Searches for users by email or name.
  * Placeholder: Returns empty list until backend endpoint is available.
  */
-export async function getJoinRequests() {
-  // const token = await getAuthToken();
-  // Call API...
+export async function searchUsers(query: string) {
+  console.log(`[Auth] searchUsers called with query: ${query}`);
   return [];
 }
 
 /**
- * Resolves a join request (approve or reject).
- * Placeholder: Returns success until backend endpoint is available.
+ * Creates a new workspace (Global Admin only) - Form Action variant.
  */
-export async function resolveJoinRequest(requestId: string, action: "approve" | "reject"): Promise<{ success: boolean }> {
-  // const token = await getAuthToken();
-  // Call API...
-  console.log(`Resolving join request ${requestId} with action: ${action}`);
-  return { success: true };
+export async function createWorkspaceFromForm(prevState: any, formData: FormData) {
+  const name = formData.get("workspaceName") as string;
+  if (!name) return { success: false, message: "Workspace name is required" };
+  return createWorkspace(name);
+}
+
+/**
+ * Requests to join a workspace - Form Action variant.
+ */
+export async function requestJoinWorkspaceFromForm(prevState: any, formData: FormData) {
+  const slug = formData.get("workspaceSlug") as string;
+  const allDiscoverable = await getDiscoverableWorkspaces();
+  const match = allDiscoverable.find((w: any) => w.slug === slug || w.name === slug);
+
+  if (!match) {
+    return { success: false, message: "Workspace not found" };
+  }
+
+  return requestJoinWorkspace(match.id);
 }
 
 /**

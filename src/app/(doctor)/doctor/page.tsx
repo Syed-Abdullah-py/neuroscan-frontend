@@ -2,19 +2,19 @@ import { getCurrentUser, getUserWorkspaces, getMyInvitations } from "@/actions/a
 import { getDoctorDashboardStats, getRecentAssignedCases } from "@/actions/doctor-actions";
 import { DoctorDashboardUI } from "@/features/doctor/components/doctor-dashboard-ui";
 
+
 export default async function DoctorDashboard() {
     const user = await getCurrentUser();
     const invitations = await getMyInvitations();
+    const workspaces = await getUserWorkspaces();
+
+    // Determine active workspace from the list (which handles cookie + fallback)
+    const activeWorkspace = workspaces.find((w: any) => w.active);
+    const activeWorkspaceId = activeWorkspace?.id || null;
 
     // Fetch dashboard data only if workspace exists
     let stats = null;
     let recentCases: any[] = [];
-
-    // Always fetch workspaces
-    const workspaces = await getUserWorkspaces();
-
-    // Determine active workspace: from session or default to first available
-    const activeWorkspaceId = (user as any)?.workspaceId || (workspaces.length > 0 ? workspaces[0].id : null);
 
     if (activeWorkspaceId) {
         // Fetch dashboard data in parallel

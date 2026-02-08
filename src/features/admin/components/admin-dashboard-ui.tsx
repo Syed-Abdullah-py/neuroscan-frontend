@@ -30,6 +30,7 @@ interface AdminDashboardUIProps {
     } | null;
     joinRequests: any[];
     workspaces: any[];
+    members?: any[];
 }
 
 // --- Animation Variants ---
@@ -57,7 +58,7 @@ const itemVariants: Variants = {
     }
 };
 
-export function AdminDashboardUI({ user, joinRequests, workspaces }: AdminDashboardUIProps) {
+export function AdminDashboardUI({ user, joinRequests, workspaces, members = [] }: AdminDashboardUIProps) {
     const [searchQuery, setSearchQuery] = useState("");
     if (!user) return null;
 
@@ -142,7 +143,7 @@ export function AdminDashboardUI({ user, joinRequests, workspaces }: AdminDashbo
                         {/* Stat: Total Members */}
                         <StatCard
                             title="Total Members"
-                            value={workspaces.find(w => w.id === user.workspaceId)?.members?.length?.toString() || "0"}
+                            value={members?.length?.toString() || workspaces.find(w => w.id === user.workspaceId)?.members?.length?.toString() || "0"}
                             icon={Users}
                             color="blue"
                             trend="Active members"
