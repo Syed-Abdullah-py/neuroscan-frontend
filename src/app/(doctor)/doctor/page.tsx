@@ -13,11 +13,14 @@ export default async function DoctorDashboard() {
     // Always fetch workspaces
     const workspaces = await getUserWorkspaces();
 
-    if (user?.workspaceId) {
+    // Determine active workspace: from session or default to first available
+    const activeWorkspaceId = (user as any)?.workspaceId || (workspaces.length > 0 ? workspaces[0].id : null);
+
+    if (activeWorkspaceId) {
         // Fetch dashboard data in parallel
         [stats, recentCases] = await Promise.all([
-            getDoctorDashboardStats(),
-            getRecentAssignedCases()
+            getDoctorDashboardStats(activeWorkspaceId),
+            getRecentAssignedCases(activeWorkspaceId)
         ]);
     }
 
@@ -29,8 +32,8 @@ export default async function DoctorDashboard() {
                 name: user?.name ?? "Doctor",
                 email: user?.email ?? "",
                 role: user?.role ?? "DOCTOR",
-                globalRole: user?.globalRole ?? null,
-                workspaceId: user?.workspaceId
+                globalRole: user?.role ?? null, // Use role from token as globalRole too for now
+                workspaceId: activeWorkspaceId || undefined
             }}
             workspaces={workspaces}
         />

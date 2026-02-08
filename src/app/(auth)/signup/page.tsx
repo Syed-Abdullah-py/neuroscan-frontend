@@ -1,20 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { Check, ArrowRight, Lock, Activity, Brain } from "lucide-react";
+import { Check, ArrowRight, Lock, Brain } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { SignupForm } from "@/features/auth/components/signup-form";
 import { useState } from "react";
 
 // Types
-type Step = 1 | 2 | 3;
+type Step = 1 | 2;
 type Role = "radiologist" | "admin";
 
 export default function SignupPage() {
     const [step, setStep] = useState<Step>(1);
     const [role, setRole] = useState<Role | null>(null);
 
-    const handleNext = () => setStep((prev) => (prev < 3 ? (prev + 1) as Step : prev));
+    const handleNext = () => setStep((prev) => (prev < 2 ? (prev + 1) as Step : prev));
     const handleBack = () => setStep((prev) => (prev > 1 ? (prev - 1) as Step : prev));
 
     return (
@@ -49,10 +49,10 @@ export default function SignupPage() {
             <main className="relative z-10 w-full max-w-[800px] px-4 pt-24 pb-12 md:py-20">
                 <div className="text-center mb-8 md:mb-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
                     <h1 className="text-2xl md:text-4xl font-bold tracking-tight mb-2 md:mb-3 text-slate-900 dark:text-white">
-                        Create your workspace
+                        Create your account
                     </h1>
                     <p className="text-slate-500 dark:text-slate-400 text-base md:text-lg px-4">
-                        Setup your medical analysis environment in a few steps.
+                        Get started with NeuroScan in a few simple steps.
                     </p>
                 </div>
 
@@ -60,17 +60,17 @@ export default function SignupPage() {
                 <div className="bg-white/80 dark:bg-slate-900/60 backdrop-blur-xl border border-slate-200/60 dark:border-white/10 rounded-2xl md:rounded-3xl shadow-2xl shadow-slate-200/50 dark:shadow-black/50 overflow-hidden">
                     <div className="p-6 md:p-14">
 
-                        {/* Stepper */}
-                        <div className="mb-12 md:mb-14 mx-auto max-w-lg">
+                        {/* Stepper - Now only 2 steps */}
+                        <div className="mb-12 md:mb-14 mx-auto max-w-xs">
                             <div className="flex items-center justify-between relative">
                                 {/* Connecting Line */}
                                 <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-0.5 bg-slate-200 dark:bg-slate-800 z-0"></div>
                                 <div
                                     className="absolute left-0 top-1/2 -translate-y-1/2 h-0.5 bg-blue-600 z-0 transition-all duration-500 ease-out"
-                                    style={{ width: step === 1 ? '0%' : step === 2 ? '50%' : '100%' }}
+                                    style={{ width: step === 1 ? '0%' : '100%' }}
                                 ></div>
 
-                                {[1, 2, 3].map((s) => (
+                                {[1, 2].map((s) => (
                                     <div key={s} className="relative z-10 flex flex-col items-center gap-3">
                                         <div className={cn(
                                             "w-8 h-8 md:w-10 md:h-10 rounded-full flex items-center justify-center text-xs md:text-sm font-bold border-2 transition-all duration-300",
@@ -88,16 +88,15 @@ export default function SignupPage() {
                                                 ? "text-blue-600 dark:text-blue-400"
                                                 : "text-slate-400 dark:text-slate-600"
                                         )}>
-                                            {s === 1 && "Identity"}
-                                            {s === 2 && "Role"}
-                                            {s === 3 && "Preferences"}
+                                            {s === 1 && "Role"}
+                                            {s === 2 && "Details"}
                                         </span>
                                     </div>
                                 ))}
                             </div>
                         </div>
 
-                        {/* Form Area - Passing State to the Logic Component */}
+                        {/* Form Area */}
                         <div className="min-h-[300px]">
                             <SignupForm
                                 currentStep={step}

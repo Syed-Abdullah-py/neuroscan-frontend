@@ -5,188 +5,271 @@ import Link from "next/link";
 import {
   Brain, Moon, Sun, ArrowRight, Activity,
   ShieldCheck, Zap, BarChart3, Users,
-  Globe, Play, Check, Menu
+  Globe, Play, Check, Menu, Sparkles
 } from "lucide-react";
-import { motion, AnimatePresence, useScroll, useTransform } from "framer-motion";
-import { cn } from "@/lib/utils";
+import { motion, useScroll, useTransform } from "framer-motion";
+import { cn } from "@/lib/utils"
 
-// --- 🎨 DESIGN SYSTEM UTILITIES ---
+// --- 🎨 PERFORMANCE-OPTIMIZED DESIGN SYSTEM ---
 
-const EASE_ELEGANT = [0.22, 1, 0.36, 1] as const;
+const EASE_SMOOTH = [0.25, 0.46, 0.45, 0.94] as const;
 
-// Custom FadeIn with Design System Easing
-const FadeIn = ({ children, delay = 0, className, yOffset = 20 }: { children: React.ReactNode, delay?: number, className?: string, yOffset?: number }) => (
+
+// Optimized FadeIn - reduced complexity
+const FadeIn = ({
+  children,
+  delay = 0,
+  className,
+}: {
+  children: React.ReactNode;
+  delay?: number;
+  className?: string;
+}) => (
   <motion.div
-    initial={{ opacity: 0, y: yOffset }}
+    initial={{ opacity: 0, y: 12 }}
     whileInView={{ opacity: 1, y: 0 }}
-    viewport={{ once: true, margin: "-50px" }}
-    transition={{ duration: 0.7, delay, ease: EASE_ELEGANT }}
+    viewport={{ once: true, margin: "-100px" }}
+    transition={{ duration: 0.5, delay, ease: EASE_SMOOTH }}
     className={className}
   >
     {children}
   </motion.div>
 );
 
-// 🔘 MAGNETIC BUTTON
-const MagneticButton = ({ children, variant = "primary", className, onClick }: any) => {
+// Simplified Button - supports href for navigation
+const Button = ({
+  children,
+  variant = "primary",
+  className,
+  onClick,
+  href
+}: {
+  children: React.ReactNode;
+  variant?: "primary" | "secondary";
+  className?: string;
+  onClick?: () => void;
+  href?: string;
+}) => {
   const isPrimary = variant === "primary";
+  const buttonClasses = cn(
+    "relative h-12 px-8 rounded-full font-semibold transition-all duration-200 flex items-center justify-center",
+    isPrimary
+      ? "bg-black dark:bg-white text-white dark:text-black"
+      : "text-black dark:text-white hover:bg-neutral-100 dark:hover:bg-neutral-900 border border-neutral-300 dark:border-neutral-700",
+    className
+  );
+
+  if (href) {
+    return (
+      <Link href={href} className={buttonClasses}>
+        <span className="flex items-center gap-2">{children}</span>
+      </Link>
+    );
+  }
 
   return (
     <motion.button
-      whileHover={{ scale: 1.05 }}
-      whileTap={{ scale: 0.95 }}
+      whileHover={{ scale: 1.01 }}
+      whileTap={{ scale: 0.99 }}
       onClick={onClick}
-      className={cn(
-        "relative group h-12 px-8 rounded-lg font-medium transition-all duration-300 flex items-center justify-center overflow-hidden",
-        isPrimary
-          ? "bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-xl"
-          : "text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900 border border-slate-200 dark:border-slate-800",
-        className
-      )}
+      className={buttonClasses}
     >
-      {isPrimary && (
-        <div className="absolute inset-0 bg-linear-to-r from-blue-600 to-cyan-500 rounded-lg blur-xl opacity-0 group-hover:opacity-50 transition-opacity duration-500 -z-10" />
-      )}
-      <span className="flex items-center gap-2 relative z-10">{children}</span>
+      <span className="flex items-center gap-2">{children}</span>
     </motion.button>
   );
 };
 
-// 📦 GLASS FEATURE CARD
+// Simplified Feature Card - no blur effects or complex animations
 const FeatureCard = ({ icon: Icon, title, desc, delay }: any) => (
   <FadeIn delay={delay}>
-    <motion.div
-      whileHover={{ y: -6 }}
-      transition={{ duration: 0.3, ease: EASE_ELEGANT }}
-      className="group relative h-full"
-    >
-      <div className="absolute inset-0 bg-linear-to-br from-blue-500/0 via-cyan-500/0 to-sky-500/0 group-hover:from-blue-500/10 group-hover:via-cyan-500/10 group-hover:to-sky-500/10 rounded-2xl blur-xl transition-all duration-500 opacity-0 group-hover:opacity-100" />
-
-      <div className="relative h-full p-8 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200/60 dark:border-slate-800/60 hover:border-slate-300 dark:hover:border-slate-700 transition-all duration-500 hover:shadow-xl hover:shadow-slate-900/5 dark:hover:shadow-black/20 backdrop-blur-sm">
-        <div className="w-12 h-12 rounded-xl bg-slate-900 dark:bg-white flex items-center justify-center mb-6 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300 shadow-lg">
-          <Icon className="w-6 h-6 text-white dark:text-slate-900" strokeWidth={2} />
-        </div>
-        <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-3 tracking-tight">{title}</h3>
-        <p className="text-[15px] text-slate-600 dark:text-slate-400 leading-relaxed font-medium">{desc}</p>
+    <div className="group h-full p-8 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 hover:border-neutral-400 dark:hover:border-neutral-600 transition-colors duration-200">
+      <div className="w-12 h-12 rounded-xl bg-black dark:bg-white flex items-center justify-center mb-6">
+        <Icon className="w-6 h-6 text-white dark:text-black" strokeWidth={2} />
       </div>
-    </motion.div>
+      <h3 className="text-lg font-bold text-black dark:text-white mb-3">
+        {title}
+      </h3>
+      <p className="text-[15px] text-neutral-600 dark:text-neutral-400 leading-relaxed">
+        {desc}
+      </p>
+    </div>
   </FadeIn>
 );
 
-// 🖥️ RESTORED DASHBOARD VISUAL (Upgraded Style)
-const DashboardMockup = () => {
+const MRIBrainScanVisual = () => {
   return (
-    <div className="rounded-2xl border border-slate-200/60 dark:border-slate-800/60 bg-white/60 dark:bg-slate-900/60 backdrop-blur-xl shadow-2xl shadow-blue-900/10 dark:shadow-black/50 overflow-hidden flex flex-col h-[420px] md:h-[520px] transition-all hover:border-slate-300 dark:hover:border-slate-700">
-      {/* Header */}
-      <div className="px-6 py-4 border-b border-slate-200/50 dark:border-slate-800/50 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/50">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-slate-900 dark:bg-white flex items-center justify-center">
-            <Brain className="w-4 h-4 text-white dark:text-slate-900" strokeWidth={2} />
-          </div>
-          <span className="text-sm font-bold text-slate-900 dark:text-white tracking-tight">NeuroScan AI</span>
-        </div>
-        <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20">
-          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400">Live Analysis</span>
-        </div>
-      </div>
+    <div className="relative w-full aspect-square max-w-xl mx-auto flex items-center justify-center">
 
-      {/* Body */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar */}
-        <div className="w-16 md:w-56 border-r border-slate-200/50 dark:border-slate-800/50 p-3 flex flex-col gap-1.5 bg-slate-50/30 dark:bg-slate-900/30 backdrop-blur-sm">
-          {[1, 2, 3].map((i) => (
+      {/* Main scan display frame */}
+      <div className="relative w-full h-full border-2 border-black dark:border-white rounded-3xl overflow-hidden bg-white dark:bg-black">
+
+        {/* Grid background */}
+        <div
+          className="absolute inset-0 opacity-10"
+          style={{
+            backgroundImage: `
+              linear-gradient(to right, rgb(0 0 0 / 0.3) 1px, transparent 1px),
+              linear-gradient(to bottom, rgb(0 0 0 / 0.3) 1px, transparent 1px)
+            `,
+            backgroundSize: '20px 20px'
+          }}
+        />
+
+        {/* CENTER AREA - EMPTY FOR YOUR BRAIN IMAGE */}
+        <div className="absolute inset-0 flex items-center justify-center p-12">
+          {/* Place your brain image here */}
+          <div className="w-full h-full flex items-center justify-center">
+            {/* Your brain image goes here - example: */}
+            <img src="/brain.png" alt="Brain MRI" className="w-full h-full object-contain" />
+          </div>
+        </div>
+
+        {/* Scanning line sweep */}
+        <motion.div
+          className="absolute inset-0"
+          initial={{ y: "-100%" }}
+          animate={{ y: "100%" }}
+          transition={{
+            duration: 3,
+            repeat: Infinity,
+            ease: "linear",
+            repeatDelay: 1
+          }}
+        >
+          <div className="w-full h-px bg-linear-to-r from-transparent via-black dark:via-white to-transparent opacity-50" />
+          <div className="w-full h-8 bg-linear-to-b from-black/10 to-transparent dark:from-white/10" />
+        </motion.div>
+
+        {/* Top HUD */}
+        <div className="absolute top-4 left-4 right-4 flex justify-between items-start m-3">
+          <motion.div
+            initial={{ opacity: 0, x: -10 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.5 }}
+            className="bg-white/90 dark:bg-black/90 border border-black/20 dark:border-white/20 rounded-lg px-3 py-1.5 backdrop-blur-sm"
+          >
+            <div className="text-[10px] font-bold text-neutral-500 mb-0.5">PATIENT ID</div>
+            <div className="text-sm font-bold">MRI-2025-001</div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, x: 10 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 0.7 }}
+            className="flex items-center gap-2 bg-white/90 dark:bg-black/90 border border-black/20 dark:border-white/20 rounded-lg px-3 py-1.5 backdrop-blur-sm"
+          >
+            <motion.div
+              animate={{
+                scale: [1, 1.2, 1],
+                opacity: [0.5, 1, 0.5],
+              }}
+              transition={{
+                duration: 1.5,
+                repeat: Infinity,
+              }}
+              className="w-2 h-2 rounded-full bg-black dark:bg-white"
+            />
+            <span className="text-xs font-bold">LIVE</span>
+          </motion.div>
+        </div>
+
+        {/* Data visualization bars on the right */}
+        <div className="absolute right-4 top-1/2 -translate-y-1/2 space-y-2">
+          {[65, 85, 45, 95, 70].map((height, i) => (
             <motion.div
               key={i}
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: i * 0.1 }}
-              className={cn(
-                "p-3 rounded-lg flex items-center gap-3 cursor-pointer transition-all duration-200 group",
-                i === 1
-                  ? "bg-white dark:bg-slate-800 shadow-sm border border-slate-200/50 dark:border-slate-700/50"
-                  : "hover:bg-white/50 dark:hover:bg-slate-800/50 text-slate-600 dark:text-slate-400"
-              )}
-            >
-              <div className={cn(
-                "w-8 h-8 rounded-md flex items-center justify-center text-xs font-bold shrink-0 transition-colors",
-                i === 1
-                  ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
-                  : "bg-slate-200 dark:bg-slate-800 group-hover:bg-slate-300 dark:group-hover:bg-slate-700"
-              )}>
-                {i}
-              </div>
-              <div className="hidden md:block overflow-hidden">
-                <div className="text-xs font-bold text-slate-900 dark:text-white truncate">Patient 00{i}</div>
-                <div className="text-[10px] opacity-60 truncate">MRI Sequence T2</div>
-              </div>
-            </motion.div>
+              initial={{ width: 0 }}
+              animate={{ width: `${height}%` }}
+              transition={{ delay: 1 + i * 0.1, duration: 0.8 }}
+              className="h-1.5 bg-black dark:bg-white rounded-full"
+              style={{ maxWidth: '60px' }}
+            />
           ))}
         </div>
 
-        {/* Main Content */}
-        <div className="flex-1 p-4 md:p-6 bg-slate-50/20 dark:bg-black/20 relative overflow-hidden">
-          <div className="h-full rounded-xl bg-slate-900 dark:bg-black relative overflow-hidden shadow-inner border border-slate-800/50">
-            {/* Subtle grid */}
-            <div className="absolute inset-0 opacity-20" style={{
-              backgroundImage: 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)',
-              backgroundSize: '40px 40px'
-            }} />
+        {/* Bottom status bar */}
+        <div className="absolute bottom-4 left-4 right-4 flex justify-between items-end m-2">
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1 }}
+            className="bg-white/90 dark:bg-black/90 border border-black/20 dark:border-white/20 rounded-lg px-3 py-1.5 backdrop-blur-sm"
+          >
+            <div className="text-[10px] font-bold text-neutral-500 mb-0.5">SEQUENCE</div>
+            <div className="text-xs font-bold">T2-FLAIR</div>
+          </motion.div>
 
-            {/* Brain visual */}
-            <div className="absolute inset-0 flex items-center justify-center">
-              <Brain className="w-48 h-48 text-slate-700 opacity-20" strokeWidth={0.5} />
-            </div>
-
-            {/* Animated pulse */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1.2 }}
+            className="bg-white/90 dark:bg-black/90 border border-black/20 dark:border-white/20 rounded-lg px-3 py-1.5 backdrop-blur-sm"
+          >
+            <div className="text-[10px] font-bold text-neutral-500 mb-0.5">CONFIDENCE</div>
             <motion.div
               animate={{
-                opacity: [0.2, 0.5, 0.2],
-                scale: [1, 1.1, 1]
+                opacity: [0.7, 1, 0.7],
               }}
               transition={{
-                duration: 3,
+                duration: 2,
                 repeat: Infinity,
-                ease: "easeInOut"
               }}
-              className="absolute inset-0 flex items-center justify-center"
+              className="text-sm font-bold"
             >
-              <Brain className="w-48 h-48 text-blue-500 opacity-40 blur-md" strokeWidth={0.5} />
+              98.7%
             </motion.div>
+          </motion.div>
 
-            {/* Scanning line */}
-            <motion.div
-              animate={{ top: ["0%", "100%"] }}
-              transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
-              className="absolute left-0 right-0 h-px bg-linear-to-r from-transparent via-blue-500 to-transparent shadow-[0_0_15px_rgba(59,130,246,0.5)]"
-            />
-
-            {/* Detection label */}
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 }}
-              className="absolute top-6 left-6 px-4 py-2 rounded-lg bg-slate-900/90 backdrop-blur-md border border-slate-700"
-            >
-              <div className="flex items-center gap-2">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-                <span className="text-xs font-bold text-white">Analysis Complete</span>
-              </div>
-              <div className="text-[10px] text-slate-400 mt-1">Confidence: 98.7%</div>
-            </motion.div>
-
-            {/* Stats overlay */}
-            <motion.div
-              initial={{ opacity: 0, x: 10 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.7 }}
-              className="absolute bottom-6 right-6 px-4 py-2 rounded-lg bg-slate-900/90 backdrop-blur-md border border-slate-700 text-right"
-            >
-              <div className="text-[10px] text-slate-400 mb-0.5">Processing Time</div>
-              <div className="text-sm font-bold text-white">0.8s</div>
-            </motion.div>
-          </div>
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1.4 }}
+            className="bg-white/90 dark:bg-black/90 border border-black/20 dark:border-white/20 rounded-lg px-3 py-1.5 backdrop-blur-sm"
+          >
+            <div className="text-[10px] font-bold text-neutral-500 mb-0.5">SLICE</div>
+            <div className="text-xs font-bold">24/128</div>
+          </motion.div>
         </div>
+
+        {/* Corner brackets */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          className="absolute top-3 left-3 w-8 h-8 border-l-2 border-t-2 border-black dark:border-white"
+        />
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.4 }}
+          className="absolute top-3 right-3 w-8 h-8 border-r-2 border-t-2 border-black dark:border-white"
+        />
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5 }}
+          className="absolute bottom-3 left-3 w-8 h-8 border-l-2 border-b-2 border-black dark:border-white"
+        />
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.6 }}
+          className="absolute bottom-3 right-3 w-8 h-8 border-r-2 border-b-2 border-black dark:border-white"
+        />
+
+        {/* Crosshair in center */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 0.3 }}
+          transition={{ delay: 1.5 }}
+          className="absolute top-1/2 left-0 right-0 h-px bg-black dark:bg-white"
+        />
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 0.3 }}
+          transition={{ delay: 1.5 }}
+          className="absolute left-1/2 top-0 bottom-0 w-px bg-black dark:bg-white"
+        />
       </div>
     </div>
   );
@@ -195,8 +278,10 @@ const DashboardMockup = () => {
 // --- THEME MANAGEMENT ---
 const useTheme = () => {
   const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     const savedTheme = localStorage.getItem("theme") as "light" | "dark" | null;
     const systemTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
     const initialTheme = savedTheme || systemTheme;
@@ -211,54 +296,61 @@ const useTheme = () => {
     document.documentElement.classList.toggle("dark", newTheme === "dark");
   };
 
-  return { theme, toggleTheme };
+  return { theme, toggleTheme, mounted };
 };
 
 // --- MAIN LANDING PAGE ---
 
 export default function LandingPage() {
-  const { theme, toggleTheme } = useTheme();
-  const { scrollYProgress } = useScroll();
-  const opacity = useTransform(scrollYProgress, [0, 0.2], [1, 0]);
+  const { theme, toggleTheme, mounted } = useTheme();
+
+  // Prevent hydration mismatch
+  if (!mounted) {
+    return null;
+  }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-slate-950 text-slate-900 dark:text-white overflow-x-hidden selection:bg-blue-500/20 selection:text-blue-900 dark:selection:text-blue-100">
+    <div className="min-h-screen bg-white dark:bg-black text-black dark:text-white overflow-x-hidden">
 
-      {/* 🌐 NAVBAR */}
-      <nav className="fixed top-0 inset-x-0 z-50 h-20 border-b border-slate-200/50 dark:border-slate-800/50 bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl">
-        <div className="max-w-[1400px] mx-auto h-full px-6 md:px-12 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3 group">
-            <motion.div
-              whileHover={{ rotate: 180 }}
-              transition={{ duration: 0.6, ease: EASE_ELEGANT }}
-              className="w-9 h-9 rounded-lg bg-slate-900 dark:bg-white flex items-center justify-center group-hover:shadow-xl transition-all duration-300"
-            >
-              <Brain className="w-5 h-5 text-white dark:text-slate-900" strokeWidth={2} />
-            </motion.div>
-            <span className="text-lg font-bold tracking-tight">NeuroScan</span>
+      {/* 🌐 MINIMAL NAVBAR */}
+      <nav className="fixed top-0 inset-x-0 z-50 h-16 border-b border-neutral-200 dark:border-neutral-800 bg-white/80 dark:bg-black/80 backdrop-blur-xl">
+        <div className="max-w-7xl mx-auto h-full px-6 md:px-8 flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-black dark:bg-white flex items-center justify-center">
+              <Brain className="w-4 h-4 text-white dark:text-black" strokeWidth={2} />
+            </div>
+            <span className="text-lg font-bold">NeuroScan</span>
           </Link>
 
-          <div className="hidden md:flex items-center gap-8 font-medium text-sm text-slate-600 dark:text-slate-400">
+          <div className="hidden md:flex items-center gap-8 text-sm font-medium text-neutral-600 dark:text-neutral-400">
             {['Technology', 'Features', 'Research', 'Pricing'].map((item) => (
-              <a key={item} href={`#${item.toLowerCase()}`} className="hover:text-slate-900 dark:hover:text-white transition-colors relative group">
+              <a
+                key={item}
+                href={`#${item.toLowerCase()}`}
+                className="hover:text-black dark:hover:text-white transition-colors"
+              >
                 {item}
-                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-slate-900 dark:bg-white transition-all duration-300 group-hover:w-full" />
               </a>
             ))}
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3">
             <button
               onClick={toggleTheme}
-              className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-900 transition-colors"
+              className="p-2 rounded-lg hover:bg-neutral-100 dark:hover:bg-neutral-900 transition-colors"
               aria-label="Toggle theme"
             >
               {theme === "dark" ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             </button>
             <div className="hidden sm:block">
-              <MagneticButton className="h-10 px-6 text-sm">
-                Get Started
-              </MagneticButton>
+              <Button variant="secondary" className="h-10 px-6 text-sm" href="/login">
+                Log In
+              </Button>
+            </div>
+            <div className="hidden sm:block">
+              <Button className="h-10 px-6 text-sm" href="/signup">
+                Sign Up
+              </Button>
             </div>
             <button className="md:hidden p-2">
               <Menu className="w-6 h-6" />
@@ -268,89 +360,59 @@ export default function LandingPage() {
       </nav>
 
       {/* 🚀 HERO SECTION */}
-      <section className="relative pt-32 pb-20 md:pt-48 md:pb-32 overflow-hidden">
-        {/* Animated background orbs */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          <motion.div
-            animate={{
-              x: [0, 100, 0],
-              y: [0, -50, 0],
-              scale: [1, 1.2, 1],
-            }}
-            transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
-            className="absolute top-1/4 -right-20 w-[600px] h-[600px] bg-blue-500/10 dark:bg-blue-900/20 rounded-full blur-[100px]"
-          />
-          <motion.div
-            animate={{
-              x: [0, -50, 0],
-              y: [0, 50, 0],
-              scale: [1, 1.1, 1],
-            }}
-            transition={{ duration: 15, repeat: Infinity, ease: "easeInOut", delay: 2 }}
-            className="absolute bottom-0 -left-20 w-[500px] h-[500px] bg-sky-500/10 dark:bg-sky-900/20 rounded-full blur-[100px]"
-          />
-        </div>
-
-        <div className="max-w-[1400px] mx-auto px-6 md:px-12 relative z-10">
-          <div className="flex flex-col lg:flex-row items-center gap-16 lg:gap-24">
+      <section className="relative pt-32 pb-20 md:pt-40 md:pb-28 min-h-screen flex items-center">
+        <div className="max-w-7xl mx-auto px-6 md:px-8 w-full">
+          <div className="flex flex-col lg:flex-row items-center gap-16 lg:gap-20">
 
             {/* Text Content */}
-            <div className="flex-1 max-w-3xl">
-              <FadeIn delay={0.1}>
-                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-700 dark:text-slate-300 bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm mb-8">
-                  <div className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                  </div>
+            <div className="flex-1 max-w-2xl text-center lg:text-left">
+              <FadeIn delay={0}>
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-neutral-300 dark:border-neutral-700 text-xs font-semibold mb-8">
+                  <div className="w-1.5 h-1.5 rounded-full bg-black dark:bg-white" />
                   FDA Cleared Technology
                 </div>
               </FadeIn>
 
-              <FadeIn delay={0.2}>
-                <h1 className="text-5xl md:text-7xl lg:text-8xl font-bold tracking-tight text-slate-900 dark:text-white mb-8 leading-[0.95]">
+              <FadeIn delay={0.1}>
+                <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight">
                   Radiology,
                   <br />
-                  {/* CHANGED: Gradient is now Blue/Sky/Cyan */}
-                  <span className="italic font-semibold text-transparent bg-clip-text bg-linear-to-r from-blue-600 via-sky-500 to-cyan-400">
-                    reimagined.
-                  </span>
+                  <span className="italic">reimagined.</span>
                 </h1>
               </FadeIn>
 
-              <FadeIn delay={0.3}>
-                <p className="text-lg md:text-xl text-slate-600 dark:text-slate-400 mb-10 leading-relaxed max-w-xl font-medium">
-                  AI-powered diagnostic intelligence for neuro-oncology.
-                  Real-time segmentation and volumetric analysis with
-                  millisecond precision.
+              <FadeIn delay={0.2}>
+                <p className="text-lg md:text-xl text-neutral-600 dark:text-neutral-400 mb-10 leading-relaxed max-w-xl mx-auto lg:mx-0">
+                  AI-powered diagnostic intelligence for neuro-oncology. Real-time segmentation and volumetric analysis with millisecond precision.
                 </p>
               </FadeIn>
 
-              <FadeIn delay={0.4} className="flex flex-wrap gap-4">
-                <MagneticButton>
+              <FadeIn delay={0.3} className="flex flex-wrap gap-4 justify-center lg:justify-start">
+                <Button href="/signup">
                   Start Free Trial
                   <ArrowRight className="ml-2 w-4 h-4" strokeWidth={2} />
-                </MagneticButton>
-                <MagneticButton variant="secondary">
+                </Button>
+                <Button variant="secondary">
                   <Play className="mr-2 w-4 h-4" strokeWidth={2} />
                   Watch Demo
-                </MagneticButton>
+                </Button>
               </FadeIn>
 
               {/* Trust Indicators */}
-              <FadeIn delay={0.6} className="mt-12 flex flex-wrap gap-8 text-sm text-slate-500 font-medium">
+              <FadeIn delay={0.4} className="mt-12 flex flex-wrap gap-6 text-sm font-medium text-neutral-500 justify-center lg:justify-start">
                 {['HIPAA Compliant', 'SOC2 Certified', '99.9% Uptime'].map((text, i) => (
                   <div key={i} className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-emerald-500" strokeWidth={2} />
+                    <Check className="w-4 h-4" strokeWidth={2} />
                     {text}
                   </div>
                 ))}
               </FadeIn>
             </div>
 
-            {/* Visual Content - CHANGED: Restored original dashboard mockup with new styling */}
+            {/* Hero Visual */}
             <div className="flex-1 w-full">
-              <FadeIn delay={0.5}>
-                <DashboardMockup />
+              <FadeIn delay={0.2}>
+                <MRIBrainScanVisual />
               </FadeIn>
             </div>
           </div>
@@ -358,8 +420,8 @@ export default function LandingPage() {
       </section>
 
       {/* 📊 STATS BAR */}
-      <section className="py-20 border-y border-slate-200/50 dark:border-slate-800/50 bg-slate-50/50 dark:bg-slate-900/20 backdrop-blur-sm">
-        <div className="max-w-[1400px] mx-auto px-6 md:px-12">
+      <section className="py-20 border-y border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950">
+        <div className="max-w-7xl mx-auto px-6 md:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-12">
             {[
               { val: "98.7%", label: "Accuracy" },
@@ -367,9 +429,13 @@ export default function LandingPage() {
               { val: "10k+", label: "Radiologists" },
               { val: "500k", label: "Scans Processed" }
             ].map((stat, i) => (
-              <FadeIn key={i} delay={i * 0.1} className="text-center group cursor-default">
-                <div className="text-4xl md:text-5xl font-bold text-slate-900 dark:text-white mb-2 tracking-tight group-hover:scale-110 transition-transform duration-500 ease-out">{stat.val}</div>
-                <div className="text-sm font-medium text-slate-500 uppercase tracking-widest">{stat.label}</div>
+              <FadeIn key={i} delay={i * 0.05} className="text-center">
+                <div className="text-4xl md:text-5xl font-bold mb-2">
+                  {stat.val}
+                </div>
+                <div className="text-xs font-semibold text-neutral-500 uppercase tracking-wider">
+                  {stat.label}
+                </div>
               </FadeIn>
             ))}
           </div>
@@ -377,16 +443,16 @@ export default function LandingPage() {
       </section>
 
       {/* ✨ FEATURES SECTION */}
-      <section id="features" className="py-32">
-        <div className="max-w-[1400px] mx-auto px-6 md:px-12">
-          <div className="max-w-2xl mb-24">
+      <section id="features" className="py-28">
+        <div className="max-w-7xl mx-auto px-6 md:px-8">
+          <div className="max-w-2xl mb-20">
             <FadeIn>
-              <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-slate-900 dark:text-white mb-6 leading-[1.1]">
+              <h2 className="text-4xl md:text-5xl font-bold mb-6 leading-tight">
                 Precision tools for
                 <br />
-                <span className="text-slate-400">modern radiology.</span>
+                <span className="text-neutral-500">modern radiology.</span>
               </h2>
-              <p className="text-lg text-slate-600 dark:text-slate-400 font-medium leading-relaxed">
+              <p className="text-lg text-neutral-600 dark:text-neutral-400 leading-relaxed">
                 Enterprise-grade AI infrastructure designed specifically for neuro-imaging workflows, seamlessly integrated into your PACS.
               </p>
             </FadeIn>
@@ -394,45 +460,77 @@ export default function LandingPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[
-              { icon: Zap, title: "Real-Time Processing", desc: "Sub-30 second analysis with cloud GPU acceleration and parallel pipelines." },
-              { icon: Activity, title: "Clinical Validation", desc: "98.7% accuracy validated against biopsy results across multiple institutions." },
-              { icon: BarChart3, title: "Automated Reports", desc: "Generate comprehensive PDF reports with volumetric data and recommendations." },
-              { icon: ShieldCheck, title: "Security First", desc: "HIPAA-compliant infrastructure with end-to-end encryption and SOC 2 Type II." },
-              { icon: Users, title: "Expert Network", desc: "Connect with global specialists for second opinions and collaborative reviews." },
-              { icon: Globe, title: "PACS Integration", desc: "Seamless connectivity with existing hospital systems via DICOM and HL7 standards." },
+              {
+                icon: Zap,
+                title: "Real-Time Processing",
+                desc: "Sub-30 second analysis with cloud GPU acceleration and parallel pipelines for instant diagnostic insights."
+              },
+              {
+                icon: Activity,
+                title: "Clinical Validation",
+                desc: "98.7% accuracy validated against biopsy results across multiple institutions and peer-reviewed studies."
+              },
+              {
+                icon: BarChart3,
+                title: "Automated Reports",
+                desc: "Generate comprehensive PDF reports with volumetric data, comparisons, and clinical recommendations."
+              },
+              {
+                icon: ShieldCheck,
+                title: "Security First",
+                desc: "HIPAA-compliant infrastructure with end-to-end encryption, SOC 2 Type II certification, and audit logs."
+              },
+              {
+                icon: Users,
+                title: "Expert Network",
+                desc: "Connect with global specialists for second opinions, collaborative reviews, and continuous learning."
+              },
+              {
+                icon: Globe,
+                title: "PACS Integration",
+                desc: "Seamless connectivity with existing hospital systems via DICOM and HL7 standards with zero downtime."
+              },
             ].map((feature, i) => (
-              <FeatureCard key={i} {...feature} delay={i * 0.1} />
+              <FeatureCard key={i} {...feature} delay={i * 0.05} />
             ))}
           </div>
         </div>
       </section>
 
       {/* 👥 TEAM SECTION */}
-      <section id="team" className="py-32 bg-slate-50 dark:bg-slate-900/50 border-y border-slate-200/50 dark:border-slate-800/50">
-        <div className="max-w-[1400px] mx-auto px-6 md:px-12">
-          <div className="flex flex-col md:flex-row justify-between items-end mb-20 gap-8">
+      <section id="team" className="py-28 bg-neutral-50 dark:bg-neutral-950 border-y border-neutral-200 dark:border-neutral-800">
+        <div className="max-w-7xl mx-auto px-6 md:px-8">
+          <div className="flex flex-col md:flex-row justify-between items-end mb-16 gap-8">
             <FadeIn>
-              <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-slate-900 dark:text-white leading-[0.95]">
+              <h2 className="text-4xl md:text-5xl font-bold leading-tight">
                 Led by experts in
                 <br />
-                <span className="italic font-semibold text-slate-500">Medicine & AI</span>
+                <span className="italic text-neutral-500">Medicine & AI</span>
               </h2>
             </FadeIn>
-            <FadeIn delay={0.2}>
-              <MagneticButton variant="secondary">See Open Roles</MagneticButton>
+            <FadeIn delay={0.1}>
+              <Button variant="secondary" className="h-11 px-6">
+                See Open Roles
+              </Button>
             </FadeIn>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {/* Supervisor Card */}
             <FadeIn className="col-span-1 md:col-span-3 lg:col-span-1">
-              <div className="h-full p-8 rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 flex flex-col justify-between shadow-xl">
+              <div className="h-full p-8 rounded-2xl bg-black dark:bg-white text-white dark:text-black flex flex-col justify-between">
                 <div>
-                  <div className="w-12 h-12 rounded-lg bg-white/20 dark:bg-slate-900/10 flex items-center justify-center text-xl font-bold mb-6">FA</div>
-                  <div className="text-xs font-bold uppercase tracking-widest opacity-60 mb-2">Supervisor</div>
+                  <div className="w-12 h-12 rounded-xl bg-white/20 dark:bg-black/10 flex items-center justify-center text-xl font-bold mb-6">
+                    FA
+                  </div>
+                  <div className="text-xs font-bold uppercase tracking-wider opacity-60 mb-2">
+                    Supervisor
+                  </div>
                   <div className="text-2xl font-bold">Mr. Faizadullah</div>
                 </div>
-                <p className="mt-8 text-sm opacity-80 font-medium italic">"Bridging the gap between academic research and clinical reality."</p>
+                <p className="mt-8 text-sm opacity-80 italic">
+                  "Bridging the gap between academic research and clinical reality."
+                </p>
               </div>
             </FadeIn>
 
@@ -442,13 +540,13 @@ export default function LandingPage() {
               { name: "Hafsa Khalil", role: "Backend Systems", init: "HK" },
               { name: "Syed Abdullah", role: "UI/UX Design", init: "SA" }
             ].map((m, i) => (
-              <FadeIn key={i} delay={0.2 + (i * 0.1)}>
-                <div className="group h-full p-8 rounded-2xl bg-white dark:bg-slate-900/80 border border-slate-200/60 dark:border-slate-800/60 hover:border-slate-300 dark:hover:border-slate-700 transition-all duration-300 hover:shadow-lg">
-                  <div className="w-12 h-12 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-600 dark:text-slate-400 font-bold mb-6 group-hover:scale-110 transition-transform">
+              <FadeIn key={i} delay={0.1 + (i * 0.05)}>
+                <div className="h-full p-8 rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 hover:border-neutral-400 dark:hover:border-neutral-600 transition-colors">
+                  <div className="w-12 h-12 rounded-xl bg-neutral-100 dark:bg-neutral-800 flex items-center justify-center text-neutral-600 dark:text-neutral-400 font-bold mb-6">
                     {m.init}
                   </div>
-                  <h3 className="text-lg font-bold text-slate-900 dark:text-white">{m.name}</h3>
-                  <p className="text-sm text-slate-500 font-medium mt-1">{m.role}</p>
+                  <h3 className="text-lg font-bold mb-1">{m.name}</h3>
+                  <p className="text-sm text-neutral-500">{m.role}</p>
                 </div>
               </FadeIn>
             ))}
@@ -457,58 +555,74 @@ export default function LandingPage() {
       </section>
 
       {/* 📣 CTA SECTION */}
-      <section className="relative py-32 overflow-hidden">
-        {/* Background Glow */}
-        <div className="absolute inset-0 bg-linear-to-b from-transparent to-slate-50 dark:to-slate-900/50 pointer-events-none" />
-
-        <div className="max-w-[1400px] mx-auto px-6 md:px-12 relative z-10 text-center">
+      <section className="py-28">
+        <div className="max-w-4xl mx-auto px-6 md:px-8 text-center">
           <FadeIn>
-            <h2 className="text-4xl md:text-6xl font-bold tracking-tight text-slate-900 dark:text-white mb-8 leading-tight">
+            <h2 className="text-4xl md:text-5xl font-bold mb-8 leading-tight">
               Ready to transform your
               <br />
-              <span className="italic font-semibold">diagnostic workflow?</span>
+              <span className="italic">diagnostic workflow?</span>
             </h2>
-            <p className="text-lg text-slate-600 dark:text-slate-400 mb-12 font-medium max-w-2xl mx-auto">
+            <p className="text-lg text-neutral-600 dark:text-neutral-400 mb-12 max-w-2xl mx-auto leading-relaxed">
               Join thousands of radiologists improving patient outcomes with AI-powered insights. Start your 14-day free trial today.
             </p>
-            <div className="flex flex-col sm:flex-row gap-6 justify-center">
-              <MagneticButton>Start Free Trial</MagneticButton>
-              <MagneticButton variant="secondary">Schedule Demo</MagneticButton>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Button href="/signup">
+                Start Free Trial
+                <ArrowRight className="ml-2 w-4 h-4" strokeWidth={2} />
+              </Button>
+              <Button variant="secondary">
+                Schedule Demo
+              </Button>
             </div>
           </FadeIn>
         </div>
       </section>
 
       {/* 🦶 FOOTER */}
-      <footer className="py-20 border-t border-slate-200/50 dark:border-slate-800/50 bg-slate-50 dark:bg-slate-950">
-        <div className="max-w-[1400px] mx-auto px-6 md:px-12">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-12 mb-16">
+      <footer className="py-16 border-t border-neutral-200 dark:border-neutral-800 bg-neutral-50 dark:bg-neutral-950">
+        <div className="max-w-7xl mx-auto px-6 md:px-8">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-12 mb-12">
             <div className="col-span-1 md:col-span-2">
-              <Link href="/" className="flex items-center gap-3 mb-6">
-                <div className="w-8 h-8 rounded-lg bg-slate-900 dark:bg-white flex items-center justify-center">
-                  <Brain className="w-4 h-4 text-white dark:text-slate-900" strokeWidth={2} />
+              <Link href="/" className="flex items-center gap-2.5 mb-6">
+                <div className="w-8 h-8 rounded-lg bg-black dark:bg-white flex items-center justify-center">
+                  <Brain className="w-4 h-4 text-white dark:text-black" strokeWidth={2} />
                 </div>
-                <span className="text-lg font-bold tracking-tight">NeuroScan</span>
+                <span className="text-lg font-bold">NeuroScan</span>
               </Link>
-              <p className="text-sm text-slate-500 leading-relaxed max-w-xs font-medium">
+              <p className="text-sm text-neutral-500 leading-relaxed max-w-xs">
                 Next-generation diagnostic intelligence for the modern medical facility.
               </p>
             </div>
             {['Product', 'Company', 'Legal'].map((col) => (
               <div key={col}>
-                <h4 className="font-bold text-slate-900 dark:text-white mb-6">{col}</h4>
-                <ul className="space-y-4 text-sm text-slate-600 dark:text-slate-400 font-medium">
-                  {[1, 2, 3].map(i => <li key={i}><a href="#" className="hover:text-slate-900 dark:hover:text-white transition-colors">Link Item {i}</a></li>)}
+                <h4 className="font-bold text-sm uppercase tracking-wider mb-4">
+                  {col}
+                </h4>
+                <ul className="space-y-3 text-sm text-neutral-600 dark:text-neutral-400">
+                  {[1, 2, 3].map(i => (
+                    <li key={i}>
+                      <a href="#" className="hover:text-black dark:hover:text-white transition-colors">
+                        Link Item {i}
+                      </a>
+                    </li>
+                  ))}
                 </ul>
               </div>
             ))}
           </div>
-          <div className="pt-8 border-t border-slate-200/50 dark:border-slate-800/50 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-slate-500 font-medium">
+          <div className="pt-8 border-t border-neutral-200 dark:border-neutral-800 flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-neutral-500">
             <p>© 2025 NeuroScan AI Inc.</p>
-            <div className="flex gap-8">
-              <a href="#" className="hover:text-slate-900 dark:hover:text-white">Privacy</a>
-              <a href="#" className="hover:text-slate-900 dark:hover:text-white">Terms</a>
-              <a href="#" className="hover:text-slate-900 dark:hover:text-white">Twitter</a>
+            <div className="flex gap-6">
+              {['Privacy', 'Terms', 'Twitter'].map((link) => (
+                <a
+                  key={link}
+                  href="#"
+                  className="hover:text-black dark:hover:text-white transition-colors"
+                >
+                  {link}
+                </a>
+              ))}
             </div>
           </div>
         </div>

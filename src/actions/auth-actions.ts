@@ -1,46 +1,47 @@
 "use server";
 
 import { z } from "zod";
-import bcrypt from "bcryptjs";
-import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
-import { writeFile } from "fs/promises";
-import { join } from "path";
-import { SignJWT, jwtVerify } from "jose";
 
-const secret = new TextEncoder().encode(process.env.AUTH_SECRET);
-const FACE_SERVICE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:8000";
+// Auth service URL
+const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || "http://localhost:8000";
 
 // --- SCHEMAS ---
 const SignupSchema = z.object({
   firstName: z.string().min(2, "First name is too short"),
   lastName: z.string().min(2, "Last name is too short"),
-  email: z.email("Invalid email address"),
+  email: z.string().email("Invalid email address"),
   password: z.string().min(8, "Password must be at least 8 characters"),
   role: z.enum(["radiologist", "admin"]),
-  faceImage: z.any().optional(), // File object for Face Login encoding
-  profileImage: z.any().optional(), // File object for Avatar display
-
-  // Extended Profile Fields
-  cnic: z.string().optional(),
-  phoneNumber: z.string().optional(),
-  city: z.string().optional(),
-  pin: z.string().optional(), // Only for face login users really
-  gender: z.string().optional(),
-  medicalLicenseId: z.string().optional(),
-  termsAccepted: z.string().optional(), // Checkbox sends "on" or undefined/null
+  termsAccepted: z.string().optional(),
 });
 
 const LoginSchema = z.object({
-  email: z.email("Invalid email address"),
+  email: z.string().email("Invalid email address"),
   password: z.string().min(1, "Password is required"),
 });
+
+// --- HELPER FUNCTIONS ---
+
+/**
+ * Stores the JWT token in an HTTP-only cookie
+ */
+async function setAuthCookie(token: string) {
+  const cookieStore = await cookies();
+  cookieStore.set("session", token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 60 * 30, // 30 minutes to match auth-service token expiry
+    path: "/",
+    sameSite: "lax",
+  });
+}
 
 // --- ACTIONS ---
 
 /**
- * Registers a new user and creates their workspace.
+ * Registers a new user via the auth-service API.
  */
 export async function registerUser(prevState: any, formData: FormData) {
   const rawData = Object.fromEntries(formData.entries());
@@ -51,14 +52,7 @@ export async function registerUser(prevState: any, formData: FormData) {
     email: rawData.email,
     password: rawData.password,
     role: rawData.role,
-    cnic: rawData.cnic,
-    phoneNumber: rawData.phoneNumber,
-    city: rawData.city,
-    pin: rawData.pin,
-    gender: rawData.gender,
-    medicalLicenseId: rawData.medicalLicenseId,
     termsAccepted: rawData.termsAccepted,
-    profileImage: rawData.profileImage,
   });
 
   if (!validated.success) {
@@ -67,117 +61,46 @@ export async function registerUser(prevState: any, formData: FormData) {
     };
   }
 
-  const { email, password, firstName, lastName, role, cnic, phoneNumber, city, pin, gender, medicalLicenseId, termsAccepted } = validated.data;
+  const { email, password, firstName, lastName, role, termsAccepted } = validated.data;
 
   // Validation Logic
   if (termsAccepted !== "on") {
     return { message: "You must accept the terms and conditions." };
   }
 
-  if (role === "radiologist" && !medicalLicenseId) {
-    return { message: "Medical License Number is required for doctors." };
-  }
-
-  const faceImage = rawData.faceImage as File;
-  const profileImage = rawData.profileImage as File;
-  let faceEncodingString: string | null = null;
-  let avatarUrl: string | null = null;
-  let finalPin = pin;
-
-  // PIN validation
-  if (faceImage && faceImage.size > 0 && (!finalPin || finalPin.length < 4)) {
-    return { message: "PIN (4+ chars) is required when setting up Face Login." };
-  }
-
-  // Handle Profile Picture Upload (Avatar)
-  if (profileImage && profileImage.size > 0) {
-    try {
-      const bytes = await profileImage.arrayBuffer();
-      const buffer = Buffer.from(bytes);
-      const safeName = profileImage.name.replace(/[^a-z0-9.]/gi, '_').toLowerCase();
-      const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1E9)}`;
-      const filename = `profile-${uniqueSuffix}-${safeName}`;
-
-      const uploadDir = join(process.cwd(), "public/uploads/profiles");
-      // Ensure dir exists if not handled elsewhere (it was created in previous step)
-      const filepath = join(uploadDir, filename);
-
-      await writeFile(filepath, buffer);
-      avatarUrl = `/uploads/profiles/${filename}`;
-    } catch (e) {
-      console.error("Failed to save profile image", e);
-    }
-  }
-
-  // Handle Face Login Image (Encoding)
-  if (faceImage && faceImage.size > 0) {
-    // 2. Get Encoding
-    try {
-      const uploadData = new FormData();
-      uploadData.append("file", faceImage);
-
-      const res = await fetch(`${FACE_SERVICE_URL}/encode`, {
-        method: "POST",
-        body: uploadData,
-      });
-
-      if (res.ok) {
-        const json = await res.json();
-        if (json.encoding) {
-          faceEncodingString = JSON.stringify(json.encoding);
-        }
-      } else {
-        console.error("Face encoding failed", await res.text());
-      }
-    } catch (e) {
-      console.error("Face service error", e);
-    }
-  }
-
-  const existingUser = await prisma.user.findUnique({ where: { email } });
-  if (existingUser) {
-    return { message: "Email already registered." };
-  }
-
-  // Slug generation removed (deferred)
-
-  const hashedPassword = await bcrypt.hash(password, 10);
-
   try {
-    await prisma.$transaction(async (tx) => {
-      // 1. Create User
-      const user = await tx.user.create({
-        data: {
-          email,
-          password: hashedPassword,
-          name: `${firstName} ${lastName}`,
-          faceEncoding: faceEncodingString,
-          role: role === "admin" ? "ADMIN" : "RADIOLOGIST",
-
-          // New Fields
-          cnic,
-          phoneNumber,
-          city,
-          pin: finalPin,
-          gender,
-          medicalLicenseId,
-          avatarUrl,
-          termsAccepted: true,
-        },
-      });
-      // Workspace creation is deferred to the dashboard.
+    // Call auth-service register endpoint
+    const response = await fetch(`${AUTH_SERVICE_URL}/auth/register`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        email,
+        password,
+        name: `${firstName} ${lastName}`,
+        global_role: role === "admin" ? "ADMIN" : "RADIOLOGIST",
+      }),
     });
 
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return {
+        message: errorData.detail || "Registration failed. Please try again.",
+      };
+    }
+
+    // Registration successful
   } catch (error) {
     console.error("Registration Error:", error);
-    return { message: "Database error. Please try again." };
+    return { message: "Network error. Please try again." };
   }
 
   redirect("/login?success=true");
 }
 
 /**
- * Authenticates a user and creates a session with Workspace context.
+ * Authenticates a user via the auth-service API.
  */
 export async function loginUser(prevState: any, formData: FormData) {
   const rawData = Object.fromEntries(formData.entries());
@@ -189,257 +112,79 @@ export async function loginUser(prevState: any, formData: FormData) {
 
   const { email, password } = validated.data;
 
-  // Include memberships to find the default workspace
-  const user = await prisma.user.findUnique({
-    where: { email },
-    include: { memberships: true }
-  });
+  let token: string | null = null;
 
-  if (!user) {
-    return { message: "Invalid email." };
+  try {
+    // Call auth-service login endpoint (OAuth2 form format)
+    console.log(`[Auth] Attempting login for: ${email}`);
+    const response = await fetch(`${AUTH_SERVICE_URL}/auth/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams({
+        username: email, // OAuth2PasswordRequestForm expects 'username'
+        password: password,
+      }),
+    });
+
+    if (!response.ok) {
+      console.error(`[Auth] Login failed. Status: ${response.status}`);
+      const text = await response.text();
+      console.error(`[Auth] Error details: ${text}`);
+      const errorData = JSON.parse(text || "{}");
+      return {
+        message: errorData.detail || "Invalid email or password.",
+      };
+    }
+
+    const data = await response.json();
+    console.log(`[Auth] Login successful. Token received.`);
+    token = data.access_token;
+
+    // Store token in HTTP-only cookie
+    await setAuthCookie(token!);
+  } catch (error) {
+    console.error("Login Error:", error);
+    return { message: "Network error. Please try again." };
   }
 
-  const isValid = await bcrypt.compare(password, user.password);
-  if (!isValid) {
-    return { message: "Invalid password." };
-  }
-
+  // Determine redirect path - execute outside try/catch to avoid trapping NEXT_REDIRECT
   let redirectPath = "/doctor";
-  let sessionPayload: { sub: string; workspaceId?: string; role?: string } = { sub: user.id };
 
-  if (user.memberships && user.memberships.length > 0) {
-    // Prioritize memberships where the user is an OWNER or ADMIN
-    let defaultMembership = user.memberships.find(m => m.role === "OWNER") ||
-      user.memberships.find(m => m.role === "ADMIN") ||
-      user.memberships[0];
+  if (token) {
+    try {
+      const [, payloadBase64] = token.split(".");
+      const payloadString = Buffer.from(payloadBase64, "base64").toString();
+      const payload = JSON.parse(payloadString);
+      const role = payload.global_role;
+      console.log(`[Auth] Extracted Global Role: ${role}`);
 
-    sessionPayload.workspaceId = defaultMembership.workspaceId;
-    sessionPayload.role = defaultMembership.role;
-
-    if (defaultMembership.role === "OWNER" || defaultMembership.role === "ADMIN") {
-      redirectPath = "/admin";
-    } else {
-      redirectPath = "/doctor";
-    }
-  } else {
-    // User has no workspace. Check GLOBAL role to determine redirect path.
-    // Global ADMIN should go to /admin to access onboarding/workspace creation.
-    // Global RADIOLOGIST/DOCTOR should go to /doctor.
-    if (user.role === "ADMIN") {
-      redirectPath = "/admin";
-      sessionPayload.role = "ADMIN"; // Set workspace role to ADMIN for consistency
-    } else {
-      redirectPath = "/doctor";
-      sessionPayload.role = "DOCTOR";
+      if (role === "ADMIN") {
+        console.log(`[Auth] User is ADMIN`);
+        redirectPath = "/admin";
+      }
+    } catch (e) {
+      console.error("Error decoding token for redirect", e);
     }
   }
 
-  const alg = "HS256";
-  const jwt = await new SignJWT(sessionPayload)
-    .setProtectedHeader({ alg })
-    .setIssuedAt()
-    .setExpirationTime("15m")
-    .sign(secret);
-
-  const cookieStore = await cookies();
-  cookieStore.set("session", jwt, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    maxAge: 60 * 15,
-    path: "/",
-    sameSite: "lax",
-  });
-
+  console.log(`[Auth] Redirecting to ${redirectPath}`);
   redirect(redirectPath);
 }
 
 /**
  * Logs out the current user.
- * 
- * Deletes the session cookie and redirects to the login page.
  */
 export async function logoutUser() {
   const cookieStore = await cookies();
-
-  // Destroy the session cookie
   cookieStore.delete("session");
-
   redirect("/login");
 }
 
 /**
- * Logs in a user via Face Recognition.
- */
-export async function loginUserWithFace(prevState: any, formData: FormData) {
-  const faceImage = formData.get("faceImage") as File;
-
-  if (!faceImage || faceImage.size === 0) {
-    return { message: "Face image is required." };
-  }
-
-  try {
-    // 1. Fetch all users with face encodings
-    // Optimize: In production, filter by expected email if available, or chunk.
-    const usersWithFace = await prisma.user.findMany({
-      where: {
-        faceEncoding: { not: null }
-      },
-      select: {
-        id: true,
-        faceEncoding: true,
-        email: true,
-        memberships: true, // Need memberships for login logic
-      }
-    });
-
-    if (usersWithFace.length === 0) {
-      return { message: "No users registered with face data." };
-    }
-
-    // 2. Prepare known data for Python service
-    const knownData = usersWithFace.map(u => {
-      try {
-        return {
-          userId: u.id,
-          encoding: JSON.parse(u.faceEncoding!)
-        };
-      } catch (e) {
-        return null;
-      }
-    }).filter(Boolean);
-
-    // 3. Call Python Verify Endpoint
-    const uploadData = new FormData();
-    uploadData.append("file", faceImage);
-    uploadData.append("known_data", JSON.stringify(knownData));
-
-    const res = await fetch(`${FACE_SERVICE_URL}/recognize`, {
-      method: "POST",
-      body: uploadData,
-    });
-
-    if (!res.ok) {
-      return { message: "Face recognition service error." };
-    }
-
-    const result = await res.json();
-
-    if (!result.match || !result.userId) {
-      return { message: "Face not recognized." };
-    }
-
-    // 4. Return user for PIN verification (DO NOT LOGIN YET)
-    const user = usersWithFace.find(u => u.id === result.userId);
-    if (!user) return { message: "User not found locally." };
-
-    // Need full user for name
-    const fullUser = await prisma.user.findUnique({
-      where: { id: user.id },
-      select: { name: true, pin: true }
-    });
-
-    if (!fullUser) return { message: "User details unavailable." };
-
-    return {
-      success: true,
-      pendingPin: true,
-      userId: user.id,
-      userName: fullUser.name || "User",
-      message: "Face verified. Please enter your PIN."
-    };
-
-  } catch (error) {
-    if ((error as Error).message === "NEXT_REDIRECT") {
-      throw error;
-    }
-    console.error("Face Login Error:", error);
-    return { message: "System error during face login." };
-  }
-}
-
-/**
- * Verifies the PIN for a user and completes the login.
- */
-export async function verifyPinAndLogin(prevState: any, formData: FormData) {
-  const userId = formData.get("userId") as string;
-  const pin = formData.get("pin") as string;
-
-  if (!userId || !pin) {
-    return { message: "User ID and PIN are required." };
-  }
-
-  try {
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      include: { memberships: true }
-    });
-
-    if (!user) {
-      return { message: "User not found." };
-    }
-
-    if (user.pin !== pin) {
-      return { message: "Invalid PIN.", pendingPin: true, userId, userName: user.name };
-    }
-
-    // --- LOGIN LOGIC (Copied from loginUser) ---
-    let redirectPath = "/doctor";
-    let sessionPayload: { sub: string; workspaceId?: string; role?: string } = { sub: user.id };
-
-    if (user.memberships && user.memberships.length > 0) {
-      // Prioritize memberships where the user is an OWNER or ADMIN
-      let defaultMembership = user.memberships.find(m => m.role === "OWNER") ||
-        user.memberships.find(m => m.role === "ADMIN") ||
-        user.memberships[0];
-
-      sessionPayload.workspaceId = defaultMembership.workspaceId;
-      sessionPayload.role = defaultMembership.role;
-
-      if (defaultMembership.role === "OWNER" || defaultMembership.role === "ADMIN") {
-        redirectPath = "/admin";
-      } else {
-        redirectPath = "/doctor";
-      }
-    } else {
-      // Global Role Fallback
-      if (user.role === "ADMIN") {
-        redirectPath = "/admin";
-        sessionPayload.role = "ADMIN";
-      } else {
-        redirectPath = "/doctor";
-        sessionPayload.role = "DOCTOR";
-      }
-    }
-
-    const alg = "HS256";
-    const jwt = await new SignJWT(sessionPayload)
-      .setProtectedHeader({ alg })
-      .setIssuedAt()
-      .setExpirationTime("15m")
-      .sign(secret);
-
-    const cookieStore = await cookies();
-    cookieStore.set("session", jwt, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      maxAge: 60 * 15,
-      path: "/",
-      sameSite: "lax",
-    });
-
-    redirect(redirectPath);
-
-  } catch (error) {
-    if ((error as Error).message === "NEXT_REDIRECT") {
-      throw error; // Let redirect happen
-    }
-    console.error("PIN Verification Error:", error);
-    return { message: "Authentication failed." };
-  }
-}
-
-/**
  * Retrieves the currently logged in user based on the session cookie.
+ * Decodes the JWT to get user info without calling the backend.
  */
 export async function getCurrentUser() {
   const cookieStore = await cookies();
@@ -448,941 +193,147 @@ export async function getCurrentUser() {
   if (!token) return null;
 
   try {
-    const { payload } = await jwtVerify(token, secret);
-    const userId = payload.sub as string;
-    const workspaceId = payload.workspaceId as string | undefined;
-    const role = payload.role as string | undefined;
+    // Decode JWT payload (without verification - verification should happen on API calls)
+    const [, payloadBase64] = token.split(".");
+    const payload = JSON.parse(Buffer.from(payloadBase64, "base64").toString());
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { name: true, email: true, role: true }
-    });
+    // Keep original global_role for RBAC checks, map for UI display
+    const globalRoleRaw = payload.global_role || "";
+    const roleRaw = globalRoleRaw.toLowerCase();
+    const role = roleRaw === "radiologist" ? "doctor" : (roleRaw || "doctor");
 
-    if (!user) return null;
+    console.log(`[Auth] getCurrentUser: User ${payload.email}, GlobalRole: ${globalRoleRaw}, MappedRole: ${role}`);
 
     return {
-      id: userId,
-      name: user.name,
-      email: user.email,
-      role: role?.toLowerCase() || "doctor", // Workspace Role (from session)
-      globalRole: user.role, // Global Role (from DB)
-      avatar: user.name?.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2) || "U",
-      workspaceId: workspaceId,
+      id: payload.sub,
+      email: payload.email,
+      name: payload.email?.split("@")[0] || "User", // Fallback name from email
+      role: role,
+      globalRole: globalRoleRaw, // Keep original uppercase for RBAC checks
+      avatar: payload.email?.charAt(0).toUpperCase() || "U",
     };
-
-
-
   } catch (error) {
+    console.error("Error decoding token:", error);
     return null;
   }
 }
 
 /**
- * Adds a user to the current user's workspace.
- * Only accessible by OWNER.
+ * Gets the auth token for API calls to auth-service
  */
-export async function addTeamMember(formData: FormData) {
-  const email = formData.get("email") as string;
-  const role = formData.get("role") as "ADMIN" | "DOCTOR";
-
-  if (!email || !role) return { message: "Email and role are required." };
-
-  try {
-    const currentUser = await getCurrentUser();
-    if (!currentUser || currentUser.role !== "owner" || !currentUser.workspaceId) {
-      return { message: "Unauthorized. Only workspace owners can add members." };
-    }
-
-    const targetUser = await prisma.user.findUnique({
-      where: { email },
-      include: { memberships: true }
-    });
-
-    if (!targetUser) {
-      return { message: "User not found. Please ask them to sign up first." };
-    }
-
-    // Check if already in THIS workspace
-    const exists = targetUser.memberships.find(m => m.workspaceId === currentUser.workspaceId);
-    if (exists) {
-      return { message: "User is already a member of this workspace." };
-    }
-
-    // Check if in ANY workspace (for MVP maybe limit to 1?)
-    // if (targetUser.memberships.length > 0) { ... } // strict mode?
-    // Let's allow multiple for now or just add them.
-
-    await prisma.workspaceMember.create({
-      data: {
-        userId: targetUser.id,
-        workspaceId: currentUser.workspaceId,
-        role: role
-      }
-    });
-
-    return { success: true, message: "Member added successfully." };
-
-  } catch (error) {
-    console.error("Add Member Error:", error);
-    return { message: "Failed to add member." };
-  }
+export async function getAuthToken(): Promise<string | null> {
+  const cookieStore = await cookies();
+  return cookieStore.get("session")?.value || null;
 }
 
 /**
- * Removes a user from the workspace.
- * Only accessible by OWNER.
- */
-export async function removeTeamMember(userId: string) {
-  try {
-    const currentUser = await getCurrentUser();
-    if (!currentUser || currentUser.role !== "owner" || !currentUser.workspaceId) {
-      return { message: "Unauthorized." };
-    }
-
-    if (userId === currentUser.email) { // Wait, userId is ID not email? Passed param.
-      // We need to resolve ID.
-      // Let's assume userId is the ID of the user to remove.
-      return { message: "Cannot remove yourself." };
-    }
-
-    // Verify target is in workspace
-    const targetMember = await prisma.workspaceMember.findUnique({
-      where: {
-        userId_workspaceId: {
-          userId,
-          workspaceId: currentUser.workspaceId
-        }
-      }
-    });
-
-    if (!targetMember) return { message: "Member not found in workspace." };
-    if (targetMember.role === "OWNER") return { message: "Cannot remove the owner." };
-
-    await prisma.workspaceMember.delete({
-      where: {
-        userId_workspaceId: {
-          userId,
-          workspaceId: currentUser.workspaceId
-        }
-      }
-    });
-
-    return { success: true, message: "Member removed." };
-
-  } catch (error) {
-    console.error("Remove Member Error:", error);
-    return { message: "Failed to remove member." };
-  }
-}
-
-/**
- * Fetches all members of the current user's workspace.
- */
-export async function getTeamMembers() {
-  try {
-    const currentUser = await getCurrentUser();
-    if (!currentUser || !currentUser.workspaceId) return [];
-
-    // Fetch workspace to know true owner
-    const workspace = await prisma.workspace.findUnique({
-      where: { id: currentUser.workspaceId },
-      select: { ownerId: true }
-    });
-
-    const members = await prisma.workspaceMember.findMany({
-      where: { workspaceId: currentUser.workspaceId },
-      include: {
-        user: {
-          select: {
-            id: true,
-            email: true,
-            name: true,
-            medicalLicenseId: true
-          }
-        }
-      },
-      orderBy: { role: 'asc' }
-    });
-
-    return members.map(m => {
-      // Enforce Single Owner Truth
-      let effectiveRole = m.role;
-      const isTrueOwner = workspace?.ownerId === m.userId;
-
-      if (isTrueOwner) {
-        effectiveRole = "OWNER";
-      } else if (effectiveRole === "OWNER") {
-        // If DB says OWNER but not the true owner, downgrade to ADMIN for display
-        effectiveRole = "ADMIN";
-      }
-
-      return {
-        userId: m.userId,
-        role: effectiveRole,
-        joinedAt: m.joinedAt,
-        name: m.user.name,
-        email: m.user.email,
-        licenseId: m.user.medicalLicenseId
-      };
-    });
-  } catch (error) {
-    console.error("Get Team Error:", error);
-    return [];
-  }
-}
-
-/**
- * Creates a new workspace and makes the current user the OWNER.
- */
-export async function createWorkspace(prevState: any, formData: FormData) {
-  const workspaceName = formData.get("workspaceName") as string;
-  if (!workspaceName || workspaceName.length < 3) {
-    return { success: false, message: "Workspace name must be at least 3 characters." };
-  }
-
-  try {
-    const currentUser = await getCurrentUser();
-
-    // Check if user is logged in
-    const cookieStore = await cookies();
-    const token = cookieStore.get("session")?.value;
-    if (!token) return { success: false, message: "Not authenticated." };
-    const { payload } = await jwtVerify(token, secret);
-    const userId = payload.sub as string;
-    const userRole = (payload.role as string)?.toUpperCase();
-
-    // AUTHORIZATION CHECK
-    // Only 'ADMIN' or 'OWNER' (session role) OR Global Admin can create workspaces.
-    // Doctors/Radiologists cannot.
-
-    const isGlobalAdmin = currentUser?.globalRole === "ADMIN";
-
-    if (userRole !== "ADMIN" && userRole !== "OWNER" && !isGlobalAdmin) {
-      return { success: false, message: "Unauthorized. Doctors cannot create workspaces." };
-    }
-
-    // Slugify
-    const slug = workspaceName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-
-    // Check slug uniqueness
-    const existing = await prisma.workspace.findUnique({ where: { slug } });
-    if (existing) {
-      return { success: false, message: "Workspace name taken." };
-    }
-
-    const newWorkspace = await prisma.$transaction(async (tx) => {
-      const w = await tx.workspace.create({
-        data: {
-          name: workspaceName,
-          slug,
-          ownerId: userId
-        }
-      });
-
-      await tx.workspaceMember.create({
-        data: {
-          userId: userId,
-          workspaceId: w.id,
-          role: "OWNER"
-        }
-      });
-      return w;
-    });
-
-    // Update Session to include new workspace
-    // We can't update the cookie easily here without rewriting it.
-    // Simplest approach: Logout and force login or just redirect to login?
-    // Better: Issue new token.
-
-    const sessionPayload = { sub: userId, workspaceId: newWorkspace.id, role: "OWNER" };
-    const alg = "HS256";
-    const jwt = await new SignJWT(sessionPayload)
-      .setProtectedHeader({ alg })
-      .setIssuedAt()
-      .setExpirationTime("15m")
-      .sign(secret);
-
-    cookieStore.set("session", jwt, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      maxAge: 60 * 15,
-      path: "/",
-      sameSite: "lax",
-    });
-
-    // Force redirection to admin dashboard
-    // This ensures the new session cookie is used
-    redirect("/admin");
-
-  } catch (error) {
-    // Check if error is a redirect error (which is expected on success)
-    if (isRedirectError(error)) {
-      throw error;
-    }
-    console.error("Create Workspace Error:", error);
-    return { success: false, message: "Failed to create workspace." };
-  }
-}
-
-function isRedirectError(error: any) {
-  return error.message === "NEXT_REDIRECT" ||
-    (typeof error === 'object' && error !== null && 'digest' in error && typeof error.digest === 'string' && error.digest.startsWith('NEXT_REDIRECT'));
-}
-
-/**
- * Requests to join an existing workspace by Slug.
- */
-export async function requestJoinWorkspace(prevState: any, formData: FormData) {
-  const slug = formData.get("workspaceSlug") as string;
-  if (!slug) return { success: false, message: "Workspace identifier required." };
-
-  try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("session")?.value;
-    if (!token) return { success: false, message: "Not authenticated." };
-    const { payload } = await jwtVerify(token, secret);
-    const userId = payload.sub as string;
-
-    const workspace = await prisma.workspace.findUnique({ where: { slug } });
-    let targetId = workspace?.id;
-
-    if (!workspace) {
-      // Try searching by name if slug fails? simple match
-      const byName = await prisma.workspace.findFirst({ where: { name: slug } });
-      if (!byName) return { success: false, message: "Workspace not found." };
-      // use mapped one
-      targetId = byName.id;
-    }
-
-    if (!targetId) return { success: false, message: "Workspace not found." };
-
-    // Check if already a member
-    const existingMember = await prisma.workspaceMember.findUnique({
-      where: { userId_workspaceId: { userId, workspaceId: targetId } }
-    });
-    if (existingMember) return { success: false, message: "You are already a member." };
-
-    // Check if pending request exists
-    const existingReq = await prisma.joinRequest.findUnique({
-      where: { userId_workspaceId: { userId, workspaceId: targetId } }
-    });
-    if (existingReq) return { success: false, message: "Request already pending." };
-
-    await prisma.joinRequest.create({
-      data: {
-        userId,
-        workspaceId: targetId,
-        status: "PENDING"
-      }
-    });
-
-    return { success: true, message: "Request sent successfully." };
-
-  } catch (error) {
-    console.error("Join Request Error:", error);
-    return { success: false, message: "Failed to send request." };
-  }
-}
-
-/**
- * Resolves a Join Request (Accept/Reject).
- * Only OWNER.
- */
-export async function resolveJoinRequest(requestId: string, action: "ACCEPT" | "REJECT") {
-  try {
-    const currentUser = await getCurrentUser();
-    if (!currentUser || currentUser.role !== "owner" || !currentUser.workspaceId) {
-      return { message: "Unauthorized." };
-    }
-
-    const request = await prisma.joinRequest.findUnique({
-      where: { id: requestId },
-      include: { user: true } // Need user info for new member role?
-    });
-
-    if (!request) return { message: "Request not found." };
-    if (request.workspaceId !== currentUser.workspaceId) return { message: "Unauthorized." };
-
-    if (action === "REJECT") {
-      await prisma.joinRequest.delete({ where: { id: requestId } });
-      return { success: true, message: "Request rejected." };
-    }
-
-    if (action === "ACCEPT") {
-      await prisma.$transaction(async (tx) => {
-        // Infer role from global role
-        const role = request.user.role === "ADMIN" ? "ADMIN" : "DOCTOR";
-
-        await tx.workspaceMember.create({
-          data: {
-            userId: request.userId,
-            workspaceId: request.workspaceId,
-            role: role
-          }
-        });
-        await tx.joinRequest.delete({ where: { id: requestId } });
-      });
-      return { success: true, message: "Member accepted." };
-    }
-
-  } catch (error) {
-    console.error("Resolve Request Error:", error);
-    return { message: "Operation failed." };
-  }
-}
-
-/**
- * Get Join Requests sent BY the current user.
- */
-export async function getMySentJoinRequests() {
-  try {
-    const currentUser = await getCurrentUser();
-    if (!currentUser) return [];
-
-    const requests = await prisma.joinRequest.findMany({
-      where: { userId: currentUser.id },
-      include: { workspace: true },
-      orderBy: { createdAt: 'desc' }
-    });
-
-    return requests.map(r => ({
-      id: r.id,
-      workspaceName: r.workspace.name,
-      status: r.status,
-      createdAt: r.createdAt
-    }));
-
-  } catch (error) {
-    return [];
-  }
-}
-
-/**
- * Get Pending Join Requests for the current workspace.
- */
-export async function getJoinRequests() {
-  try {
-    const currentUser = await getCurrentUser();
-    if (!currentUser || !currentUser.workspaceId) return [];
-
-    const requests = await prisma.joinRequest.findMany({
-      where: { workspaceId: currentUser.workspaceId, status: "PENDING" },
-      include: { user: true }
-    });
-
-    return requests.map(r => ({
-      id: r.id,
-      user: {
-        name: r.user.name,
-        email: r.user.email
-      },
-      createdAt: r.createdAt
-    }));
-
-  } catch (error) {
-    return [];
-  }
-}
-
-/**
- * Get Workspaces owned or joined by the current user for switching.
+ * Retrieves the current user's workspaces from the auth-service.
  */
 export async function getUserWorkspaces() {
+  const token = await getAuthToken();
+  if (!token) return [];
+
   try {
-    const currentUser = await getCurrentUser();
-    if (!currentUser) return [];
-
-    const memberships = await prisma.workspaceMember.findMany({
-      where: { userId: currentUser.id },
-      include: { workspace: true }
-    });
-
-    return memberships.map(m => {
-      // Enforce Single Owner Truth
-      let effectiveRole = m.role;
-      const isTrueOwner = m.workspace.ownerId === currentUser.id;
-
-      if (isTrueOwner) {
-        effectiveRole = "OWNER";
-      } else if (effectiveRole === "OWNER") {
-        effectiveRole = "ADMIN";
-      }
-
-      return {
-        id: m.workspace.id,
-        name: m.workspace.name,
-        role: effectiveRole,
-        slug: m.workspace.slug,
-        active: m.workspace.id === currentUser.workspaceId
-      };
-    });
-  } catch (error) {
-    return [];
-  }
-}
-
-/**
- * Search users by name or email.
- * Excludes current workspace members.
- */
-export async function searchUsers(query: string) {
-  try {
-    const currentUser = await getCurrentUser();
-    if (!currentUser?.workspaceId) return [];
-
-    const workspaceMembers = await prisma.workspaceMember.findMany({
-      where: { workspaceId: currentUser.workspaceId },
-      select: { userId: true }
-    });
-
-    const memberIds = workspaceMembers.map(m => m.userId);
-
-    // Convert query to lowercase for case-insensitive matching
-    const lowerQuery = query.toLowerCase();
-
-    const users = await prisma.user.findMany({
-      where: {
-        AND: [
-          {
-            OR: [
-              { name: { contains: query } },
-              { email: { contains: lowerQuery } }
-            ]
-          },
-          { id: { notIn: memberIds } }
-        ]
+    const response = await fetch(`${AUTH_SERVICE_URL}/workspaces`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
       },
-      take: 10,
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        medicalLicenseId: true
-      }
+      cache: "no-store", // Ensure fresh data
     });
 
-    return users;
+    if (!response.ok) {
+      console.error("Failed to fetch workspaces:", response.status, await response.text());
+      return [];
+    }
+
+    const memberships = await response.json();
+
+    // Map to expected format if needed, or return as is
+    // The UI expects: { id, name, ... } or similar for workspace?
+    // The API returns MembershipResponse: { id, workspace_id, role, joined_at, workspace_name }
+
+    // Let's interpret what the UI likely needs.
+    // DoctorDashboardUI likely uses workspaces to show a switcher or list.
+    // It's safer to return a structure similar to what Prisma used to return if possible,
+    // OR update the UI. But since I can't easily see UI usage deep in components without lookups,
+    // I'll return a mapped object that covers bases.
+
+    return memberships.map((m: any) => ({
+      id: m.workspace_id,
+      name: m.workspace_name,
+      role: m.role,
+      membershipId: m.id,
+      joinedAt: m.joined_at
+    }));
 
   } catch (error) {
+    console.error("Get Workspaces Error:", error);
     return [];
   }
 }
 
 /**
- * Removes the current user from a specific workspace.
- */
-export async function leaveWorkspace(workspaceId: string) {
-  try {
-    const currentUser = await getCurrentUser();
-    if (!currentUser) return { message: "Not authenticated." };
-
-    // Prevent OWNER from leaving without transferring ownership
-    const membership = await prisma.workspaceMember.findUnique({
-      where: {
-        userId_workspaceId: {
-          userId: currentUser.id,
-          workspaceId: workspaceId
-        }
-      }
-    });
-
-    if (!membership) return { message: "You are not a member of this workspace." };
-
-    if (membership.role === "OWNER") {
-      return { message: "Owners cannot leave their own workspace. Delete the workspace instead." };
-    }
-
-    await prisma.workspaceMember.delete({
-      where: {
-        userId_workspaceId: {
-          userId: currentUser.id,
-          workspaceId: workspaceId
-        }
-      }
-    });
-
-    // --- SESSION UPDATE LOGIC ---
-    // If we left the *active* workspace, we must update the session cookie.
-    const cookieStore = await cookies();
-    const token = cookieStore.get("session")?.value;
-
-    if (token) {
-      try {
-        const { payload } = await jwtVerify(token, secret);
-
-        // Check if the current session workspace matches the one we just left
-        if (payload.workspaceId === workspaceId) {
-
-          // Fetch user again to see remaining memberships
-          const userWithMemberships = await prisma.user.findUnique({
-            where: { id: currentUser.id },
-            include: { memberships: true }
-          });
-
-          if (userWithMemberships) {
-            let newWorkspaceId: string | undefined = undefined;
-            let newRole = userWithMemberships.role === "ADMIN" ? "ADMIN" : "DOCTOR"; // Default to global role
-
-            // If other memberships exist, pick the best one
-            if (userWithMemberships.memberships.length > 0) {
-              const nextBest = userWithMemberships.memberships.find(m => m.role === "OWNER") ||
-                userWithMemberships.memberships.find(m => m.role === "ADMIN") ||
-                userWithMemberships.memberships[0];
-              newWorkspaceId = nextBest.workspaceId;
-              newRole = nextBest.role;
-            }
-
-            // Generate NEW Token
-            const sessionPayload = {
-              sub: currentUser.id,
-              workspaceId: newWorkspaceId,
-              role: newRole
-            };
-
-            const alg = "HS256";
-            const jwt = await new SignJWT(sessionPayload)
-              .setProtectedHeader({ alg })
-              .setIssuedAt()
-              .setExpirationTime("24h")
-              .sign(secret);
-
-            cookieStore.set("session", jwt, {
-              httpOnly: true,
-              secure: process.env.NODE_ENV === "production",
-              maxAge: 60 * 60 * 24, // 24 hours
-              path: "/",
-              sameSite: "lax",
-            });
-          }
-        }
-      } catch (e) {
-        console.error("Session update failed during leave:", e);
-        // Fallback: Just return success, client might need to re-login if token invalid
-      }
-    }
-
-    return { success: true, message: "Left workspace successfully." };
-
-  } catch (error) {
-    console.error("Leave Workspace Error:", error);
-    return { message: "Failed to leave workspace." };
-  }
-}
-
-
-/**
- * Fetch discoverable workspaces for the join screen.
- * Limit to top 20 for now.
- */
-export async function getDiscoverableWorkspaces() {
-  try {
-    const workspaces = await prisma.workspace.findMany({
-      take: 20,
-      orderBy: { createdAt: 'desc' },
-      select: {
-        id: true,
-        name: true,
-        slug: true,
-        _count: {
-          select: { members: true }
-        }
-      }
-    });
-
-    return workspaces;
-  } catch (error) {
-    console.error("Fetch Workspaces Error:", error);
-    return [];
-  }
-}
-
-/**
- * Invite a user to the current workspace.
- * Creates an Invitation record.
- */
-export async function inviteUser(targetUserId: string, role?: "ADMIN" | "DOCTOR") {
-  try {
-    const currentUser = await getCurrentUser();
-    if (!currentUser?.workspaceId || (currentUser.role !== "owner" && currentUser.role !== "admin")) {
-      return { success: false, message: "Unauthorized." };
-    }
-
-    const targetUser = await prisma.user.findUnique({ where: { id: targetUserId } });
-    if (!targetUser) return { success: false, message: "User not found." };
-
-    // Check if already a member
-    const existingMember = await prisma.workspaceMember.findUnique({
-      where: { userId_workspaceId: { userId: targetUserId, workspaceId: currentUser.workspaceId } }
-    });
-    if (existingMember) return { success: false, message: "User is already a member." };
-
-    // Check for existing pending invitation
-    const existingInvite = await prisma.invitation.findFirst({
-      where: { email: targetUser.email, workspaceId: currentUser.workspaceId }
-    });
-    if (existingInvite) return { success: false, message: "Invitation already sent." };
-
-    // Determine Workspace Role
-    // If role is provided, use it.
-    // Otherwise, infer from Global Role (Legacy behavior fallback)
-    let workspaceRole = role || "DOCTOR";
-
-    // Explicit validation just in case
-    if (workspaceRole !== "ADMIN" && workspaceRole !== "DOCTOR") {
-      workspaceRole = "DOCTOR";
-    }
-
-    // Create Invitation
-    await prisma.invitation.create({
-      data: {
-        email: targetUser.email,
-        workspaceId: currentUser.workspaceId,
-        role: workspaceRole,
-        token: crypto.randomUUID(),
-        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
-      }
-    });
-
-    return { success: true, message: "Invitation sent." };
-  } catch (error) {
-    console.error("Invite Error:", error);
-    return { success: false, message: "Failed to invite user." };
-  }
-}
-
-/**
- * Get pending invitations for the current user (by email).
+ * Retrieves the current user's invitations.
+ * Placeholder: Returns empty list until backend endpoint is available.
  */
 export async function getMyInvitations() {
-  try {
-    const user = await getCurrentUser();
-    if (!user) return [];
-
-    const invites = await prisma.invitation.findMany({
-      where: { email: user.email },
-      include: { workspace: true }
-    });
-
-    return invites.map(i => ({
-      id: i.id,
-      workspaceName: i.workspace.name,
-      role: i.role,
-      sentAt: i.expiresAt // Actually we don't store sentAt, using expiresAt for now or just ID
-    }));
-  } catch (error) {
-    return [];
-  }
+  // const token = await getAuthToken();
+  // Call API...
+  return [];
 }
 
 /**
- * Get pending invitations SENT BY the current workspace.
+ * Switches the active workspace for the current user.
+ * Stores the active workspace ID in a cookie.
  */
-export async function getWorkspaceInvitations() {
-  try {
-    const user = await getCurrentUser();
-    if (!user || !user.workspaceId) return [];
-
-    const invites = await prisma.invitation.findMany({
-      where: { workspaceId: user.workspaceId },
-      orderBy: { expiresAt: 'desc' }
-    });
-
-    return invites.map(i => ({
-      id: i.id,
-      email: i.email,
-      role: i.role,
-      expiresAt: i.expiresAt
-    }));
-  } catch (error) {
-    return [];
-  }
-}
-
-/**
- * Accept an invitation.
- */
-export async function acceptInvitation(invitationId: string) {
-  try {
-    const user = await getCurrentUser();
-    if (!user) return { success: false, message: "Not authenticated." };
-
-    const invite = await prisma.invitation.findUnique({ where: { id: invitationId } });
-    if (!invite) return { success: false, message: "Invitation not found." };
-
-    if (invite.email !== user.email) return { success: false, message: "This invitation is not for you." };
-
-    await prisma.$transaction(async (tx) => {
-      // Create Member
-      await tx.workspaceMember.create({
-        data: {
-          userId: user.id,
-          workspaceId: invite.workspaceId,
-          role: invite.role
-        }
-      });
-      // Delete Invitation
-      await tx.invitation.delete({ where: { id: invitationId } });
-    });
-
-    return { success: true, message: "Invitation accepted." };
-  } catch (error) {
-    console.error("Accept Invite Error:", error);
-    return { success: false, message: "Failed to join workspace." };
-  }
-}
-
-/**
- * Reject an invitation.
- */
-export async function rejectInvitation(invitationId: string) {
-  try {
-    const user = await getCurrentUser();
-    if (!user) return { success: false, message: "Not authenticated." };
-
-    const invite = await prisma.invitation.findUnique({ where: { id: invitationId } });
-    if (!invite) return { success: false, message: "Invitation not found." };
-
-    if (invite.email !== user.email) return { success: false, message: "Unauthorized." };
-
-    await prisma.invitation.delete({ where: { id: invitationId } });
-    return { success: true, message: "Invitation rejected." };
-  } catch (error) {
-    return { success: false, message: "Failed to reject invitation." };
-  }
-}
-
-/**
- * Update Workspace Name (Owner Only)
- */
-export async function updateWorkspace(workspaceId: string, newName: string) {
-  try {
-    const user = await getCurrentUser();
-    if (!user) return { success: false, message: "Not authenticated." };
-
-    // Verify membership and role
-    const member = await prisma.workspaceMember.findUnique({
-      where: { userId_workspaceId: { userId: user.id, workspaceId } }
-    });
-
-    if (!member || member.role !== "OWNER") {
-      return { success: false, message: "Unauthorized. Only Owners can update workspace settings." };
-    }
-
-    await prisma.workspace.update({
-      where: { id: workspaceId },
-      data: { name: newName }
-    });
-
-    return { success: true, message: "Workspace updated." };
-  } catch (error) {
-    console.error("Update Workspace Error:", error);
-    return { success: false, message: "Failed to update workspace." };
-  }
-}
-
-/**
- * Delete Workspace (Owner Only)
- */
-export async function deleteWorkspace(workspaceId: string) {
-  try {
-    const user = await getCurrentUser();
-    if (!user) return { success: false, message: "Not authenticated." };
-
-    // Verify membership and role
-    const member = await prisma.workspaceMember.findUnique({
-      where: { userId_workspaceId: { userId: user.id, workspaceId } }
-    });
-
-    if (!member || member.role !== "OWNER") {
-      return { success: false, message: "Unauthorized. Only Owners can delete workspaces." };
-    }
-
-    await prisma.workspace.delete({
-      where: { id: workspaceId }
-    });
-
-    // Check if we are deleting the CURRENT active workspace from the session
-    const cookieStore = await cookies();
-    const token = cookieStore.get("session")?.value;
-
-    if (token) {
-      const { payload } = await jwtVerify(token, secret);
-      if (payload.workspaceId === workspaceId) {
-        // We are deleting the active workspace.
-        // We must update the session to remove workspaceId and role.
-
-        // Keep 'sub' (userId)
-        const newPayload = {
-          sub: payload.sub,
-          // workspaceId: removed
-          // role: removed (will fallback to default or we can set to "DOCTOR" explicitly if needed but undefined is handled)
-        };
-
-        const alg = "HS256";
-        const newJwt = await new SignJWT(newPayload)
-          .setProtectedHeader({ alg })
-          .setIssuedAt()
-          .setExpirationTime("15m")
-          .sign(secret);
-
-        cookieStore.set("session", newJwt, {
-          httpOnly: true,
-          secure: process.env.NODE_ENV === "production",
-          maxAge: 60 * 15,
-          path: "/",
-          sameSite: "lax",
-        });
-      }
-    }
-
-    return { success: true, message: "Workspace deleted." };
-
-  } catch (error) {
-    console.error("Delete Workspace Error:", error);
-    return { success: false, message: "Failed to delete workspace." };
-  }
-}
-
-
-/**
- * Switch active workspace session.
- */
-export async function switchWorkspace(workspaceId: string) {
+export async function switchWorkspace(workspaceId: string): Promise<{ success: boolean }> {
   try {
     const cookieStore = await cookies();
-    const token = cookieStore.get("session")?.value;
-    if (!token) return { success: false, message: "Not authenticated." };
-    const { payload } = await jwtVerify(token, secret);
-    const userId = payload.sub as string;
-
-    // Verify membership
-    const member = await prisma.workspaceMember.findUnique({
-      where: { userId_workspaceId: { userId, workspaceId } }
-    });
-
-    if (!member) return { success: false, message: "Not a member of this workspace." };
-
-    // Create new session
-    const sessionPayload = { sub: userId, workspaceId, role: member.role };
-    const alg = "HS256";
-    const jwt = await new SignJWT(sessionPayload)
-      .setProtectedHeader({ alg })
-      .setIssuedAt()
-      .setExpirationTime("15m")
-      .sign(secret);
-
-    cookieStore.set("session", jwt, {
+    cookieStore.set("active_workspace", workspaceId, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      maxAge: 60 * 15,
+      maxAge: 60 * 60 * 24 * 30, // 30 days
       path: "/",
       sameSite: "lax",
     });
-
     return { success: true };
-
   } catch (error) {
     console.error("Switch Workspace Error:", error);
-    return { success: false, message: "Failed to switch workspace." };
+    return { success: false };
   }
+}
+
+/**
+ * Retrieves join requests for the current workspace.
+ * Placeholder: Returns empty list until backend endpoint is available.
+ */
+export async function getJoinRequests() {
+  // const token = await getAuthToken();
+  // Call API...
+  return [];
+}
+
+/**
+ * Resolves a join request (approve or reject).
+ * Placeholder: Returns success until backend endpoint is available.
+ */
+export async function resolveJoinRequest(requestId: string, action: "approve" | "reject"): Promise<{ success: boolean }> {
+  // const token = await getAuthToken();
+  // Call API...
+  console.log(`Resolving join request ${requestId} with action: ${action}`);
+  return { success: true };
+}
+
+/**
+ * Face login placeholder - to be implemented when face service is integrated
+ */
+export async function loginUserWithFace(prevState: any, formData: FormData) {
+  return { message: "Face login is not yet available." };
+}
+
+/**
+ * PIN verification placeholder - to be implemented when face service is integrated
+ */
+export async function verifyPinAndLogin(prevState: any, formData: FormData) {
+  return { message: "PIN verification is not yet available." };
 }

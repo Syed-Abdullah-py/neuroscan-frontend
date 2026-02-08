@@ -24,53 +24,36 @@ export async function proxy(request: NextRequest) {
             algorithms: ["HS256"],
         });
 
-        // 5. Role-Based Access Control (RBAC)
+        // 5. Strict Role-Based Access Control (RBAC) based on GLOBAL ROLE only
         const path = request.nextUrl.pathname;
-        const role = payload.role as string;
+        const globalRole = (payload.global_role as string || "").toUpperCase();
 
-        // If user has no active workspace (role is undefined), force them to workspace selection
-        if (!role) {
-            // Check global role to decide where to send them
-            // If they are a global admin, they should go to /admin to see "No Active Workspace" and manage/create one.
-            // If they are a global doctor, they should go to /doctor.
+        console.log(`[Middleware] Path: ${path}, GlobalRole: ${globalRole}`);
 
-            // Note: We need to trust the payload or fetch user. Payload is faster.
-            // Assuming we stored globalRole in the JWT payload.
-            // If not, we might need to default to /doctor or check another claim.
-            // Let's assume we can fetch or infer. For now, default to /doctor unless we can verify admin.
-
-            // However, our JWT creation logic needs to ensure `globalRole` or similar is present if `role` (workspace role) is missing.
-            // Let's rely on path for now: if they are trying to access /admin*, let them go to /admin (which handles empty state).
-            // If they are trying to access /doctor*, let them go to /doctor.
-
-            // BETTER LOGIC: Just allow access to the dashboard ROOT so they can see the "No Workspace" state.
-            // Taking them to /admin or /doctor root is fine.
-
-            // If they are at /admin/workspaces or /doctor/workspaces, allow it.
-            if (path.includes("/workspaces")) {
-                return NextResponse.next();
-            }
-
-            // Otherwise, let them proceed to the dashboard root corresponding to the path they are trying to visit.
-            // The Page component itself handles the "No Workspace" UI.
-            if (path === "/admin" || path === "/doctor") {
-                return NextResponse.next();
-            }
-
-            // valid redirect
-            if (path.startsWith("/admin")) return NextResponse.redirect(new URL("/admin", request.url));
-            return NextResponse.redirect(new URL("/doctor", request.url));
+        // If no global role, redirect to login
+        if (!globalRole) {
+            console.log("[Middleware] No global role found, redirecting to login");
+            return NextResponse.redirect(loginUrl);
         }
 
-        // Prevent Doctors from accessing Admin routes
-        if (path.startsWith("/admin") && role !== "ADMIN" && role !== "OWNER") {
-            return NextResponse.redirect(new URL("/doctor", request.url));
+        // STRICT ENFORCEMENT:
+        // ADMIN users can ONLY access /admin routes
+        // RADIOLOGIST users can ONLY access /doctor routes
+
+        if (path.startsWith("/admin")) {
+            // Only ADMIN can access /admin routes
+            if (globalRole !== "ADMIN") {
+                console.log(`[Middleware] Non-admin (${globalRole}) trying to access /admin, redirecting to /doctor`);
+                return NextResponse.redirect(new URL("/doctor", request.url));
+            }
         }
 
-        // Prevent Admins from accessing Doctor routes (Optional, depending on business logic)
-        // If Admins can see everything, remove this block.
-        if (path.startsWith("/doctor") && role !== "DOCTOR" && role !== "ADMIN") {
-            return NextResponse.redirect(new URL("/admin", request.url));
+        if (path.startsWith("/doctor")) {
+            // Only RADIOLOGIST can access /doctor routes
+            if (globalRole !== "RADIOLOGIST") {
+                console.log(`[Middleware] Non-radiologist (${globalRole}) trying to access /doctor, redirecting to /admin`);
+                return NextResponse.redirect(new URL("/admin", request.url));
+            }
         }
 
         // 6. Allow access if all checks pass
@@ -79,6 +62,8 @@ export async function proxy(request: NextRequest) {
     } catch (error) {
         // JWT is expired or invalid -> Redirect to Login
         console.log("Session expired or invalid");
+        console.error("JWT Verification Error Details:", error);
+        console.log("SECRET being used:", process.env.AUTH_SECRET?.substring(0, 10) + "...");
         return NextResponse.redirect(loginUrl);
     }
 }

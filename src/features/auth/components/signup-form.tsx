@@ -1,14 +1,13 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { Stethoscope, Shield, Eye, EyeOff, CheckCircle2, AlertCircle, Loader2, ChevronDown, Upload, FileText, X } from "lucide-react";
+import { Stethoscope, Shield, Eye, EyeOff, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useState, useActionState } from "react";
 import { registerUser } from "@/actions/auth-actions";
-import { FaceCapture } from "./face-capture";
 
 // Types
-type Step = 1 | 2 | 3;
+type Step = 1 | 2;
 type Role = "radiologist" | "admin";
 
 interface SignupFormProps {
@@ -35,42 +34,10 @@ export function SignupForm({ currentStep, onNext, onBack, onRoleSelect, selected
         email: "",
         password: "",
         confirmPassword: "",
-        cnic: "",
-        phoneNumber: "",
-        city: "",
-        medicalLicenseId: "",
-        pin: "",
-        gender: "",
         termsAccepted: false
     });
 
     const [errors, setErrors] = useState<Record<string, string>>({});
-    const [faceFile, setFaceFile] = useState<File | null>(null);
-    const [profileImage, setProfileImage] = useState<File | null>(null);
-
-    // Phone State
-    const [countryCode, setCountryCode] = useState("+92");
-    const [localNumber, setLocalNumber] = useState("");
-
-    const COUNTRY_CODES = [
-        { code: "+92", country: "PK", flag: "🇵🇰" },
-        { code: "+1", country: "US", flag: "🇺🇸" },
-        { code: "+44", country: "UK", flag: "🇬🇧" },
-        { code: "+971", country: "AE", flag: "🇦🇪" },
-        { code: "+91", country: "IN", flag: "🇮🇳" },
-        { code: "+1", country: "CA", flag: "🇨🇦" },
-        { code: "+61", country: "AU", flag: "🇦🇺" },
-        { code: "+49", country: "DE", flag: "🇩🇪" },
-    ];
-
-    // Update formData phone number when components change
-    const handlePhoneChange = (code: string, number: string) => {
-        setCountryCode(code);
-        setLocalNumber(number);
-        const fullNumber = code + number;
-        setFormData(prev => ({ ...prev, phoneNumber: fullNumber }));
-        // Optional: Validate phone length here if needed
-    };
 
     const validateField = (name: string, value: string) => {
         let error = "";
@@ -95,22 +62,15 @@ export function SignupForm({ currentStep, onNext, onBack, onRoleSelect, selected
             case "confirmPassword":
                 if (value !== formData.password) error = "Passwords do not match";
                 break;
-            case "medicalLicenseId":
-                if (selectedRole === "radiologist" && !value.trim()) error = "License ID is required";
-                break;
-            case "pin":
-                if (faceFile && (!value || value.length < 4)) error = "PIN (4+ chars) required for Face Login";
-                break;
         }
         setErrors(prev => ({ ...prev, [name]: error }));
         return !error;
     };
 
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        const { name, value, type } = e.target;
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value, type, checked } = e.target;
 
         if (type === "checkbox") {
-            const checked = (e.target as HTMLInputElement).checked;
             setFormData(prev => ({ ...prev, [name]: checked }));
             setErrors(prev => ({ ...prev, [name]: checked ? "" : "Must accept terms" }));
         } else {
@@ -124,50 +84,8 @@ export function SignupForm({ currentStep, onNext, onBack, onRoleSelect, selected
         if (!formData.firstName || !formData.lastName || !formData.email || !formData.password || !formData.confirmPassword) return false;
         if (formData.password !== formData.confirmPassword) return false;
         if (!formData.termsAccepted) return false;
-        if (selectedRole === "radiologist" && !formData.medicalLicenseId) return false;
-        if (faceFile && (!formData.pin || formData.pin.length < 4)) return false;
         if (formData.password.length < 8) return false;
         return true;
-    };
-
-    const handleStep2Next = () => {
-        // Technically this is submit now, with the button directly submitting the form.
-        // However, if we keep the "Next" logic for some reason, here it is.
-        // But the button is type="submit" in the JSX below, so this function might not be called by the button directly
-        // UNLESS the button is type="button" and calls this.
-        // Looking at the JSX (step 2), the button is type="submit".
-        // So this function is actually unused for submission in the current flow if the button submits the form.
-        // BUT, wait... previous code called onNext()? 
-        // Let's check logic. The form action handles the submission. 
-        // The button is disabled if invalid.
-        // IF the user hits enter, form submits.
-        // So we really just need `wrappedAction` to handle the submission data.
-        // `handleStep2Next` seems to have been legacy or for manual validation before strict form actions?
-        // Use validation check here if called manually.
-
-        if (!isFormValid()) return;
-
-        // Perform strict validation feedback
-        const fields = ["firstName", "lastName", "email", "password", "confirmPassword"];
-        if (selectedRole === "radiologist") fields.push("medicalLicenseId");
-        if (faceFile) fields.push("pin");
-
-        let isValid = true;
-        fields.forEach(field => {
-            const valid = validateField(field, formData[field as keyof typeof formData] as string);
-            if (!valid) isValid = false;
-        });
-
-        if (isValid) {
-            // Because we use form action, we don't necessarily need onNext() unless it moves to a step 3 'confirmation'?
-            // The original code had step 3 removed/commented out effectively.
-            // If the button submits, we don't call this.
-            // But if we want to support "Next" to a review step, we use this.
-            // Let's assume the button is SUBMIT.
-            // So this function might be dead code or used if we change button type.
-            // I will keep it functional just in case.
-            onNext();
-        }
     };
 
     // Common Input Styles
@@ -175,27 +93,8 @@ export function SignupForm({ currentStep, onNext, onBack, onRoleSelect, selected
     const errorInputClasses = "border-red-500 focus:ring-red-500";
     const labelClasses = "text-[11px] font-bold text-slate-500 dark:text-slate-400 tracking-wider uppercase mb-2 block";
 
-    const wrappedAction = (formData: FormData) => {
-        if (faceFile) {
-            formData.append("faceImage", faceFile); // For Face Login encoding
-        }
-        if (profileImage) {
-            formData.append("profileImage", profileImage); // For display Avatar
-        }
-        // Append all fields explicitly or ensure formData has them if they were plain objects
-        // The form action receives FormData from the DOM form automatically for inputs with 'name'
-
-        // Ensure role is passed
-        formData.append("role", selectedRole || "");
-
-        // Ensure phoneNumber is passed if using custom input that might not sync perfectly with native input logic (though we added hidden input)
-        // Hidden input takes care of it.
-
-        formAction(formData);
-    };
-
     return (
-        <form action={wrappedAction} className="relative">
+        <form action={formAction} className="relative">
 
             {/* STEP 1: Role Selection */}
             {currentStep === 1 && (
@@ -273,51 +172,6 @@ export function SignupForm({ currentStep, onNext, onBack, onRoleSelect, selected
 
             {currentStep === 2 && (
                 <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
-
-                    {/* PROFILE PICTURE UPLOAD - Top of Step 2 */}
-                    <div className="flex justify-center mb-6">
-                        <div className="relative group">
-                            <label className={cn(labelClasses, "text-center mb-3")}>Profile Picture</label>
-
-                            {!profileImage ? (
-                                <div className="w-40 h-40 rounded-full border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-blue-500 dark:hover:border-blue-500 bg-slate-50 dark:bg-slate-900/50 flex flex-col items-center justify-center cursor-pointer transition-all relative overflow-hidden group-hover:bg-slate-100 dark:group-hover:bg-slate-800">
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        onChange={(e) => {
-                                            if (e.target.files && e.target.files[0]) {
-                                                setProfileImage(e.target.files[0]);
-                                            }
-                                        }}
-                                        className="absolute inset-0 w-full h-full opacity-0 z-50 cursor-pointer"
-                                    />
-                                    <div className="absolute inset-0 flex items-center justify-center opacity-50">
-                                        {/* Abstract Person/Avatar Placeholder */}
-                                        <svg className="w-24 h-24 text-slate-300 dark:text-slate-600" viewBox="0 0 24 24" fill="currentColor">
-                                            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-                                        </svg>
-                                    </div>
-                                    <div className="absolute inset-x-0 bottom-0 bg-black/50 p-2 text-white text-[10px] uppercase font-bold text-center translate-y-full group-hover:translate-y-0 transition-transform">
-                                        Upload
-                                    </div>
-                                    <Upload className="w-8 h-8 text-blue-500 opacity-0 group-hover:opacity-100 transition-opacity z-10 absolute mb-2" />
-                                </div>
-                            ) : (
-                                <div className="relative w-40 h-40">
-                                    <div className="w-40 h-40 rounded-full overflow-hidden border-2 border-slate-200 dark:border-slate-700 shadow-xl">
-                                        <img src={URL.createObjectURL(profileImage)} alt="Preview" className="w-full h-full object-cover" />
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => setProfileImage(null)}
-                                        className="absolute top-0 right-0 bg-red-500 text-white p-1.5 rounded-full shadow-lg hover:bg-red-600 transition-colors z-20"
-                                    >
-                                        <X size={14} />
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    </div>
 
                     <div className="grid grid-cols-2 gap-5">
                         <div>
@@ -403,137 +257,6 @@ export function SignupForm({ currentStep, onNext, onBack, onRoleSelect, selected
                         {errors.confirmPassword && <p className="text-xs text-red-500 mt-1 font-medium animate-in slide-in-from-top-1">{errors.confirmPassword}</p>}
                     </div>
 
-                    {/* SHARED EXTRA FIELDS */}
-                    <div className="grid grid-cols-2 gap-5">
-                        <div>
-                            <label className={labelClasses}>Gender</label>
-                            <select
-                                name="gender"
-                                value={formData.gender}
-                                onChange={handleInputChange}
-                                className={cn(inputClasses, "appearance-none")}
-                            >
-                                <option value="">Select Gender</option>
-                                <option value="Male">Male</option>
-                                <option value="Female">Female</option>
-                                <option value="Other">Other</option>
-                            </select>
-                        </div>
-                        <div className="col-span-1">
-                            <label className={labelClasses}>Phone Number</label>
-                            <div className="flex bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-blue-600 transition-all h-12">
-                                {/* Country Code Dropdown */}
-                                <div className="relative border-r border-slate-200 dark:border-slate-800 h-full">
-                                    <select
-                                        value={countryCode}
-                                        onChange={e => handlePhoneChange(e.target.value, localNumber)}
-                                        className="appearance-none h-full bg-slate-100 dark:bg-slate-900/50 pl-3 pr-8 outline-none text-sm font-medium cursor-pointer hover:bg-slate-200/50 dark:hover:bg-slate-800 transition-colors text-slate-900 dark:text-white border-none focus:ring-0"
-                                    >
-                                        {COUNTRY_CODES.map((c, idx) => (
-                                            <option key={`${c.code}-${c.country}-${idx}`} value={c.code}>
-                                                {c.flag} {c.code}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <div className="absolute inset-y-0 right-2 flex items-center pointer-events-none text-slate-500">
-                                        <ChevronDown size={12} />
-                                    </div>
-                                </div>
-
-                                {/* Local Number Input */}
-                                <input
-                                    type="tel"
-                                    value={localNumber}
-                                    onChange={e => {
-                                        const val = e.target.value.replace(/\D/g, '');
-                                        handlePhoneChange(countryCode, val);
-                                    }}
-                                    className="flex-1 bg-transparent px-4 outline-none text-sm placeholder:text-slate-400 dark:text-white border-none focus:ring-0"
-                                    placeholder="300 1234567"
-                                />
-                            </div>
-                            {/* Hidden input to ensure it submits if needed, though we sync to formData state which is what matters if we were using purely controlled. But this is a form action. 
-                                 Wait, the form action uses FormData(form). We need to ensure 'phoneNumber' is in there. 
-                                 Either we use a hidden input with name="phoneNumber" value={formData.phoneNumber} 
-                                 OR we manually append it in wrappedAction. 
-                                 The current code for other fields relies on inputs having names. 
-                                 Let's add a hidden input.
-                             */}
-                            <input type="hidden" name="phoneNumber" value={formData.phoneNumber} />
-                        </div>
-                    </div>
-
-
-                    <div className="grid grid-cols-2 gap-5">
-                        <div>
-                            <label className={labelClasses}>CNIC / ID</label>
-                            <input
-                                name="cnic"
-                                value={formData.cnic}
-                                onChange={handleInputChange}
-                                className={cn(inputClasses)}
-                                placeholder="ID Number"
-                            />
-                        </div>
-
-                        {/* ADMIN: Show City */}
-                        {selectedRole === "admin" && (
-                            <div>
-                                <label className={labelClasses}>City</label>
-                                <input
-                                    name="city"
-                                    value={formData.city}
-                                    onChange={handleInputChange}
-                                    className={cn(inputClasses)}
-                                    placeholder="City"
-                                />
-                            </div>
-                        )}
-
-                        {/* DOCTOR: Show Medical License */}
-                        {selectedRole === "radiologist" && (
-                            <div>
-                                <label className={labelClasses}>Medical License Number (Required)</label>
-                                <input
-                                    name="medicalLicenseId"
-                                    value={formData.medicalLicenseId}
-                                    onChange={handleInputChange}
-                                    className={cn(inputClasses, errors.medicalLicenseId && errorInputClasses)}
-                                    placeholder="License #"
-                                    required
-                                />
-                                {errors.medicalLicenseId && <p className="text-xs text-red-500 mt-1 font-medium animate-in slide-in-from-top-1">{errors.medicalLicenseId}</p>}
-                            </div>
-                        )}
-                    </div>
-
-
-                    <div className="pt-4 border-t border-slate-100 dark:border-white/5">
-                        <label className={labelClasses}>Face Login Setup (Optional)</label>
-                        <FaceCapture onCapture={(file) => {
-                            setFaceFile(file);
-                            if (!file) setFormData(prev => ({ ...prev, pin: "" }));
-                        }} label="Scan Face for Easy Login" />
-                    </div>
-
-                    {/* PIN FIELD - CONDITIONAL */}
-                    {faceFile && (
-                        <div className="animate-in slide-in-from-top-2 fade-in duration-300">
-                            <label className={labelClasses}>Security PIN (For Face Login)</label>
-                            <input
-                                name="pin"
-                                type="password"
-                                maxLength={6}
-                                value={formData.pin}
-                                onChange={handleInputChange}
-                                className={cn(inputClasses, errors.pin && errorInputClasses)}
-                                placeholder="Enter 4-6 digit PIN"
-                            />
-                            <p className="text-xs text-slate-400 mt-1">Required when face login is enabled.</p>
-                            {errors.pin && <p className="text-xs text-red-500 mt-1 font-medium animate-in slide-in-from-top-1">{errors.pin}</p>}
-                        </div>
-                    )}
-
                     <div className="py-2">
                         <label className="flex items-center gap-3 cursor-pointer group">
                             <input
@@ -561,7 +284,6 @@ export function SignupForm({ currentStep, onNext, onBack, onRoleSelect, selected
                                 Back
                             </button>
 
-                            {/* NOTE: We removed Step 3 for simplicity. Step 2 Submit IS the signup. */}
                             <button
                                 type="submit"
                                 disabled={isPending || !isFormValid()}
@@ -571,6 +293,7 @@ export function SignupForm({ currentStep, onNext, onBack, onRoleSelect, selected
                             </button>
                         </div>
                     </div>
+
                     {/* Server Error Display */}
                     {state?.message && (
                         <div className="mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-600 dark:text-red-400 text-sm flex items-center justify-center gap-2">
