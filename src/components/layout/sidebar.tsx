@@ -8,8 +8,6 @@ import {
   Users,
   FileText,
   Settings,
-  Activity,
-  LogOut,
   Building2
 } from "lucide-react";
 import WorkspaceSwitcher from "@/components/layout/workspace-switcher";
@@ -30,6 +28,7 @@ const adminRoutes = [
 const doctorRoutes = [
   { name: "Overview", href: "/doctor", icon: LayoutDashboard },
   { name: "Workspaces", href: "/doctor/workspaces", icon: Building2 },
+  { name: "Settings", href: "/doctor/settings", icon: Settings },
 ];
 
 type UserSummary = {
@@ -45,17 +44,8 @@ type UserSummary = {
 // Add workspaces prop
 export function Sidebar({ role = "admin", user, workspaces = [] }: { role?: "admin" | "doctor", user?: UserSummary | null, workspaces?: any[] }) {
   const pathname = usePathname();
-  // Determine role: Prefer workspace role, fallback to global role
-  // If user has no workspace role (undefined), check globalRole.
-  // user.role is from the session (workspace role), which is "doctor" default in getCurrentUser if missing? 
-  // Wait, getCurrentUser defaults role to "doctor" OR user.role?
-  // Let's rely on checking if `user.role` matches known admin strings OR if `user.globalRole` matches admin strings.
-
   const isWorkspaceAdmin = user?.role === "owner" || user?.role === "admin" || user?.role === "ADMIN";
   const isGlobalAdmin = user?.globalRole === "ADMIN";
-
-  // If no workspace role is present (or default "doctor" from my previous guess), but global role is ADMIN, treat as admin.
-  // Actually, getCurrentUser returns role: role?.toLowerCase() || "doctor". So it is never undefined.
 
   // We need to fix the logic:
   // If user.workspaceId is missing, rely entirely on globalRole.
@@ -66,16 +56,20 @@ export function Sidebar({ role = "admin", user, workspaces = [] }: { role?: "adm
   const routes = effectiveRole === "doctor" ? doctorRoutes : adminRoutes;
 
   return (
-    <aside className="hidden md:flex flex-col w-75 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 h-screen fixed left-0 top-0 z-40">
+    <aside className="hidden md:flex flex-col w-75 border-r border-neutral-200 dark:border-slate-700/50 bg-neutral-50 dark:bg-gray-900 h-screen fixed left-0 top-0 z-40">
       {/* Header with Workspace Switcher */}
-      <div className="h-20 flex items-center px-4 border-b border-slate-200 dark:border-slate-800">
+      <div className="h-20 flex items-center px-4 border-b border-neutral-200 dark:border-slate-700/50">
         <WorkspaceSwitcher items={workspaces} userRole={user?.globalRole ?? undefined} />
       </div>
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-6 px-4 space-y-1">
         {routes.map((route) => {
-          const isActive = pathname === route.href || pathname?.startsWith(route.href + "/");
+          // FIXED: Exact match for overview pages, prefix match for others
+          const isActive =
+            pathname === route.href ||
+            (pathname?.startsWith(route.href + "/") && route.href !== "/admin" && route.href !== "/doctor");
+
           return (
             <Link
               key={route.href}
@@ -83,11 +77,17 @@ export function Sidebar({ role = "admin", user, workspaces = [] }: { role?: "adm
               className={cn(
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all",
                 isActive
-                  ? "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400"
-                  : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-900 hover:text-slate-900 dark:hover:text-white"
+                  ? "bg-neutral-200 dark:bg-slate-700/50 text-black dark:text-white"
+                  : "text-neutral-600 dark:text-slate-400 hover:bg-neutral-100 dark:hover:bg-slate-700/30 hover:text-black dark:hover:text-slate-200"
               )}
             >
-              <route.icon className={cn("w-4 h-4", isActive ? "text-blue-600 dark:text-blue-400" : "text-slate-400")} />
+              <route.icon
+                className={cn(
+                  "w-4 h-4",
+                  isActive ? "text-black dark:text-white" : "text-neutral-400 dark:text-slate-500"
+                )}
+                strokeWidth={2}
+              />
               {route.name}
             </Link>
           );
@@ -95,20 +95,24 @@ export function Sidebar({ role = "admin", user, workspaces = [] }: { role?: "adm
       </nav>
 
       {/* Footer Area */}
-      <div className="p-4 border-t border-slate-200 dark:border-slate-800 space-y-4">
+      <div className="p-4 border-t border-neutral-200 dark:border-slate-700/50 space-y-4">
 
         {/* The Logout Button */}
         <LogoutButton />
 
         {/* User Profile Info */}
         <div className="flex items-center gap-3 px-3">
-          <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
-            <span className="text-xs font-bold text-slate-600 dark:text-slate-300">{user?.avatar || "U"}</span>
+          <div className="w-8 h-8 rounded-full bg-neutral-200 dark:bg-slate-700 flex items-center justify-center">
+            <span className="text-xs font-bold text-neutral-600 dark:text-slate-300">
+              {user?.avatar || "U"}
+            </span>
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-slate-900 dark:text-white truncate">{user?.name || "User"}</p>
+            <p className="text-sm font-medium text-black dark:text-white truncate">
+              {user?.name || "User"}
+            </p>
             <div className="flex items-center gap-1.5">
-              <span className="text-[10px] uppercase font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded">
+              <span className="text-[10px] uppercase font-bold text-neutral-600 dark:text-slate-400 bg-neutral-200 dark:bg-slate-700/50 px-1.5 py-0.5 rounded">
                 {user?.globalRole || user?.role || "USER"}
               </span>
             </div>

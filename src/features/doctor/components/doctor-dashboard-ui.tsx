@@ -1,11 +1,16 @@
 "use client";
 
-import { Activity, Clock, FileText, CheckCircle2, Upload, Calendar, Building2, LogOut, Stethoscope, Brain, ChevronDown } from "lucide-react";
-import { cn } from "@/lib/utils";
+import React, { useState } from "react";
 import Link from "next/link";
-import { motion, AnimatePresence, Variants } from "framer-motion";
-import { useState } from "react";
+import {
+    Activity, Clock, CheckCircle2, Building2,
+    Brain, ChevronDown,
+    ArrowUpRight, Calendar, Filter, AlertCircle, Search
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { motion, Variants } from "framer-motion";
 
+// --- TYPES ---
 interface DoctorDashboardUIProps {
     stats: {
         totalCases: number;
@@ -23,34 +28,105 @@ interface DoctorDashboardUIProps {
     workspaces: any[];
 }
 
-// --- Animation Variants (Moved outside for performance) ---
+// --- ANIMATION ---
 const containerVariants: Variants = {
     hidden: { opacity: 0 },
     show: {
         opacity: 1,
-        transition: {
-            staggerChildren: 0.1,
-            delayChildren: 0.1
-        }
+        transition: { staggerChildren: 0.05 }
     }
 };
 
 const itemVariants: Variants = {
-    hidden: { opacity: 0, y: 20 },
+    hidden: { opacity: 0, y: 10 },
     show: {
         opacity: 1,
         y: 0,
-        transition: {
-            type: "spring",
-            stiffness: 260,
-            damping: 20
-        }
+        transition: { type: "spring", stiffness: 260, damping: 20 }
     }
 };
 
-export function DoctorDashboardUI({ stats, recentCases, user, workspaces }: DoctorDashboardUIProps) {
+// --- COMPONENTS ---
 
-    // Logic: Filter & Sort Cases
+const StatCard = ({ title, value, icon: Icon, trend, color }: any) => {
+    const colorStyles: Record<string, string> = {
+        blue: "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20",
+        amber: "text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20",
+        emerald: "text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20",
+    };
+
+    return (
+        <motion.div
+            variants={itemVariants}
+            className="flex flex-col justify-between p-6 rounded-2xl bg-white dark:bg-gray-900/40 border border-neutral-200 dark:border-slate-700/50 hover:border-neutral-300 dark:hover:border-slate-600 transition-all duration-200"
+        >
+            <div className="flex justify-between items-start mb-4">
+                <div className={cn("p-2.5 rounded-xl", colorStyles[color])}>
+                    <Icon className="w-5 h-5" strokeWidth={2} />
+                </div>
+                {trend && (
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500 bg-neutral-100 dark:bg-gray-800 px-2 py-1 rounded-md">
+                        {trend}
+                    </span>
+                )}
+            </div>
+            <div>
+                <h3 className="text-3xl font-bold text-black dark:text-white tracking-tight mb-1">{value}</h3>
+                <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide">{title}</p>
+            </div>
+        </motion.div>
+    );
+};
+
+const PriorityBadge = ({ priority }: { priority: string }) => {
+    const p = (priority || 'normal').toLowerCase();
+    const styles: Record<string, string> = {
+        critical: "text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-900/30",
+        urgent: "text-orange-700 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-900/30",
+        high: "text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-900/30",
+        normal: "text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-900/30",
+        low: "text-neutral-600 dark:text-neutral-400 bg-neutral-100 dark:bg-gray-800 border-neutral-200 dark:border-gray-700",
+    };
+
+    return (
+        <span className={cn("inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border", styles[p] || styles.normal)}>
+            {p === 'critical' && <AlertCircle className="w-3 h-3" />}
+            {p}
+        </span>
+    );
+};
+
+const StatusBadge = ({ status }: { status: string }) => {
+    if (status === "PENDING") {
+        return (
+            <div className="flex items-center gap-2">
+                <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                </span>
+                <span className="text-xs font-bold text-neutral-700 dark:text-neutral-300">In Review</span>
+            </div>
+        )
+    }
+    if (status === "COMPLETED") {
+        return (
+            <div className="flex items-center gap-2">
+                <div className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" />
+                <span className="text-xs font-bold text-neutral-700 dark:text-neutral-300">Finalized</span>
+            </div>
+        )
+    }
+    return (
+        <div className="flex items-center gap-2">
+            <div className="h-2 w-2 rounded-full bg-neutral-300 dark:bg-neutral-600" />
+            <span className="text-xs font-bold text-neutral-500 dark:text-neutral-400 capitalize">{status.toLowerCase()}</span>
+        </div>
+    )
+};
+
+// --- MAIN PAGE ---
+
+export function DoctorDashboardUI({ stats, recentCases, user, workspaces }: DoctorDashboardUIProps) {
     const [filterStatus, setFilterStatus] = useState("ALL");
     const [filterPriority, setFilterPriority] = useState("ALL");
 
@@ -59,16 +135,8 @@ export function DoctorDashboardUI({ stats, recentCases, user, workspaces }: Doct
         if (filterPriority !== "ALL" && (c.priority || 'normal') !== filterPriority) return false;
         return true;
     }).sort((a, b) => {
-        const priorityOrder: Record<string, number> = {
-            'critical': 4,
-            'urgent': 3,
-            'high': 3,
-            'normal': 2,
-            'low': 1
-        };
-        const pA = (a.priority || 'normal').toLowerCase();
-        const pB = (b.priority || 'normal').toLowerCase();
-        return (priorityOrder[pB] || 0) - (priorityOrder[pA] || 0);
+        const priorityOrder: Record<string, number> = { 'critical': 4, 'urgent': 3, 'high': 3, 'normal': 2, 'low': 1 };
+        return (priorityOrder[(b.priority || 'normal').toLowerCase()] || 0) - (priorityOrder[(a.priority || 'normal').toLowerCase()] || 0);
     });
 
     return (
@@ -76,245 +144,193 @@ export function DoctorDashboardUI({ stats, recentCases, user, workspaces }: Doct
             variants={containerVariants}
             initial="hidden"
             animate="show"
-            className="space-y-8 p-6 md:p-8 max-w-7xl mx-auto"
+            className="min-h-screen bg-transparent text-black dark:text-white"
         >
-            {/* Header */}
-            <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Doctor Dashboard</h1>
-                    <p className="text-slate-500 dark:text-slate-400 mt-1">
-                        Welcome back, Dr. {user.name}.
-                    </p>
-                </div>
-                <div className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-4 py-2.5 rounded-xl shadow-sm">
-                    <Clock size={18} className="text-blue-500" />
-                    <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
-                        {new Date().toLocaleDateString('en-US', {
-                            weekday: 'long',
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric'
-                        })}
-                    </span>
-                </div>
-            </motion.div>
+            <div className="max-w-7xl mx-auto p-6 md:p-8 space-y-8">
 
-            {!user.workspaceId ? (
-                // Empty State
-                <motion.div
-                    variants={itemVariants}
-                    className="relative overflow-hidden rounded-[2.5rem] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl shadow-slate-200/50 dark:shadow-black/40 min-h-[500px] flex flex-col items-center justify-center text-center p-8 md:p-16 group"
-                >
-                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,var(--tw-gradient-stops))] from-blue-50/80 via-transparent to-transparent dark:from-blue-900/10 pointer-events-none" />
-                    <div className="absolute top-0 left-0 w-full h-1 bg-linear-to-r from-blue-500 via-cyan-400 to-blue-500 opacity-0" />
-
-                    <div className="relative mb-8 cursor-default">
-                        <div className="absolute inset-0 bg-blue-500/20 rounded-full blur-2xl transition-all duration-500 peer-hover:bg-blue-500/30" />
-                        <div className="peer relative w-28 h-28 bg-white dark:bg-slate-800 rounded-3xl shadow-lg border border-slate-100 dark:border-slate-700 flex items-center justify-center transform -rotate-3 hover:rotate-3 transition-transform duration-500 ease-out">
-                            <Stethoscope className="w-16 h-16 text-blue-600 dark:text-blue-400 drop-shadow-md" strokeWidth={1.5} />
-                        </div>
-                    </div>
-
-                    <h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-4 tracking-tight max-w-lg">
-                        No Active Workspace Found
-                    </h2>
-                    <p className="text-slate-500 dark:text-slate-400 max-w-md mx-auto text-base leading-relaxed mb-10">
-                        You are currently not assigned to any medical facility. Please join a workspace to start viewing patient assignments and analyzing scans.
-                    </p>
-
-                    <div className="flex flex-col sm:flex-row gap-4 w-full justify-center">
-                        <Link
-                            href="/doctor/workspaces"
-                            className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-8 py-3.5 rounded-xl font-bold text-sm shadow-lg shadow-blue-600/25 transition-all hover:scale-105 active:scale-95"
-                        >
-                            <Building2 size={18} />
-                            Browse Workspaces
-                        </Link>
-                    </div>
-                </motion.div>
-            ) : (
-                <>
-                    {/* Stats Grid */}
-                    <motion.div
-                        variants={containerVariants}
-                        className="grid grid-cols-1 md:grid-cols-3 gap-6"
-                    >
-                        <StatCard
-                            title="Assigned Cases"
-                            value={stats?.totalCases || 0}
-                            icon={FileText}
-                            color="blue"
-                            trend="+2 this week"
-                        />
-                        <StatCard
-                            title="Pending Review"
-                            value={stats?.pendingCases || 0}
-                            icon={Clock}
-                            color="amber"
-                            trend="Requires attention"
-                        />
-                        <StatCard
-                            title="Completed"
-                            value={stats?.completedCases || 0}
-                            icon={CheckCircle2}
-                            color="green"
-                            trend="Great job!"
-                        />
+                {/* 1. Header Section */}
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-2">
+                    <motion.div variants={itemVariants}>
+                        <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-black dark:text-white mb-2">
+                            Dashboard
+                        </h1>
+                        <p className="text-neutral-500 dark:text-neutral-400 text-sm md:text-base">
+                            Welcome back, <span className="text-black dark:text-white font-medium">Dr. {user.name.split(' ')[0]}</span>
+                        </p>
                     </motion.div>
 
-                    {/* Filters */}
-                    <motion.div variants={itemVariants} className="flex flex-wrap gap-4 items-center">
-                        <div className="flex items-center gap-2 bg-white dark:bg-slate-900 p-1 rounded-lg border border-slate-200 dark:border-slate-800 shadow-sm">
-                            {["ALL", "PENDING", "COMPLETED"].map((status) => (
-                                <button
-                                    key={status}
-                                    onClick={() => setFilterStatus(status)}
-                                    className={cn(
-                                        "px-3 py-1.5 text-xs font-bold rounded-md transition-all",
-                                        filterStatus === status
-                                            ? "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400 shadow-sm"
-                                            : "text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800"
-                                    )}
-                                >
-                                    {status === "ALL" ? "All Status" : status}
-                                </button>
-                            ))}
-                        </div>
-
-                        <div className="relative group">
-                            <select
-                                value={filterPriority}
-                                onChange={(e) => setFilterPriority(e.target.value)}
-                                className="appearance-none bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 hover:border-blue-400 dark:hover:border-blue-500 text-slate-700 dark:text-slate-300 rounded-xl pl-4 pr-10 py-2.5 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all cursor-pointer shadow-sm min-w-[180px]"
-                            >
-                                <option value="ALL">All Priorities</option>
-                                <option value="low">Low - Routine</option>
-                                <option value="normal">Normal - Standard</option>
-                                <option value="high">High - Urgent</option>
-                                <option value="critical">Critical - Emergency</option>
-                            </select>
-                            <div className="absolute inset-y-0 right-3 flex items-center pointer-events-none text-slate-500 group-hover:text-blue-500 transition-colors">
-                                <ChevronDown size={14} />
-                            </div>
+                    <motion.div variants={itemVariants} className="flex items-center gap-3">
+                        <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-slate-700/50 bg-white dark:bg-gray-900/50 text-xs font-semibold text-neutral-600 dark:text-neutral-300 shadow-sm">
+                            <Calendar className="w-3.5 h-3.5 text-neutral-400" />
+                            {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
                         </div>
                     </motion.div>
+                </div>
 
-                    {/* Recent Cases Section */}
+                {!user.workspaceId ? (
+                    // Empty State
                     <motion.div
                         variants={itemVariants}
-                        className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden"
+                        className="flex flex-col items-center justify-center p-12 rounded-2xl bg-white dark:bg-gray-900/30 border border-neutral-200 dark:border-slate-700/50 text-center min-h-[400px]"
                     >
-                        <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50/50 dark:bg-slate-900">
-                            <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                                <Brain className="w-5 h-5 text-blue-500" />
-                                Assigned Cases
-                            </h2>
+                        <div className="w-16 h-16 rounded-2xl bg-neutral-100 dark:bg-gray-800 flex items-center justify-center mb-6">
+                            <Building2 className="w-8 h-8 text-neutral-400" strokeWidth={1.5} />
                         </div>
+                        <h2 className="text-xl font-bold mb-2">No Active Workspace</h2>
+                        <p className="text-neutral-500 max-w-sm mb-8 text-sm leading-relaxed">
+                            You aren't assigned to any medical facility yet. Join a workspace to start your diagnostics.
+                        </p>
+                        <Link href="/doctor/workspaces" className="px-6 py-2.5 bg-black dark:bg-white text-white dark:text-black rounded-lg text-sm font-bold hover:opacity-90 transition-opacity">
+                            Browse Workspaces
+                        </Link>
+                    </motion.div>
+                ) : (
+                    <>
+                        {/* 2. Stats Grid */}
+                        <motion.div variants={containerVariants} className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <StatCard
+                                title="Assigned Cases"
+                                value={stats?.totalCases || 0}
+                                icon={Brain}
+                                color="blue"
+                                trend="Active"
+                            />
+                            <StatCard
+                                title="Pending Review"
+                                value={stats?.pendingCases || 0}
+                                icon={Clock}
+                                color="amber"
+                                trend="Action Required"
+                            />
+                            <StatCard
+                                title="Completed"
+                                value={stats?.completedCases || 0}
+                                icon={CheckCircle2}
+                                color="emerald"
+                                trend="This Week"
+                            />
+                        </motion.div>
 
-                        <div className="overflow-x-auto">
-                            <table className="w-full">
-                                <thead className="bg-slate-50 dark:bg-slate-950/50">
-                                    <tr>
-                                        <th className="text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider py-4 px-6">Patient</th>
-                                        <th className="text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider py-4 px-6">Priority</th>
-                                        <th className="text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider py-4 px-6">Status</th>
-                                        <th className="text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider py-4 px-6">Date</th>
-                                        <th className="text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider py-4 px-6">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                                    {filteredCases.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={6} className="py-12 text-center text-slate-500 dark:text-slate-400">
-                                                No cases match your filters.
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        filteredCases.map((c) => {
-                                            const p = (c.priority || 'normal').toLowerCase();
-                                            let priorityClass = "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400";
-                                            if (p === 'critical' || p === 'urgent') priorityClass = "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400 border border-red-200 dark:border-red-900/30";
-                                            else if (p === 'high') priorityClass = "bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400 border border-orange-200 dark:border-orange-900/30";
-                                            else if (p === 'normal') priorityClass = "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400 border border-blue-100 dark:border-blue-900/20";
-                                            else if (p === 'low') priorityClass = "bg-slate-50 text-slate-600 dark:bg-slate-800/50 dark:text-slate-400 border border-slate-200 dark:border-slate-800";
+                        {/* 3. Main Data Table Section */}
+                        <motion.div variants={itemVariants} className="space-y-4 pt-2">
 
-                                            return (
-                                                <tr key={c.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors group">
-                                                    <td className="py-4 px-6">
-                                                        <div className="flex flex-col">
-                                                            <span className="font-medium text-slate-900 dark:text-white">
-                                                                {c.patient.firstName} {c.patient.lastName}
-                                                            </span>
-                                                            <span className="text-xs text-slate-500">MRN: {c.patient.mrn || "N/A"}</span>
-                                                        </div>
-                                                    </td>
-                                                    <td className="py-4 px-6">
-                                                        <span className={cn("px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wide", priorityClass)}>
-                                                            {p}
-                                                        </span>
-                                                    </td>
-                                                    <td className="py-4 px-6">
-                                                        <StatusBadge status={c.status} />
-                                                    </td>
-                                                    <td className="py-4 px-6 text-sm text-slate-500">
-                                                        {new Date(c.updatedAt).toLocaleDateString()}
-                                                    </td>
-                                                    <td className="py-4 px-6 text-right">
-                                                        <div className="flex items-center justify-end gap-2">
-                                                            <Link
-                                                                href={`/cases/${c.id}`}
-                                                                className="px-4 py-2 bg-slate-900 dark:bg-white hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-slate-900 text-xs font-bold rounded-xl shadow-md hover:shadow-lg transition-all active:scale-95"
-                                                            >
-                                                                View
-                                                            </Link>
+                            {/* Toolbar */}
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                <div className="flex items-center gap-2">
+                                    <Activity className="w-5 h-5 text-neutral-400" />
+                                    <h2 className="text-lg font-bold">Recent Assignments</h2>
+                                </div>
+
+                                <div className="flex items-center gap-3 w-full sm:w-auto">
+                                    {/* Tab Filter */}
+                                    <div className="flex p-1 rounded-lg bg-neutral-100 dark:bg-gray-900 border border-neutral-200 dark:border-slate-700/50">
+                                        {["ALL", "PENDING", "COMPLETED"].map((status) => (
+                                            <button
+                                                key={status}
+                                                onClick={() => setFilterStatus(status)}
+                                                className={cn(
+                                                    "px-3 py-1.5 text-[11px] font-bold rounded-md transition-all uppercase tracking-wide",
+                                                    filterStatus === status
+                                                        ? "bg-white dark:bg-slate-800 text-black dark:text-white shadow-sm"
+                                                        : "text-neutral-500 hover:text-black dark:hover:text-white"
+                                                )}
+                                            >
+                                                {status === "ALL" ? "All" : status}
+                                            </button>
+                                        ))}
+                                    </div>
+
+                                    {/* Priority Select */}
+                                    <div className="relative">
+                                        <select
+                                            value={filterPriority}
+                                            onChange={(e) => setFilterPriority(e.target.value)}
+                                            className="appearance-none pl-3 pr-8 py-1.5 bg-white dark:bg-gray-900 border border-neutral-200 dark:border-slate-700/50 rounded-lg text-xs font-bold text-neutral-700 dark:text-neutral-300 focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white transition-colors cursor-pointer"
+                                        >
+                                            <option value="ALL">Priority: All</option>
+                                            <option value="critical">Critical</option>
+                                            <option value="urgent">Urgent</option>
+                                            <option value="normal">Normal</option>
+                                        </select>
+                                        <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-neutral-400 pointer-events-none" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Table Card */}
+                            <div className="rounded-xl border border-neutral-200 dark:border-slate-700/50 overflow-hidden bg-white dark:bg-gray-900/20 shadow-sm">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full">
+                                        <thead>
+                                            <tr className="border-b border-neutral-200 dark:border-slate-700/50 bg-neutral-50/50 dark:bg-gray-900/50">
+                                                <th className="py-4 px-6 text-left text-[11px] font-bold text-neutral-500 uppercase tracking-widest">Patient Details</th>
+                                                <th className="py-4 px-6 text-left text-[11px] font-bold text-neutral-500 uppercase tracking-widest">Priority</th>
+                                                <th className="py-4 px-6 text-left text-[11px] font-bold text-neutral-500 uppercase tracking-widest">Status</th>
+                                                <th className="py-4 px-6 text-left text-[11px] font-bold text-neutral-500 uppercase tracking-widest">Last Updated</th>
+                                                <th className="py-4 px-6 text-right text-[11px] font-bold text-neutral-500 uppercase tracking-widest">Action</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-neutral-100 dark:divide-slate-700/30">
+                                            {filteredCases.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={5} className="py-16 text-center">
+                                                        <div className="flex flex-col items-center gap-3 opacity-50">
+                                                            <div className="p-3 rounded-full bg-neutral-100 dark:bg-gray-800">
+                                                                <Search className="w-5 h-5 text-neutral-400" />
+                                                            </div>
+                                                            <p className="text-sm font-medium text-neutral-500">No cases match your filters.</p>
                                                         </div>
                                                     </td>
                                                 </tr>
-                                            );
-                                        })
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </motion.div>
-                </>
-            )}
+                                            ) : (
+                                                filteredCases.map((c) => (
+                                                    <tr key={c.id} className="group hover:bg-neutral-50 dark:hover:bg-slate-800/30 transition-colors">
+                                                        <td className="py-4 px-6">
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="w-9 h-9 rounded-lg bg-neutral-100 dark:bg-gray-800 flex items-center justify-center text-[10px] font-bold text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-slate-700/50">
+                                                                    {c.patient.firstName[0]}{c.patient.lastName[0]}
+                                                                </div>
+                                                                <div className="flex flex-col">
+                                                                    <span className="text-sm font-bold text-black dark:text-white">
+                                                                        {c.patient.firstName} {c.patient.lastName}
+                                                                    </span>
+                                                                    <span className="text-[10px] text-neutral-500 font-mono tracking-wide">
+                                                                        MRN: {c.patient.mrn || "N/A"}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                        <td className="py-4 px-6">
+                                                            <PriorityBadge priority={c.priority} />
+                                                        </td>
+                                                        <td className="py-4 px-6">
+                                                            <StatusBadge status={c.status} />
+                                                        </td>
+                                                        <td className="py-4 px-6">
+                                                            <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
+                                                                {new Date(c.updatedAt).toLocaleDateString()}
+                                                            </span>
+                                                        </td>
+                                                        <td className="py-4 px-6 text-right">
+                                                            <Link
+                                                                href={`/cases/${c.id}`}
+                                                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-slate-700 bg-white dark:bg-transparent hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black hover:border-black dark:hover:border-white text-xs font-bold text-black dark:text-white transition-all duration-200"
+                                                            >
+                                                                Open
+                                                                <ArrowUpRight className="w-3 h-3" />
+                                                            </Link>
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </motion.div>
+                    </>
+                )}
+            </div>
         </motion.div>
     );
-}
-
-function StatCard({ title, value, icon: Icon, color, trend }: { title: string, value: number, icon: any, color: string, trend: string }) {
-    const colors: any = {
-        blue: "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400",
-        green: "bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400",
-        amber: "bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400",
-    };
-
-    return (
-        <motion.div
-            variants={itemVariants}
-            className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-lg transition-all duration-300"
-        >
-            <div className="flex justify-between items-start mb-4">
-                <div className={cn("p-3 rounded-xl", colors[color])}>
-                    <Icon size={24} />
-                </div>
-            </div>
-            <div>
-                <h3 className="text-3xl font-bold text-slate-900 dark:text-white mb-1">{value}</h3>
-                <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">{title}</p>
-                <p className="text-xs text-slate-400 mt-2">{trend}</p>
-            </div>
-        </motion.div>
-    );
-}
-
-function StatusBadge({ status }: { status: string }) {
-    if (status === "PENDING") {
-        return <span className="text-xs font-bold text-amber-600 bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400 px-2 py-1 rounded-md">Pending</span>;
-    }
-    if (status === "COMPLETED") {
-        return <span className="text-xs font-bold text-green-600 bg-green-100 dark:bg-green-900/30 dark:text-green-400 px-2 py-1 rounded-md">Completed</span>;
-    }
-    return <span className="text-xs font-bold text-slate-600 bg-slate-100 dark:bg-slate-800 dark:text-slate-400 px-2 py-1 rounded-md">{status}</span>;
 }

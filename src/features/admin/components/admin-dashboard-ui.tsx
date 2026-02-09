@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import {
     Users,
     FileText,
@@ -10,16 +11,18 @@ import {
     ShieldCheck,
     CheckCircle2,
     Clock,
-    ChevronRight,
-    Brain,
-    Search
+    Search,
+    ArrowUpRight,
+    AlertCircle
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { motion, AnimatePresence, Variants } from "framer-motion";
+import { motion, Variants } from "framer-motion";
+
+// --- PROJECT IMPORTS ---
 import { JoinRequestsList } from "@/features/admin/components/join-requests-list";
 import { PatientManagement } from "@/features/admin/components/patient-management";
-import Link from "next/link";
 
+// --- TYPES ---
 interface AdminDashboardUIProps {
     user: {
         name: string | null;
@@ -33,260 +36,233 @@ interface AdminDashboardUIProps {
     members?: any[];
 }
 
-// --- Animation Variants ---
+// --- ANIMATION ---
 const containerVariants: Variants = {
     hidden: { opacity: 0 },
     show: {
         opacity: 1,
-        transition: {
-            staggerChildren: 0.1,
-            delayChildren: 0.1
-        }
+        transition: { staggerChildren: 0.05 }
     }
 };
 
 const itemVariants: Variants = {
-    hidden: { opacity: 0, y: 20 },
+    hidden: { opacity: 0, y: 10 },
     show: {
         opacity: 1,
         y: 0,
-        transition: {
-            type: "spring",
-            stiffness: 260,
-            damping: 20
-        }
+        transition: { type: "spring", stiffness: 260, damping: 20 }
     }
 };
 
+// --- COMPONENTS ---
+
+const StatCard = ({ title, value, icon: Icon, trend, color }: any) => {
+    const colorStyles: Record<string, string> = {
+        blue: "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20",
+        green: "text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20",
+        amber: "text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20",
+    };
+
+    return (
+        <motion.div
+            variants={itemVariants}
+            className="flex flex-col justify-between p-6 rounded-2xl bg-white dark:bg-gray-900/40 border border-neutral-200 dark:border-slate-700/50 hover:border-neutral-300 dark:hover:border-slate-600 transition-all duration-200"
+        >
+            <div className="flex justify-between items-start mb-4">
+                <div className={cn("p-2.5 rounded-xl", colorStyles[color])}>
+                    <Icon className="w-5 h-5" strokeWidth={2} />
+                </div>
+                {trend && (
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500 bg-neutral-100 dark:bg-gray-800 px-2 py-1 rounded-md">
+                        {trend}
+                    </span>
+                )}
+            </div>
+            <div>
+                <h3 className="text-3xl font-bold text-black dark:text-white tracking-tight mb-1">{value}</h3>
+                <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wide">{title}</p>
+            </div>
+        </motion.div>
+    );
+};
+
+const EmptyState = () => (
+    <motion.div
+        variants={itemVariants}
+        className="flex flex-col items-center justify-center p-12 rounded-2xl bg-white dark:bg-gray-900/30 border border-neutral-200 dark:border-slate-700/50 text-center min-h-[400px]"
+    >
+        <div className="w-16 h-16 rounded-2xl bg-neutral-100 dark:bg-gray-800 flex items-center justify-center mb-6">
+            <Building2 className="w-8 h-8 text-neutral-400" strokeWidth={1.5} />
+        </div>
+        <h2 className="text-xl font-bold mb-2 text-black dark:text-white">No Active Workspace</h2>
+        <p className="text-neutral-500 max-w-sm mb-8 text-sm leading-relaxed">
+            Select a workspace to manage patients, staff, and system configurations.
+        </p>
+        <Link
+            href="/admin/workspaces"
+            className="px-6 py-2.5 bg-black dark:bg-white text-white dark:text-black rounded-full text-sm font-bold hover:opacity-90 transition-opacity"
+        >
+            Manage Workspaces
+        </Link>
+    </motion.div>
+);
+
+// --- MAIN DASHBOARD ---
+
 export function AdminDashboardUI({ user, joinRequests, workspaces, members = [] }: AdminDashboardUIProps) {
     const [searchQuery, setSearchQuery] = useState("");
+
     if (!user) return null;
+
+    // Calculate members count with safe fallback
+    const memberCount = members?.length?.toString() ||
+        workspaces.find(w => w.id === user.workspaceId)?.members?.length?.toString() || "0";
 
     return (
         <motion.div
             variants={containerVariants}
             initial="hidden"
             animate="show"
-            className="space-y-8 p-6 md:p-8 max-w-7xl mx-auto relative"
+            className="min-h-screen bg-transparent text-black dark:text-white"
         >
-            {/* Header */}
-            <motion.div variants={itemVariants} className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Admin Dashboard</h1>
-                    <p className="text-slate-500 dark:text-slate-400 mt-1">
-                        {`Welcome back, ${user.name}.`}
-                    </p>
-                </div>
-                <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 px-4 py-2.5 rounded-xl shadow-sm">
-                        <Clock size={18} className="text-blue-500" />
-                        <span className="text-sm font-medium text-slate-600 dark:text-slate-400">
-                            {new Date().toLocaleDateString('en-US', {
-                                weekday: 'long',
-                                year: 'numeric',
-                                month: 'long',
-                                day: 'numeric'
-                            })}
-                        </span>
-                    </div>
-                </div>
-            </motion.div>
+            <div className="max-w-7xl mx-auto p-6 md:p-8 space-y-8">
 
-            {!user.workspaceId ? (
-                // ==========================================
-                // EMPTY STATE (Matches Doctor Dashboard)
-                // ==========================================
-                <motion.div
-                    variants={itemVariants}
-                    className="relative overflow-hidden rounded-[2.5rem] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl shadow-slate-200/50 dark:shadow-black/40 min-h-[500px] flex flex-col items-center justify-center text-center p-8 md:p-16 group"
-                >
-                    {/* Decorative Background Elements */}
-                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,var(--tw-gradient-stops))] from-blue-50/80 via-transparent to-transparent dark:from-blue-900/10 pointer-events-none" />
-                    <div className="absolute top-0 left-0 w-full h-1" />
-
-                    {/* Icon Animation */}
-                    <div className="relative mb-8 cursor-default">
-                        {/* Glow reacts to inner hover */}
-                        <div className="absolute inset-0 bg-blue-500/20 rounded-full blur-2xl transition-all duration-500 peer-hover:bg-blue-500/30" />
-
-                        {/* Inner Icon Container */}
-                        <div className="peer relative w-28 h-28 bg-white dark:bg-slate-800 rounded-3xl shadow-lg border border-slate-100 dark:border-slate-700 flex items-center justify-center transform -rotate-3 hover:rotate-3 transition-transform duration-500 ease-out">
-                            <Building2 className="w-16 h-16 text-blue-600 dark:text-blue-400 drop-shadow-md" strokeWidth={1.5} />
-                        </div>
-                    </div>
-
-                    {/* Text Content */}
-                    <h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-4 tracking-tight max-w-lg">
-                        No Active Workspace
-                    </h2>
-                    <p className="text-slate-500 dark:text-slate-400 max-w-md mx-auto text-base leading-relaxed mb-10">
-                        Select a workspace from the sidebar to manage your team, view analytics, and handle access requests.
-                    </p>
-
-                    {/* CTA Buttons */}
-                    <div className="flex flex-col sm:flex-row gap-4 w-full justify-center">
-                        <Link href="/admin/workspaces">
-                            <button className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-8 py-3.5 rounded-xl font-bold text-sm shadow-lg shadow-blue-600/25 transition-all hover:scale-105 active:scale-95">
-                                <Building2 size={18} />
-                                Manage Workspaces
-                            </button>
-                        </Link>
-                    </div>
-                </motion.div>
-            ) : (
-                <>
-                    {/* Stats & Access Requests Grid */}
-                    <motion.div
-                        variants={containerVariants}
-                        className="grid grid-cols-1 md:grid-cols-3 gap-6"
-                    >
-                        {/* Stat: Total Members */}
-                        <StatCard
-                            title="Total Members"
-                            value={members?.length?.toString() || workspaces.find(w => w.id === user.workspaceId)?.members?.length?.toString() || "0"}
-                            icon={Users}
-                            color="blue"
-                            trend="Active members"
-                        />
-
-                        {/* Stat: System Health */}
-                        <StatCard
-                            title="System Health"
-                            value="99.9%"
-                            icon={Activity}
-                            color="green"
-                            trend="Operational"
-                        />
-
-                        {/* Access Requests Card */}
-                        <motion.div
-                            variants={itemVariants}
-                            className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-lg transition-all duration-300 overflow-hidden flex flex-col h-full"
-                        >
-
-                            <div className="p-6 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center">
-                                <h2 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                                    <ShieldCheck className="w-5 h-5 text-blue-500" />
-                                    Access Requests
-                                </h2>
-                                {joinRequests.length > 0 && (
-                                    <span className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 text-xs font-bold px-2 py-1 rounded-full">
-                                        {joinRequests.length}
-                                    </span>
-                                )}
-                            </div>
-
-                            <div className="flex-1 overflow-auto max-h-[200px] md:max-h-[160px]">
-                                {joinRequests.length === 0 ? (
-                                    <div className="h-full flex flex-col items-center justify-center p-6 text-center">
-                                        <div className="w-10 h-10 bg-green-100 dark:bg-green-900/20 rounded-full flex items-center justify-center mx-auto mb-2">
-                                            <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
-                                        </div>
-                                        <h3 className="text-sm font-semibold text-slate-900 dark:text-white">All Caught Up</h3>
-                                        <p className="text-[10px] text-slate-500">No pending requests.</p>
-                                    </div>
-                                ) : (
-                                    <div className="p-2">
-                                        <JoinRequestsList requests={joinRequests} currentUserEmail={user.email || ""} />
-                                    </div>
-                                )}
-                            </div>
-                        </motion.div>
+                {/* 1. HEADER SECTION */}
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-2">
+                    <motion.div variants={itemVariants}>
+                        <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-black dark:text-white mb-2">
+                            Admin Portal
+                        </h1>
+                        <p className="text-neutral-500 dark:text-neutral-400 text-sm md:text-base">
+                            Welcome back, <span className="text-black dark:text-white font-medium">{user.name}</span>.
+                            System status is <span className="text-emerald-600 dark:text-emerald-400 font-bold">Operational</span>.
+                        </p>
                     </motion.div>
 
-                    {/* Patient Management - Full Width Below */}
-                    <motion.div
-                        variants={itemVariants}
-                    >
-                        <PatientManagement
-                            workspaceId={user.workspaceId}
-                            searchQuery={searchQuery}
-                            headerActions={
-                                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between w-full">
+                    <motion.div variants={itemVariants} className="flex items-center gap-3">
+                        <div className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-slate-700/50 bg-white dark:bg-gray-900/50 text-xs font-semibold text-neutral-600 dark:text-neutral-300 shadow-sm">
+                            <Clock className="w-3.5 h-3.5 text-neutral-400" />
+                            {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                        </div>
+                    </motion.div>
+                </div>
 
-                                    {/* Left: Search Placeholder (Handled inside PatientManagement usually, but structure kept) */}
-                                    <div className="flex items-center gap-4 w-full md:w-auto">
-                                        <div className="relative w-full md:w-72">
-                                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-                                            <input
-                                                type="text"
-                                                placeholder="Search patients..."
-                                                value={searchQuery}
-                                                onChange={(e) => setSearchQuery(e.target.value)}
-                                                className="w-full pl-10 pr-4 py-2 rounded-xl
-                                                border border-slate-200 dark:border-slate-700
-                                                bg-slate-50 dark:bg-slate-800
-                                                text-sm text-slate-700 dark:text-slate-200
-                                                placeholder:text-slate-400
-                                                focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500
-                                                transition-all"
-                                            />
+                {!user.workspaceId ? (
+                    <EmptyState />
+                ) : (
+                    <>
+                        {/* 2. STATS & ALERTS GRID */}
+                        <motion.div variants={containerVariants} className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+                            {/* Stat: Active Members */}
+                            <StatCard
+                                title="Active Members"
+                                value={memberCount}
+                                icon={Users}
+                                color="blue"
+                                trend="Workspace Staff"
+                            />
+
+                            {/* Stat: System Health */}
+                            <StatCard
+                                title="System Health"
+                                value="99.9%"
+                                icon={Activity}
+                                color="green"
+                                trend="Stable"
+                            />
+
+                            {/* Card: Join Requests */}
+                            <motion.div
+                                variants={itemVariants}
+                                className="flex flex-col bg-white dark:bg-gray-900/40 rounded-2xl border border-neutral-200 dark:border-slate-700/50 overflow-hidden hover:border-neutral-300 dark:hover:border-slate-600 transition-all duration-200"
+                            >
+                                <div className="p-5 border-b border-neutral-100 dark:border-slate-700/50 flex justify-between items-center bg-neutral-50/50 dark:bg-gray-800/20">
+                                    <div className="flex items-center gap-2">
+                                        <div className="p-1.5 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+                                            <ShieldCheck className="w-4 h-4 text-amber-600 dark:text-amber-400" strokeWidth={2} />
                                         </div>
+                                        <span className="text-xs font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300">Access Requests</span>
+                                    </div>
+                                    {joinRequests.length > 0 && (
+                                        <span className="flex items-center justify-center w-5 h-5 bg-amber-500 text-white text-[10px] font-bold rounded-full">
+                                            {joinRequests.length}
+                                        </span>
+                                    )}
+                                </div>
+
+                                <div className="flex-1 p-0 overflow-y-auto max-h-[140px] scrollbar-thin scrollbar-thumb-neutral-200 dark:scrollbar-thumb-neutral-700">
+                                    {joinRequests.length === 0 ? (
+                                        <div className="h-full flex flex-col items-center justify-center p-6 text-center opacity-60">
+                                            <CheckCircle2 className="w-6 h-6 text-neutral-400 mb-2" />
+                                            <p className="text-xs font-medium text-neutral-500">All caught up</p>
+                                        </div>
+                                    ) : (
+                                        <div className="p-3">
+                                            <JoinRequestsList requests={joinRequests} currentUserEmail={user.email || ""} />
+                                        </div>
+                                    )}
+                                </div>
+                            </motion.div>
+                        </motion.div>
+
+                        {/* 3. PATIENT MANAGEMENT SECTION */}
+                        <motion.div variants={itemVariants} className="space-y-4 pt-2">
+
+                            {/* Custom Toolbar */}
+                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                                <div className="flex items-center gap-2">
+                                    <div className="p-2 bg-black dark:bg-white rounded-lg">
+                                        <Users className="w-4 h-4 text-white dark:text-black" />
+                                    </div>
+                                    <h2 className="text-lg font-bold">Patient Records</h2>
+                                </div>
+
+                                <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                                    {/* Search Bar */}
+                                    <div className="relative group w-full md:w-64">
+                                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400 w-4 h-4 group-focus-within:text-black dark:group-focus-within:text-white transition-colors" />
+                                        <input
+                                            type="text"
+                                            placeholder="Search by name or MRN..."
+                                            value={searchQuery}
+                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                            className="w-full pl-9 pr-4 py-2 rounded-full border border-neutral-200 dark:border-slate-700/50 bg-white dark:bg-gray-900 text-sm font-medium focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white transition-all placeholder:text-neutral-400"
+                                        />
                                     </div>
 
-                                    {/* Right: Action Buttons */}
-                                    <div className="flex gap-2 w-full md:w-auto md:ml-auto">
+                                    {/* Action Buttons */}
+                                    <div className="flex gap-2">
                                         <Link
                                             href="/admin/patients/new"
-                                            className="bg-white dark:bg-slate-800 
-                               text-slate-700 dark:text-slate-200 
-                               border border-slate-200 dark:border-slate-700 
-                               hover:bg-slate-50 dark:hover:bg-slate-700 
-                               px-3 py-2 md:px-4 md:py-2 
-                               rounded-xl font-bold text-xs md:text-sm 
-                               flex items-center gap-2 transition-all 
-                               justify-center flex-1 md:flex-none ml-80"
+                                            className="inline-flex items-center justify-center px-4 py-2 rounded-full border border-neutral-200 dark:border-slate-700 bg-white dark:bg-transparent hover:bg-neutral-50 dark:hover:bg-slate-800 text-xs font-bold text-black dark:text-white transition-all h-10"
                                         >
-                                            <UserPlus size={16} />
+                                            <UserPlus className="w-3.5 h-3.5 sm:mr-2" />
                                             <span className="hidden sm:inline">Add Patient</span>
-                                            <span className="sm:hidden">Add</span>
                                         </Link>
 
                                         <Link
                                             href="/admin/cases/new"
-                                            className="bg-blue-600 hover:bg-blue-600 
-                               text-white px-3 py-2 md:px-4 md:py-2 
-                               rounded-xl font-bold text-xs md:text-sm 
-                               flex items-center gap-2 shadow-lg 
-                               shadow-blue-600/25 transition-all 
-                               justify-center flex-1 md:flex-none"
+                                            className="inline-flex items-center justify-center px-4 py-2 rounded-full bg-black dark:bg-white text-white dark:text-black hover:opacity-90 text-xs font-bold transition-all h-10 shadow-sm"
                                         >
-                                            <FileText size={16} />
-                                            <span className="hidden sm:inline">Register Case</span>
-                                            <span className="sm:hidden">New Case</span>
+                                            <FileText className="w-3.5 h-3.5 sm:mr-2" />
+                                            <span className="hidden sm:inline">New Case</span>
                                         </Link>
                                     </div>
                                 </div>
-                            }
-                        />
-                    </motion.div>
-                </>
-            )}
-        </motion.div>
-    );
-}
+                            </div>
 
-function StatCard({ title, value, icon: Icon, color, trend }: { title: string, value: string, icon: any, color: string, trend: string }) {
-    const colors: any = {
-        blue: "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400",
-        green: "bg-green-50 text-green-600 dark:bg-green-900/20 dark:text-green-400",
-        amber: "bg-amber-50 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400",
-    };
-
-    return (
-        <motion.div
-            variants={itemVariants}
-            className="bg-white dark:bg-slate-900 rounded-2xl p-6 border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-lg transition-all duration-300"
-        >
-            <div className="flex justify-between items-start mb-4">
-                <div className={cn("p-3 rounded-xl", colors[color])}>
-                    <Icon size={24} />
-                </div>
-            </div>
-            <div>
-                <h3 className="text-3xl font-bold text-slate-900 dark:text-white mb-1">{value}</h3>
-                <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">{title}</p>
-                <p className="text-xs text-slate-400 mt-2">{trend}</p>
+                            {/* Table Wrapper */}
+                            <div className="rounded-3xl border border-neutral-200 dark:border-slate-700/50 overflow-hidden bg-white dark:bg-gray-900/20 shadow-sm">
+                                <PatientManagement
+                                    workspaceId={user.workspaceId}
+                                    searchQuery={searchQuery}
+                                    headerActions={<></>}
+                                />
+                            </div>
+                        </motion.div>
+                    </>
+                )}
             </div>
         </motion.div>
     );

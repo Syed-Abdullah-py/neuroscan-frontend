@@ -1,7 +1,7 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { Stethoscope, Shield, Eye, EyeOff, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { Stethoscope, Shield, Eye, EyeOff, Check, AlertCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useState, useActionState } from "react";
 import { registerUser } from "@/actions/auth-actions";
@@ -89,80 +89,104 @@ export function SignupForm({ currentStep, onNext, onBack, onRoleSelect, selected
     };
 
     // Common Input Styles
-    const inputClasses = "w-full bg-slate-50 dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 rounded-xl h-12 px-4 text-sm text-slate-900 dark:text-slate-100 focus:ring-2 focus:ring-blue-600 focus:border-transparent outline-none transition-all placeholder:text-slate-400 dark:placeholder:text-slate-600";
-    const errorInputClasses = "border-red-500 focus:ring-red-500";
-    const labelClasses = "text-[11px] font-bold text-slate-500 dark:text-slate-400 tracking-wider uppercase mb-2 block";
+    const inputClasses = "w-full bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 rounded-xl h-12 px-4 text-sm text-black dark:text-white focus:ring-2 focus:ring-black dark:focus:ring-white focus:ring-offset-0 focus:border-transparent outline-none transition-all placeholder:text-neutral-400";
+    const errorInputClasses = "border-neutral-900 dark:border-neutral-100";
+    const labelClasses = "text-xs font-bold text-neutral-500 tracking-wider uppercase mb-2 block";
 
     return (
         <form action={formAction} className="relative">
 
             {/* STEP 1: Role Selection */}
             {currentStep === 1 && (
-                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
-                    <h3 className="text-center text-lg font-medium text-slate-900 dark:text-white mb-6">Select your primary role</h3>
+                <div className="space-y-8">
+                    <h3 className="text-center text-lg font-bold text-black dark:text-white">
+                        Select your primary role
+                    </h3>
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Radiologist Card - BLUE */}
                         <div
                             onClick={() => onRoleSelect("radiologist")}
                             className={cn(
-                                "cursor-pointer group relative p-6 rounded-2xl border-2 transition-all duration-300",
+                                "cursor-pointer group relative p-6 rounded-2xl border-2 transition-all duration-200",
                                 selectedRole === "radiologist"
-                                    ? "border-blue-600 bg-blue-50/50 dark:bg-blue-900/10"
-                                    : "border-slate-200 dark:border-slate-800 bg-transparent hover:border-blue-300 dark:hover:border-blue-600"
+                                    ? "border-blue-500 bg-blue-50 dark:bg-blue-950/20"
+                                    : "border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 hover:border-blue-300 dark:hover:border-blue-700"
                             )}
                         >
                             <div className="flex justify-between items-start mb-4">
                                 <div className={cn(
                                     "w-12 h-12 rounded-xl flex items-center justify-center transition-colors",
                                     selectedRole === "radiologist"
-                                        ? "bg-blue-600 text-white"
-                                        : "bg-slate-100 dark:bg-slate-800 text-blue-500 dark:text-blue-400 group-hover:bg-blue-100 dark:group-hover:bg-blue-900/30 group-hover:text-blue-600"
+                                        ? "bg-blue-500 text-white"
+                                        : "bg-neutral-100 dark:bg-neutral-800 text-blue-500"
                                 )}>
-                                    <Stethoscope className="w-6 h-6" />
+                                    <Stethoscope className="w-6 h-6" strokeWidth={2} />
                                 </div>
-                                {selectedRole === "radiologist" && <CheckCircle2 className="text-blue-600" size={24} />}
+                                {selectedRole === "radiologist" && (
+                                    <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center">
+                                        <Check className="w-4 h-4 text-white" strokeWidth={2.5} />
+                                    </div>
+                                )}
                             </div>
-                            <h4 className={cn("font-bold text-sm mb-2", selectedRole === "radiologist" ? "text-blue-700 dark:text-blue-400" : "text-slate-900 dark:text-white")}>
+                            <h4 className={cn(
+                                "font-bold text-sm mb-2",
+                                selectedRole === "radiologist"
+                                    ? "text-blue-700 dark:text-blue-400"
+                                    : "text-black dark:text-white"
+                            )}>
                                 Radiologist / Doctor
                             </h4>
-                            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                            <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed">
                                 Join a workspace to access scans, analysis tools, and patient reporting workflows.
                             </p>
                         </div>
 
+                        {/* Admin Card - PINK/PURPLE */}
                         <div
                             onClick={() => onRoleSelect("admin")}
                             className={cn(
-                                "cursor-pointer group relative p-6 rounded-2xl border-2 transition-all duration-300",
+                                "cursor-pointer group relative p-6 rounded-2xl border-2 transition-all duration-200",
                                 selectedRole === "admin"
-                                    ? "border-purple-600 bg-purple-50/50 dark:bg-purple-900/10"
-                                    : "border-slate-200 dark:border-slate-800 bg-transparent hover:border-purple-300 dark:hover:border-purple-400"
+                                    ? "border-pink-500 bg-pink-50 dark:bg-pink-950/20"
+                                    : "border-neutral-200 dark:border-neutral-800 bg-white dark:bg-neutral-950 hover:border-pink-300 dark:hover:border-pink-700"
                             )}
                         >
                             <div className="flex justify-between items-start mb-4">
                                 <div className={cn(
                                     "w-12 h-12 rounded-xl flex items-center justify-center transition-colors",
                                     selectedRole === "admin"
-                                        ? "bg-purple-600 text-white"
-                                        : "bg-slate-100 dark:bg-slate-800 text-purple-600 dark:text-purple-400 group-hover:bg-purple-100 dark:group-hover:bg-purple-900/30 group-hover:text-purple-600"
+                                        ? "bg-pink-500 text-white"
+                                        : "bg-neutral-100 dark:bg-neutral-800 text-pink-500"
                                 )}>
-                                    <Shield className="w-6 h-6" />
+                                    <Shield className="w-6 h-6" strokeWidth={2} />
                                 </div>
-                                {selectedRole === "admin" && <CheckCircle2 className="text-purple-600" size={24} />}
+                                {selectedRole === "admin" && (
+                                    <div className="w-6 h-6 rounded-full bg-pink-500 flex items-center justify-center">
+                                        <Check className="w-4 h-4 text-white" strokeWidth={2.5} />
+                                    </div>
+                                )}
                             </div>
-                            <h4 className={cn("font-bold text-sm mb-2", selectedRole === "admin" ? "text-purple-700 dark:text-purple-400" : "text-slate-900 dark:text-white")}>
+                            <h4 className={cn(
+                                "font-bold text-sm mb-2",
+                                selectedRole === "admin"
+                                    ? "text-pink-700 dark:text-pink-400"
+                                    : "text-black dark:text-white"
+                            )}>
                                 Administrator
                             </h4>
-                            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                            <p className="text-xs text-neutral-600 dark:text-neutral-400 leading-relaxed">
                                 Create and manage workspaces, teams, permissions, and billing.
                             </p>
                         </div>
                     </div>
-                    <div className="pt-6 flex justify-end items-center border-t border-slate-100 dark:border-white/5 mt-8">
+
+                    <div className="pt-6 flex justify-end items-center border-t border-neutral-200 dark:border-neutral-800">
                         <button
                             type="button"
                             onClick={onNext}
                             disabled={!selectedRole}
-                            className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-8 py-3 rounded-xl text-sm font-semibold shadow-lg shadow-blue-600/20 hover:shadow-blue-600/40 transition-all transform hover:-translate-y-0.5 active:scale-95"
+                            className="bg-black dark:bg-white hover:bg-neutral-800 dark:hover:bg-neutral-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-black dark:disabled:hover:bg-white text-white dark:text-black px-8 py-3 rounded-xl text-sm font-semibold transition-all active:scale-95"
                         >
                             Continue
                         </button>
@@ -170,10 +194,11 @@ export function SignupForm({ currentStep, onNext, onBack, onRoleSelect, selected
                 </div>
             )}
 
+            {/* STEP 2: Form Details */}
             {currentStep === 2 && (
-                <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                <div className="space-y-5">
 
-                    <div className="grid grid-cols-2 gap-5">
+                    <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className={labelClasses}>First Name</label>
                             <input
@@ -184,7 +209,11 @@ export function SignupForm({ currentStep, onNext, onBack, onRoleSelect, selected
                                 placeholder="e.g. Jane"
                                 required
                             />
-                            {errors.firstName && <p className="text-xs text-red-500 mt-1 font-medium animate-in slide-in-from-top-1">{errors.firstName}</p>}
+                            {errors.firstName && (
+                                <p className="text-xs font-medium mt-1 text-neutral-600 dark:text-neutral-400">
+                                    {errors.firstName}
+                                </p>
+                            )}
                         </div>
                         <div>
                             <label className={labelClasses}>Last Name</label>
@@ -196,7 +225,11 @@ export function SignupForm({ currentStep, onNext, onBack, onRoleSelect, selected
                                 placeholder="e.g. Doe"
                                 required
                             />
-                            {errors.lastName && <p className="text-xs text-red-500 mt-1 font-medium animate-in slide-in-from-top-1">{errors.lastName}</p>}
+                            {errors.lastName && (
+                                <p className="text-xs font-medium mt-1 text-neutral-600 dark:text-neutral-400">
+                                    {errors.lastName}
+                                </p>
+                            )}
                         </div>
                     </div>
 
@@ -212,11 +245,18 @@ export function SignupForm({ currentStep, onNext, onBack, onRoleSelect, selected
                                 placeholder="doctor@hospital.org"
                                 required
                             />
-                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="4" width="20" height="16" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" /></svg>
+                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <rect x="2" y="4" width="20" height="16" rx="2" />
+                                    <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+                                </svg>
                             </div>
                         </div>
-                        {errors.email && <p className="text-xs text-red-500 mt-1 font-medium animate-in slide-in-from-top-1">{errors.email}</p>}
+                        {errors.email && (
+                            <p className="text-xs font-medium mt-1 text-neutral-600 dark:text-neutral-400">
+                                {errors.email}
+                            </p>
+                        )}
                     </div>
 
                     <div>
@@ -235,12 +275,16 @@ export function SignupForm({ currentStep, onNext, onBack, onRoleSelect, selected
                             <button
                                 type="button"
                                 onClick={() => setShowPass(!showPass)}
-                                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
+                                className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-black dark:hover:text-white transition-colors"
                             >
-                                {showPass ? <EyeOff size={18} /> : <Eye size={18} />}
+                                {showPass ? <EyeOff size={18} strokeWidth={2} /> : <Eye size={18} strokeWidth={2} />}
                             </button>
                         </div>
-                        {errors.password && <p className="text-xs text-red-500 mt-1 font-medium animate-in slide-in-from-top-1">{errors.password}</p>}
+                        {errors.password && (
+                            <p className="text-xs font-medium mt-1 text-neutral-600 dark:text-neutral-400">
+                                {errors.password}
+                            </p>
+                        )}
                     </div>
 
                     <div>
@@ -254,51 +298,64 @@ export function SignupForm({ currentStep, onNext, onBack, onRoleSelect, selected
                             placeholder="••••••••"
                             required
                         />
-                        {errors.confirmPassword && <p className="text-xs text-red-500 mt-1 font-medium animate-in slide-in-from-top-1">{errors.confirmPassword}</p>}
+                        {errors.confirmPassword && (
+                            <p className="text-xs font-medium mt-1 text-neutral-600 dark:text-neutral-400">
+                                {errors.confirmPassword}
+                            </p>
+                        )}
                     </div>
 
                     <div className="py-2">
-                        <label className="flex items-center gap-3 cursor-pointer group">
+                        <label className="flex items-start gap-3 cursor-pointer group">
                             <input
                                 type="checkbox"
                                 name="termsAccepted"
                                 checked={formData.termsAccepted}
                                 onChange={handleInputChange}
-                                className="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-600 cursor-pointer"
+                                className="mt-0.5 w-4 h-4 rounded border-neutral-300 dark:border-neutral-700 text-black dark:text-white focus:ring-black dark:focus:ring-white cursor-pointer"
                                 required
                             />
-                            <span className="text-sm text-slate-600 dark:text-slate-400 group-hover:text-slate-900 dark:group-hover:text-slate-200 transition-colors">
-                                I agree to the <Link href="/terms" className="text-blue-600 hover:underline">Terms of Service</Link> and <Link href="/privacy" className="text-blue-600 hover:underline">Privacy Policy</Link>
+                            <span className="text-sm text-neutral-600 dark:text-neutral-400 group-hover:text-black dark:group-hover:text-white transition-colors">
+                                I agree to the{" "}
+                                <Link href="/terms" className="underline hover:text-black dark:hover:text-white">
+                                    Terms of Service
+                                </Link>
+                                {" "}and{" "}
+                                <Link href="/privacy" className="underline hover:text-black dark:hover:text-white">
+                                    Privacy Policy
+                                </Link>
                             </span>
                         </label>
-                        {errors.termsAccepted && <p className="text-xs text-red-500 mt-1 font-medium pl-8 animate-in slide-in-from-top-1">{errors.termsAccepted}</p>}
+                        {errors.termsAccepted && (
+                            <p className="text-xs font-medium mt-1 pl-7 text-neutral-600 dark:text-neutral-400">
+                                {errors.termsAccepted}
+                            </p>
+                        )}
                     </div>
 
-                    <div className="pt-4 flex items-center justify-between border-t border-slate-100 dark:border-white/5 mt-8">
-                        <div className="flex gap-4 w-full justify-between items-center">
-                            <button
-                                type="button"
-                                onClick={onBack}
-                                className="text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white text-sm font-medium transition-colors"
-                            >
-                                Back
-                            </button>
+                    <div className="pt-4 flex items-center justify-between border-t border-neutral-200 dark:border-neutral-800 mt-6">
+                        <button
+                            type="button"
+                            onClick={onBack}
+                            className="text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white text-sm font-medium transition-colors"
+                        >
+                            Back
+                        </button>
 
-                            <button
-                                type="submit"
-                                disabled={isPending || !isFormValid()}
-                                className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-blue-600 text-white px-8 py-3 rounded-xl text-sm font-semibold shadow-lg shadow-blue-600/20 hover:shadow-blue-600/40 transition-all transform hover:-translate-y-0.5 active:scale-95 disabled:active:scale-100 disabled:hover:translate-y-0 flex items-center gap-2"
-                            >
-                                {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : "Create Account"}
-                            </button>
-                        </div>
+                        <button
+                            type="submit"
+                            disabled={isPending || !isFormValid()}
+                            className="bg-black dark:bg-white hover:bg-neutral-800 dark:hover:bg-neutral-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-black dark:disabled:hover:bg-white text-white dark:text-black px-8 py-3 rounded-xl text-sm font-semibold transition-all active:scale-95 disabled:active:scale-100 flex items-center gap-2"
+                        >
+                            {isPending ? <Loader2 className="w-4 h-4 animate-spin" strokeWidth={2} /> : "Create Account"}
+                        </button>
                     </div>
 
                     {/* Server Error Display */}
                     {state?.message && (
-                        <div className="mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-600 dark:text-red-400 text-sm flex items-center justify-center gap-2">
-                            <AlertCircle className="w-4 h-4" />
-                            {state.message}
+                        <div className="mt-4 p-4 bg-neutral-50 dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-xl text-sm flex items-center gap-3">
+                            <AlertCircle className="w-5 h-5 shrink-0" strokeWidth={2} />
+                            <span className="font-medium">{state.message}</span>
                         </div>
                     )}
 

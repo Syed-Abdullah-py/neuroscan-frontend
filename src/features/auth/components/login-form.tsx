@@ -4,7 +4,7 @@ import { useState, useActionState } from "react";
 import { loginUser } from "@/actions/auth-actions";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Mail, Lock, ArrowRight, Loader2, AlertCircle } from "lucide-react";
+import { Mail, Lock, ArrowRight, Loader2, AlertCircle, Check } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 
@@ -71,22 +71,28 @@ export function LoginForm() {
 
     return (
         <div className="space-y-6">
+            {/* Success Message */}
             {isSuccess && (
-                <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg text-green-600 dark:text-green-400 text-sm text-center">
-                    Account created! Please log in.
+                <div className="p-4 bg-neutral-50 dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 rounded-xl text-sm flex items-center gap-3">
+                    <div className="w-5 h-5 rounded-full bg-black dark:bg-white flex items-center justify-center shrink-0">
+                        <Check className="w-3 h-3 text-white dark:text-black" strokeWidth={2.5} />
+                    </div>
+                    <span className="font-medium">Account created! Please log in.</span>
                 </div>
             )}
 
+            {/* Error Message */}
             {state?.message && (
-                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-600 dark:text-red-400 text-sm flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4" />
-                    {state.message}
+                <div className="p-4 bg-neutral-50 dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-xl text-sm flex items-center gap-3">
+                    <AlertCircle className="w-5 h-5 shrink-0" strokeWidth={2} />
+                    <span className="font-medium">{state.message}</span>
                 </div>
             )}
 
-            <form action={handleSubmit} className="space-y-6">
+            <form action={handleSubmit} className="space-y-5">
+                {/* Email Field */}
                 <div className="space-y-2">
-                    <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 tracking-wider uppercase ml-1">
+                    <label className="text-xs font-bold text-neutral-500 tracking-wider uppercase ml-1">
                         Email Address
                     </label>
                     <Input
@@ -99,26 +105,37 @@ export function LoginForm() {
                             validateField("email", val);
                         }}
                         placeholder="doctor@hospital.org"
-                        icon={<Mail className="w-4 h-4 text-slate-400" />}
-                        className={`bg-slate-50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 h-12 rounded-xl focus-visible:ring-blue-600 ${errors.email ? "border-red-500 focus-visible:ring-red-500" : ""
-                            }`}
+                        icon={<Mail className="w-4 h-4 text-neutral-400" strokeWidth={2} />}
+                        className={`
+                            bg-white dark:bg-neutral-950 
+                            border-neutral-200 dark:border-neutral-800 
+                            text-black dark:text-white 
+                            placeholder:text-neutral-400 
+                            h-12 rounded-xl 
+                            focus-visible:ring-2 
+                            focus-visible:ring-black dark:focus-visible:ring-white
+                            focus-visible:ring-offset-0
+                            transition-all
+                            ${errors.email ? "border-neutral-900 dark:border-neutral-100" : ""}
+                        `}
                         required
                     />
                     {errors.email && (
-                        <p className="text-xs text-red-500 font-medium ml-1 animate-in slide-in-from-top-1 fade-in duration-200">
+                        <p className="text-xs font-medium ml-1 text-neutral-600 dark:text-neutral-400">
                             {errors.email}
                         </p>
                     )}
                 </div>
 
+                {/* Password Field */}
                 <div className="space-y-2">
                     <div className="flex items-center justify-between ml-1">
-                        <label className="text-[11px] font-bold text-slate-500 dark:text-slate-400 tracking-wider uppercase">
+                        <label className="text-xs font-bold text-neutral-500 tracking-wider uppercase">
                             Password
                         </label>
                         <Link
                             href="#"
-                            className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500 hover:underline"
+                            className="text-xs font-medium hover:text-neutral-600 dark:hover:text-neutral-400 transition-colors underline"
                         >
                             Forgot Password?
                         </Link>
@@ -133,26 +150,51 @@ export function LoginForm() {
                             validateField("password", val);
                         }}
                         placeholder="••••••••"
-                        icon={<Lock className="w-4 h-4 text-slate-400" />}
-                        className={`bg-slate-50 dark:bg-slate-950/50 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 placeholder:text-slate-400 h-12 rounded-xl focus-visible:ring-blue-600 ${errors.password ? "border-red-500 focus-visible:ring-red-500" : ""
-                            }`}
+                        icon={<Lock className="w-4 h-4 text-neutral-400" strokeWidth={2} />}
+                        className={`
+                            bg-white dark:bg-neutral-950 
+                            border-neutral-200 dark:border-neutral-800 
+                            text-black dark:text-white 
+                            placeholder:text-neutral-400 
+                            h-12 rounded-xl 
+                            focus-visible:ring-2 
+                            focus-visible:ring-black dark:focus-visible:ring-white
+                            focus-visible:ring-offset-0
+                            transition-all
+                            ${errors.password ? "border-neutral-900 dark:border-neutral-100" : ""}
+                        `}
                         required
                     />
                     {errors.password && (
-                        <p className="text-xs text-red-500 font-medium ml-1 animate-in slide-in-from-top-1 fade-in duration-200">
+                        <p className="text-xs font-medium ml-1 text-neutral-600 dark:text-neutral-400">
                             {errors.password}
                         </p>
                     )}
                 </div>
 
+                {/* Submit Button */}
                 <Button
                     type="submit"
                     disabled={isPending}
-                    className="w-full bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/20 h-12 text-sm font-semibold rounded-xl transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                    className="
+                        w-full 
+                        bg-black dark:bg-white 
+                        hover:bg-neutral-800 dark:hover:bg-neutral-200
+                        text-white dark:text-black 
+                        h-12 
+                        text-sm 
+                        font-semibold 
+                        rounded-xl 
+                        transition-all 
+                        active:scale-[0.98]
+                        flex items-center justify-center gap-2
+                        disabled:opacity-50
+                        disabled:cursor-not-allowed
+                    "
                 >
-                    {isPending && <Loader2 className="w-4 h-4 animate-spin" />}
+                    {isPending && <Loader2 className="w-4 h-4 animate-spin" strokeWidth={2} />}
                     {isPending ? "Signing In..." : "Sign In"}
-                    {!isPending && <ArrowRight className="w-4 h-4" />}
+                    {!isPending && <ArrowRight className="w-4 h-4" strokeWidth={2} />}
                 </Button>
             </form>
         </div>
