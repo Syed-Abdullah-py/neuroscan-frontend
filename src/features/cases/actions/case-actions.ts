@@ -16,6 +16,11 @@ export async function createCase(data: {
     const token = await getAuthToken();
     if (!token) throw new Error("Unauthorized");
 
+    const user = await getCurrentUser();
+    if (!user || (user.role !== 'admin' && user.role !== 'owner')) {
+        throw new Error("Unauthorized: Only Admins or Owners can create cases");
+    }
+
     try {
         const response = await fetch(`${AUTH_SERVICE_URL}/cases`, {
             method: "POST",
@@ -40,6 +45,7 @@ export async function createCase(data: {
 
         const newCase = await response.json();
         revalidatePath(`/admin`);
+        revalidatePath(`/admin/cases`);
         revalidatePath(`/doctor`);
         return newCase;
     } catch (error) {
@@ -105,7 +111,8 @@ export async function getAssignedCases() {
             headers: {
                 Authorization: `Bearer ${token}`,
                 "X-Workspace-Id": user.workspaceId
-            }
+            },
+            cache: 'no-store'
         });
 
         if (!response.ok) return [];
@@ -125,7 +132,8 @@ export async function getDoctorsForDropdown(workspaceId: string) {
         const response = await fetch(`${AUTH_SERVICE_URL}/workspaces/${workspaceId}/members`, {
             headers: {
                 Authorization: `Bearer ${token}`
-            }
+            },
+            cache: 'no-store'
         });
 
         if (!response.ok) return [];
@@ -161,7 +169,8 @@ export async function getAllCasesForWorkspace(workspaceId: string) {
             headers: {
                 Authorization: `Bearer ${token}`,
                 "X-Workspace-Id": workspaceId
-            }
+            },
+            cache: 'no-store'
         });
 
         if (!response.ok) throw new Error("Failed to fetch cases");
@@ -188,7 +197,8 @@ export async function getCaseById(caseId: string) {
         if (workspaceId) headers["X-Workspace-Id"] = workspaceId;
 
         const response = await fetch(`${AUTH_SERVICE_URL}/cases/${caseId}`, {
-            headers
+            headers,
+            cache: 'no-store'
         });
 
         if (!response.ok) return null;

@@ -252,12 +252,28 @@ export async function getUserWorkspaces() {
     }
 
     const memberships = await response.json();
+    console.log('[Auth] getUserWorkspaces - memberships:', memberships);
     const cookieStore = await cookies();
     const activeWorkspaceId = cookieStore.get("active_workspace")?.value;
+    console.log('[Auth] getUserWorkspaces - activeWorkspaceId from cookie:', activeWorkspaceId);
 
     // Resolve which one is actually active: Cookie (if valid) > First available
     const activeMember = memberships.find((m: any) => m.workspace_id === activeWorkspaceId) || memberships[0];
     const resolvedActiveId = activeMember?.workspace_id;
+    console.log('[Auth] getUserWorkspaces - resolvedActiveId:', resolvedActiveId);
+
+    // IMPORTANT: If no cookie was set, persist the resolved workspace ID
+    // This ensures subsequent requests have a valid workspace context
+    if (!activeWorkspaceId && resolvedActiveId) {
+      console.log('[Auth] getUserWorkspaces - Setting active_workspace cookie to:', resolvedActiveId);
+      cookieStore.set("active_workspace", resolvedActiveId, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        maxAge: 60 * 60 * 24 * 30, // 30 days
+        path: "/",
+        sameSite: "lax",
+      });
+    }
 
     return memberships.map((m: any) => ({
       id: m.workspace_id,

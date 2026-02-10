@@ -37,7 +37,8 @@ export async function checkPatientByPhone(phoneNumber: string, workspaceId: stri
         };
 
         const response = await fetch(`${AUTH_SERVICE_URL}/patients?phone_number=${encodeURIComponent(phoneNumber)}`, {
-            headers
+            headers,
+            cache: 'no-store'
         });
 
         if (!response.ok) return [];
@@ -99,6 +100,7 @@ export async function createPatient(data: {
 
         const patient = await response.json();
         revalidatePath(`/admin`);
+        revalidatePath(`/admin/patients`);
         return mapPatient(patient);
     } catch (error) {
         console.error("Create Patient Error:", error);
@@ -155,6 +157,7 @@ export async function updatePatient(id: string, data: Partial<{
 
         const patient = await response.json();
         revalidatePath(`/admin`);
+        revalidatePath(`/admin/patients`);
         return mapPatient(patient);
     } catch (error) {
         console.error("Update Patient Error:", error);
@@ -163,10 +166,14 @@ export async function updatePatient(id: string, data: Partial<{
 }
 
 export async function getAllPatients(workspaceId: string) {
+    console.log('[getAllPatients] Called with workspaceId:', workspaceId)
     const user = await getCurrentUser()
     const token = await getAuthToken()
 
-    if (!user || !token || (user.role !== 'admin' && user.role !== 'owner')) {
+    console.log('[getAllPatients] User:', user?.email, 'Role:', user?.role)
+
+    if (!user || !token) {
+        console.error('[getAllPatients] Unauthorized - no user or token')
         throw new Error("Unauthorized")
     }
 
@@ -176,13 +183,26 @@ export async function getAllPatients(workspaceId: string) {
             "X-Workspace-Id": workspaceId
         };
 
+        console.log('[getAllPatients] Fetching from:', `${AUTH_SERVICE_URL}/patients`)
+        console.log('[getAllPatients] Headers:', { ...headers, Authorization: 'Bearer [REDACTED]' })
+
         const response = await fetch(`${AUTH_SERVICE_URL}/patients`, {
-            headers
+            headers,
+            cache: 'no-store'
         });
 
-        if (!response.ok) throw new Error("Failed to fetch patients");
+        console.log('[getAllPatients] Response status:', response.status)
+
+        if (!response.ok) {
+            const errorText = await response.text()
+            console.error('[getAllPatients] Error response:', errorText)
+            throw new Error("Failed to fetch patients");
+        }
 
         const patients = await response.json();
+        console.log('[getAllPatients] Raw response:', JSON.stringify(patients))
+        console.log('[getAllPatients] Response type:', typeof patients, 'isArray:', Array.isArray(patients))
+        console.log('[getAllPatients] Received', patients?.length, 'patients from backend')
         return Array.isArray(patients) ? patients.map(mapPatient) : [];
     } catch (error) {
         console.error("Get All Patients Error:", error);
@@ -217,6 +237,7 @@ export async function deletePatient(id: string) {
         }
 
         revalidatePath(`/admin`);
+        revalidatePath(`/admin/patients`);
     } catch (error) {
         console.error("Delete Patient Error:", error);
         throw error;

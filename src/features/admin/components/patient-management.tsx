@@ -19,9 +19,19 @@ export function PatientManagement({ workspaceId, headerActions, searchQuery }: {
     }, [workspaceId])
 
     const loadHeader = async () => {
+        console.log('[PatientManagement] loadHeader called, workspaceId:', workspaceId)
+        if (!workspaceId) {
+            console.warn('[PatientManagement] No workspaceId provided, skipping patient load')
+            setLoading(false)
+            return
+        }
         try {
+            console.log('[PatientManagement] Loading patients for workspace:', workspaceId)
             const data = await getAllPatients(workspaceId)
+            console.log('[PatientManagement] Loaded patients:', data?.length, 'patients')
             setPatients(data)
+        } catch (error) {
+            console.error('[PatientManagement] Error loading patients:', error)
         } finally {
             setLoading(false)
         }
