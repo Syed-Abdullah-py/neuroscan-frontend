@@ -288,14 +288,14 @@ export function DoctorDashboardUI({ stats, recentCases, user, workspaces }: Doct
                                                         <td className="py-4 px-6">
                                                             <div className="flex items-center gap-3">
                                                                 <div className="w-9 h-9 rounded-lg bg-neutral-100 dark:bg-gray-800 flex items-center justify-center text-[10px] font-bold text-neutral-600 dark:text-neutral-400 border border-neutral-200 dark:border-slate-700/50">
-                                                                    {c.patient.firstName[0]}{c.patient.lastName[0]}
+                                                                    {c.patient?.first_name?.[0] ?? "?"}{c.patient?.last_name?.[0] ?? ""}
                                                                 </div>
                                                                 <div className="flex flex-col">
                                                                     <span className="text-sm font-bold text-black dark:text-white">
-                                                                        {c.patient.firstName} {c.patient.lastName}
+                                                                        {c.patient?.first_name ?? "Unknown"} {c.patient?.last_name ?? ""}
                                                                     </span>
                                                                     <span className="text-[10px] text-neutral-500 font-mono tracking-wide">
-                                                                        MRN: {c.patient.mrn || "N/A"}
+                                                                        MRN: {c.patient?.mrn || "N/A"}
                                                                     </span>
                                                                 </div>
                                                             </div>
@@ -308,7 +308,7 @@ export function DoctorDashboardUI({ stats, recentCases, user, workspaces }: Doct
                                                         </td>
                                                         <td className="py-4 px-6">
                                                             <span className="text-xs font-medium text-neutral-500 dark:text-neutral-400">
-                                                                {new Date(c.updatedAt).toLocaleDateString()}
+                                                                {new Date(c.updatedAt || c.updated_at).toLocaleDateString()}
                                                             </span>
                                                         </td>
                                                         <td className="py-4 px-6 text-right">

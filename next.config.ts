@@ -4,7 +4,7 @@ const nextConfig: NextConfig = {
   /* config options here */
   experimental: {
     serverActions: {
-      bodySizeLimit: '10mb', // Increase to 10MB for profile picture uploads
+      bodySizeLimit: '500mb', // Increased for large medical file uploads
     },
   },
 };

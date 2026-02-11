@@ -262,17 +262,22 @@ export async function getUserWorkspaces() {
     const resolvedActiveId = activeMember?.workspace_id;
     console.log('[Auth] getUserWorkspaces - resolvedActiveId:', resolvedActiveId);
 
-    // IMPORTANT: If no cookie was set, persist the resolved workspace ID
-    // This ensures subsequent requests have a valid workspace context
+    // IMPORTANT: If no cookie was set, try to persist the resolved workspace ID.
+    // This may fail in Server Component context (cookies are read-only there),
+    // so we wrap it in a try-catch and let it succeed silently.
     if (!activeWorkspaceId && resolvedActiveId) {
-      console.log('[Auth] getUserWorkspaces - Setting active_workspace cookie to:', resolvedActiveId);
-      cookieStore.set("active_workspace", resolvedActiveId, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        maxAge: 60 * 60 * 24 * 30, // 30 days
-        path: "/",
-        sameSite: "lax",
-      });
+      try {
+        cookieStore.set("active_workspace", resolvedActiveId, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === "production",
+          maxAge: 60 * 60 * 24 * 30, // 30 days
+          path: "/",
+          sameSite: "lax",
+        });
+      } catch {
+        // Called from a Server Component — cookie is read-only here, that's fine.
+        // The active workspace is still resolved from memberships for this request.
+      }
     }
 
     return memberships.map((m: any) => ({

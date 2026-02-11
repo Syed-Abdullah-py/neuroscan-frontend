@@ -46,7 +46,6 @@ interface CaseDetailsViewProps {
 }
 
 export function CaseDetailsView({ caseItem, user, aiData, isDoctor, isAssignedDoctor }: CaseDetailsViewProps) {
-
     const renderPriorityBadge = (priority: string) => {
         const p = (priority || 'normal').toLowerCase();
         let className = "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-400";
@@ -88,7 +87,7 @@ export function CaseDetailsView({ caseItem, user, aiData, isDoctor, isAssignedDo
                             </div>
                             <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
                                 <Calendar size={14} />
-                                <span>Created {new Date(caseItem.createdAt).toLocaleDateString()}</span>
+                                <span>Created {new Date(caseItem.created_at).toLocaleDateString()}</span>
                             </div>
                         </div>
                     </div>
@@ -126,21 +125,21 @@ export function CaseDetailsView({ caseItem, user, aiData, isDoctor, isAssignedDo
                                 <div className="space-y-4">
                                     <div>
                                         <p className="text-lg font-semibold text-slate-900 dark:text-white">
-                                            {caseItem.patient.firstName} {caseItem.patient.lastName}
+                                            {caseItem.patient?.first_name ?? "Unknown"} {caseItem.patient?.last_name ?? ""}
                                         </p>
-                                        <p className="text-sm text-slate-500">MRN: {caseItem.patient.id.slice(0, 8)}</p>
+                                        <p className="text-sm text-slate-500">MRN: {caseItem.patient?.id?.slice(0, 8) ?? "N/A"}</p>
                                     </div>
                                     <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
                                         <div className="flex items-center justify-between mb-2">
                                             <span className="text-sm text-slate-500">Contact</span>
                                             <span className="text-sm font-medium text-slate-900 dark:text-white flex items-center gap-2">
-                                                <Phone size={14} /> {caseItem.patient.phoneNumber}
+                                                <Phone size={14} /> {caseItem.patient?.phone_number ?? "N/A"}
                                             </span>
                                         </div>
                                         <div className="flex items-center justify-between">
                                             <span className="text-sm text-slate-500">Assigned To</span>
                                             <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
-                                                Dr. {caseItem.assignedTo?.user?.name || "Unassigned"}
+                                                {caseItem.assigned_to_member_id ? "Assigned" : "Unassigned"}
                                             </span>
                                         </div>
                                     </div>
@@ -235,7 +234,7 @@ export function CaseDetailsView({ caseItem, user, aiData, isDoctor, isAssignedDo
                                 <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-950/50 rounded-lg border border-slate-100 dark:border-slate-800">
                                     <span className="text-sm text-slate-600 dark:text-slate-400">Last Update</span>
                                     <span className="text-sm font-medium text-slate-900 dark:text-white">
-                                        {new Date(caseItem.updatedAt).toLocaleDateString()}
+                                        {new Date(caseItem.updated_at).toLocaleDateString()}
                                     </span>
                                 </div>
                             </div>

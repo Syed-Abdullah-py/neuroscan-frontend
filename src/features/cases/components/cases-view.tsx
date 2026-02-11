@@ -12,20 +12,16 @@ type Case = {
     status: string;
     priority: string;
     notes: string | null;
-    createdAt: Date;
-    updatedAt: Date;
+    created_at: string;
+    updated_at: string;
     verdict: string | null;
     patient: {
         id: string;
-        firstName: string;
-        lastName: string;
-        phoneNumber: string;
-    };
-    assignedTo: {
-        user: {
-            name: string;
-        };
+        first_name: string;
+        last_name: string;
+        phone_number: string;
     } | null;
+    assigned_to_member_id: string | null;
 };
 
 // --- Animation Variants ---
@@ -164,9 +160,9 @@ export function CasesView({ workspaceId }: { workspaceId: string }) {
                                                 </div>
                                                 <div>
                                                     <p className="font-bold text-slate-900 dark:text-white">
-                                                        {caseItem.patient.firstName} {caseItem.patient.lastName}
+                                                        {caseItem.patient?.first_name ?? "Unknown"} {caseItem.patient?.last_name ?? ""}
                                                     </p>
-                                                    <p className="text-xs text-slate-500">{caseItem.patient.phoneNumber}</p>
+                                                    <p className="text-xs text-slate-500">{caseItem.patient?.phone_number ?? "N/A"}</p>
                                                 </div>
                                             </div>
                                         </td>
@@ -177,11 +173,11 @@ export function CasesView({ workspaceId }: { workspaceId: string }) {
                                             {getStatusBadge(caseItem.status)}
                                         </td>
                                         <td className="px-6 py-4">
-                                            {caseItem.assignedTo ? (
+                                            {caseItem.assigned_to_member_id ? (
                                                 <div className="flex items-center gap-2">
                                                     <Stethoscope size={14} className="text-slate-400" />
                                                     <span className="text-sm text-slate-700 dark:text-slate-300">
-                                                        Dr. {caseItem.assignedTo.user.name || 'Unknown'}
+                                                        Assigned
                                                     </span>
                                                 </div>
                                             ) : (
@@ -191,7 +187,7 @@ export function CasesView({ workspaceId }: { workspaceId: string }) {
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-2 text-sm text-slate-500">
                                                 <Calendar size={14} />
-                                                {new Date(caseItem.createdAt).toLocaleDateString()}
+                                                {new Date(caseItem.created_at).toLocaleDateString()}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-right">

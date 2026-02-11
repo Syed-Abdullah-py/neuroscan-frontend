@@ -47,7 +47,8 @@ export function CreateCaseWizard({ workspaceId, onSuccess, mode = 'case' }: { wo
 
     // Files
     const [files, setFiles] = useState<File[]>([])
-    const [validationResult, setValidationResult] = useState<any>(null)
+    const [uploadedFileRefs, setUploadedFileRefs] = useState<any[]>([])
+    const [uploading, setUploading] = useState(false)
 
     // Case Details
     const [caseDetails, setCaseDetails] = useState({
@@ -132,33 +133,33 @@ export function CreateCaseWizard({ workspaceId, onSuccess, mode = 'case' }: { wo
 
     // Step 3: File Upload
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files) {
+        if (e.target.files && e.target.files.length > 0) {
             const selectedFiles = Array.from(e.target.files)
             setFiles(selectedFiles)
+            setUploading(true)
+            setError(null)
 
-            // Validate
-            setLoading(true)
             const formData = new FormData()
             selectedFiles.forEach(f => formData.append("files", f))
 
             try {
-                // Call Python Backend
-                const response = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/validate-case-files`, {
-                    method: "POST",
-                    body: formData
+                // Upload directly via API route to bypass middleware body size limits
+                const res = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData,
                 })
-                const result = await response.json()
-                setValidationResult(result)
-
-                if (!result.valid) {
-                    setError(result.message)
-                } else {
-                    setError(null)
+                if (!res.ok) {
+                    const errData = await res.json().catch(() => ({}))
+                    throw new Error(errData.error || 'Upload failed')
                 }
+                const result = await res.json()
+                setUploadedFileRefs(result.uploaded)
             } catch (err) {
-                setError("Failed to validate files with backend")
+                console.error(err)
+                setError("Failed to upload files. Please try again.")
+                setFiles([]) // Reset on failure
             } finally {
-                setLoading(false)
+                setUploading(false)
             }
         }
     }
@@ -173,14 +174,15 @@ export function CreateCaseWizard({ workspaceId, onSuccess, mode = 'case' }: { wo
     }
 
     const handleSubmit = async () => {
-        if (!validationResult?.valid) return
+        if (files.length === 0 || uploadedFileRefs.length === 0) {
+            setError("Please upload at least one file")
+            return
+        }
 
         setLoading(true)
         try {
-            // "Upload logic" - Since we don't have cloud storage, we just mock the file references
-            // In a real app we'd upload to S3 here.
-
-            const fileRefs = JSON.stringify(files.map(f => ({ name: f.name, size: f.size })))
+            // Serialize the file references returned by the backend
+            const fileRefs = JSON.stringify(uploadedFileRefs)
 
             await createCase({
                 patientId: patient.id,
@@ -563,25 +565,23 @@ export function CreateCaseWizard({ workspaceId, onSuccess, mode = 'case' }: { wo
                                 </div>
                             )}
 
-                            {loading && <p className="text-sm text-center text-blue-500 font-medium animate-pulse">Validating and processing files...</p>}
+                            {uploading && <p className="text-sm text-center text-blue-500 font-medium animate-pulse">Uploading files...</p>}
 
-                            {validationResult && (
-                                <div className={cn("p-5 rounded-2xl border text-sm flex items-start gap-3", validationResult.valid ? "bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-900/30 text-green-700 dark:text-green-400" : "bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-900/30 text-red-700 dark:text-red-400")}>
-                                    {validationResult.valid ? <CheckCircle2 size={20} className="shrink-0 mt-0.5" /> : <AlertCircle size={20} className="shrink-0 mt-0.5" />}
+                            {uploadedFileRefs.length > 0 && (
+                                <div className="p-5 rounded-2xl border text-sm flex items-start gap-3 bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-900/30 text-green-700 dark:text-green-400">
+                                    <CheckCircle2 size={20} className="shrink-0 mt-0.5" />
                                     <div className="flex-1">
-                                        <p className="font-bold">{validationResult.valid ? "Validation Successful" : "Validation Failed"}</p>
-                                        <p className="mt-1 opacity-90">{validationResult.message}</p>
+                                        <p className="font-bold">Files Ready</p>
+                                        <p className="mt-1 opacity-90">{uploadedFileRefs.length} file(s) uploaded successfully.</p>
                                     </div>
-                                    {validationResult.valid && (
-                                        <button
-                                            onClick={handleSubmit}
-                                            disabled={loading}
-                                            className="bg-green-600 hover:bg-green-500 text-white px-6 py-2 rounded-xl font-bold text-sm flex items-center gap-2 shadow-lg shadow-green-600/20"
-                                        >
-                                            Submit Case
-                                            <ChevronRight size={16} />
-                                        </button>
-                                    )}
+                                    <button
+                                        onClick={handleSubmit}
+                                        disabled={loading}
+                                        className="bg-green-600 hover:bg-green-500 text-white px-6 py-2 rounded-xl font-bold text-sm flex items-center gap-2 shadow-lg shadow-green-600/20"
+                                    >
+                                        Submit Case
+                                        <ChevronRight size={16} />
+                                    </button>
                                 </div>
                             )}
                         </motion.div>
