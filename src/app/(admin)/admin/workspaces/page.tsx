@@ -31,14 +31,6 @@ export default async function AdminWorkspacesPage() {
                 </p>
             </div>
 
-            {/* Workspace Management (CRUD) */}
-            {/* <div className="border-b border-slate-200 dark:border-slate-800 pb-12">
-                <WorkspaceManagement
-                    initialWorkspaces={workspaces}
-                    userGlobalRole={user.globalRole || ""}
-                />
-            </div> */}
-
             {/* Existing Unified View */}
             <UnifiedWorkspace
                 user={{
