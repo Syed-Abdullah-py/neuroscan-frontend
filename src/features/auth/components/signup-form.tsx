@@ -3,11 +3,11 @@
 import { cn } from "@/lib/utils";
 import { Stethoscope, Shield, Eye, EyeOff, Check, AlertCircle, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { useState, useActionState } from "react";
-import { registerUser } from "@/actions/auth-actions";
+import { useState, useActionState, useEffect, useRef } from "react";
+import { verifyOtp, resendOtp, registerUser, SignupState } from "@/actions/auth-actions"; // Update imports
 
 // Types
-type Step = 1 | 2;
+type Step = 1 | 2 | 3;
 type Role = "radiologist" | "admin";
 
 interface SignupFormProps {
@@ -18,14 +18,26 @@ interface SignupFormProps {
     selectedRole: Role | null;
 }
 
-const initialState = {
+const initialState: SignupState = {
     message: "",
     errors: {} as Record<string, string[]>,
+    success: false,
+    step: 1,
+    email: "",
+    timestamp: 0
 };
 
 export function SignupForm({ currentStep, onNext, onBack, onRoleSelect, selectedRole }: SignupFormProps) {
     const [showPass, setShowPass] = useState(false);
     const [state, formAction, isPending] = useActionState(registerUser, initialState);
+
+    // OTP Verification State
+    const [otpState, verifyAction, isVerifying] = useActionState(verifyOtp, { message: "" });
+    const [otp, setOtp] = useState("");
+    const [resendStatus, setResendStatus] = useState("");
+
+    // Ref to track if we've already handled this specific success state
+    const lastTimestamp = useRef<number>(0);
 
     // Local state to persist data across wizard steps
     const [formData, setFormData] = useState({
@@ -39,6 +51,15 @@ export function SignupForm({ currentStep, onNext, onBack, onRoleSelect, selected
 
     const [errors, setErrors] = useState<Record<string, string>>({});
 
+    // Handle Registration Success -> Move to Step 3
+    useEffect(() => {
+        if (state?.success && state?.step === 3 && state.timestamp && state.timestamp !== lastTimestamp.current) {
+            lastTimestamp.current = state.timestamp;
+            onNext();
+        }
+    }, [state, onNext]);
+
+    // ... validation logic ...
     const validateField = (name: string, value: string) => {
         let error = "";
         switch (name) {
@@ -88,23 +109,33 @@ export function SignupForm({ currentStep, onNext, onBack, onRoleSelect, selected
         return true;
     };
 
+    const handleResendOtp = async () => {
+        setResendStatus("Sending...");
+        const success = await resendOtp(state.email || formData.email);
+        setResendStatus(success ? "Sent!" : "Failed");
+        setTimeout(() => setResendStatus(""), 3000);
+    };
+
     // Common Input Styles
     const inputClasses = "w-full bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 rounded-xl h-12 px-4 text-sm text-black dark:text-white focus:ring-2 focus:ring-black dark:focus:ring-white focus:ring-offset-0 focus:border-transparent outline-none transition-all placeholder:text-neutral-400";
     const errorInputClasses = "border-neutral-900 dark:border-neutral-100";
     const labelClasses = "text-xs font-bold text-neutral-500 tracking-wider uppercase mb-2 block";
 
-    return (
-        <form action={formAction} className="relative">
+    // Determines if we should show OTP step - STRICTLY based on parent step now
+    const showOtpStep = currentStep === 3;
 
+    return (
+        <div className="relative">
             {/* STEP 1: Role Selection */}
             {currentStep === 1 && (
                 <div className="space-y-8">
+                    {/* ... (Role Selection UI - same as before) ... */}
                     <h3 className="text-center text-lg font-bold text-black dark:text-white">
                         Select your primary role
                     </h3>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {/* Radiologist Card - BLUE */}
+                        {/* Radiologist Card */}
                         <div
                             onClick={() => onRoleSelect("radiologist")}
                             className={cn(
@@ -142,7 +173,7 @@ export function SignupForm({ currentStep, onNext, onBack, onRoleSelect, selected
                             </p>
                         </div>
 
-                        {/* Admin Card - PINK/PURPLE */}
+                        {/* Admin Card */}
                         <div
                             onClick={() => onRoleSelect("admin")}
                             className={cn(
@@ -196,8 +227,8 @@ export function SignupForm({ currentStep, onNext, onBack, onRoleSelect, selected
 
             {/* STEP 2: Form Details */}
             {currentStep === 2 && (
-                <div className="space-y-5">
-
+                <form action={formAction} className="space-y-5">
+                    {/* ... (Existing Form Fields - same as before) ... */}
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className={labelClasses}>First Name</label>
@@ -351,17 +382,83 @@ export function SignupForm({ currentStep, onNext, onBack, onRoleSelect, selected
                         </button>
                     </div>
 
-                    {/* Server Error Display */}
                     {state?.message && (
                         <div className="mt-4 p-4 bg-neutral-50 dark:bg-neutral-900 border border-neutral-300 dark:border-neutral-700 rounded-xl text-sm flex items-center gap-3">
-                            <AlertCircle className="w-5 h-5 shrink-0" strokeWidth={2} />
-                            <span className="font-medium">{state.message}</span>
+                            <AlertCircle className="w-5 h-5 shrink-0 text-red-500" strokeWidth={2} />
+                            <span className="font-medium text-red-600 dark:text-red-400">{state.message}</span>
                         </div>
                     )}
 
                     <input type="hidden" name="role" value={selectedRole || ""} />
-                </div>
+                </form>
             )}
-        </form>
+
+            {/* STEP 3: OTP Verification */}
+            {showOtpStep && (
+                <form action={verifyAction} className="space-y-6">
+                    <div className="text-center space-y-2">
+                        <div className="w-12 h-12 bg-green-50 dark:bg-green-950/30 rounded-xl flex items-center justify-center mx-auto mb-4 text-green-600 dark:text-green-400">
+                            <Check className="w-6 h-6" strokeWidth={3} />
+                        </div>
+                        <h3 className="text-xl font-bold text-black dark:text-white">Verify your email</h3>
+                        <p className="text-neutral-500 text-sm max-w-xs mx-auto">
+                            We've sent a 6-digit code to <span className="font-semibold text-black dark:text-white">{state?.email || formData.email}</span>
+                        </p>
+                    </div>
+
+                    <div className="flex flex-col items-center gap-4">
+                        <input
+                            name="otp"
+                            type="text"
+                            maxLength={6}
+                            value={otp}
+                            onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                            className="w-full text-center text-2xl tracking-[0.5em] font-mono bg-white dark:bg-neutral-950 border border-neutral-200 dark:border-neutral-800 rounded-xl h-14 px-4 text-black dark:text-white focus:ring-2 focus:ring-black dark:focus:ring-white focus:ring-offset-0 focus:border-transparent outline-none transition-all placeholder:text-neutral-300"
+                            placeholder="000000"
+                            required
+                            autoFocus
+                        />
+
+                        <input type="hidden" name="email" value={state?.email || formData.email} />
+
+                        <div className="flex items-center gap-2 text-xs">
+                            <span className="text-neutral-500">Didn't receive code?</span>
+                            <button
+                                type="button"
+                                onClick={handleResendOtp}
+                                disabled={!!resendStatus}
+                                className="font-semibold text-black dark:text-white hover:underline disabled:opacity-50"
+                            >
+                                {resendStatus || "Resend OTP"}
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                        <button
+                            type="button"
+                            onClick={onBack}
+                            className="w-1/3 bg-neutral-100 dark:bg-neutral-900 hover:bg-neutral-200 dark:hover:bg-neutral-800 text-black dark:text-white py-3 rounded-xl text-sm font-semibold transition-colors"
+                        >
+                            Back
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={isVerifying || otp.length !== 6}
+                            className="w-2/3 bg-black dark:bg-white hover:bg-neutral-800 dark:hover:bg-neutral-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-black dark:disabled:hover:bg-white text-white dark:text-black py-3 rounded-xl text-sm font-semibold transition-all active:scale-95 disabled:active:scale-100 flex items-center justify-center gap-2"
+                        >
+                            {isVerifying ? <Loader2 className="w-4 h-4 animate-spin" strokeWidth={2} /> : "Verify & Continue"}
+                        </button>
+                    </div>
+
+                    {otpState?.message && (
+                        <div className="p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 rounded-xl text-sm flex items-center gap-3 text-red-600 dark:text-red-400">
+                            <AlertCircle className="w-5 h-5 shrink-0" strokeWidth={2} />
+                            <span className="font-medium">{otpState.message}</span>
+                        </div>
+                    )}
+                </form>
+            )}
+        </div>
     );
 }

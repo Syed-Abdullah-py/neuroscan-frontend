@@ -7,18 +7,18 @@ import { SignupForm } from "@/features/auth/components/signup-form";
 import { useState } from "react";
 
 // Types
-type Step = 1 | 2;
+type Step = 1 | 2 | 3;
 type Role = "radiologist" | "admin";
 
 export default function SignupPage() {
     const [step, setStep] = useState<Step>(1);
     const [role, setRole] = useState<Role | null>(null);
 
-    const handleNext = () => setStep((prev) => (prev < 2 ? (prev + 1) as Step : prev));
+    const handleNext = () => setStep((prev) => (prev < 3 ? (prev + 1) as Step : prev));
     const handleBack = () => setStep((prev) => (prev > 1 ? (prev - 1) as Step : prev));
 
     return (
-        <div className="min-h-screen bg-white dark:bg-black text-black dark:text-white overflow-x-hidden">
+        <div className="min-h-screen bg-white dark:bg-neutral-950 text-black dark:text-white overflow-x-hidden">
 
             {/* Minimal Navbar */}
             <nav className="fixed top-0 inset-x-0 z-50 h-16 border-b border-neutral-200 dark:border-neutral-800 bg-white/80 dark:bg-black/80 backdrop-blur-xl">
@@ -65,8 +65,8 @@ export default function SignupPage() {
                     <div className="rounded-2xl bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800 overflow-hidden">
                         <div className="p-8 md:p-12">
 
-                            {/* Stepper - Elegant 2-step design */}
-                            <div className="mb-12 mx-auto max-w-xs">
+                            {/* Stepper - Elegant 3-step design */}
+                            <div className="mb-12 mx-auto max-w-sm">
                                 <div className="flex items-center justify-between relative">
                                     {/* Background Line */}
                                     <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-0.5 bg-neutral-200 dark:bg-neutral-800 z-0" />
@@ -74,10 +74,10 @@ export default function SignupPage() {
                                     {/* Progress Line */}
                                     <div
                                         className="absolute left-0 top-1/2 -translate-y-1/2 h-0.5 bg-black dark:bg-white z-0 transition-all duration-500 ease-out"
-                                        style={{ width: step === 1 ? '0%' : '100%' }}
+                                        style={{ width: step === 1 ? '0%' : step === 2 ? '50%' : '100%' }}
                                     />
 
-                                    {[1, 2].map((s) => (
+                                    {[1, 2, 3].map((s) => (
                                         <div key={s} className="relative z-10 flex flex-col items-center gap-3">
                                             <div className={cn(
                                                 "w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold border-2 transition-all duration-300",
@@ -97,6 +97,7 @@ export default function SignupPage() {
                                             )}>
                                                 {s === 1 && "Role"}
                                                 {s === 2 && "Details"}
+                                                {s === 3 && "Verification"}
                                             </span>
                                         </div>
                                     ))}

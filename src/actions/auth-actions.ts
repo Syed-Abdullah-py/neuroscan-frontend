@@ -40,10 +40,20 @@ async function setAuthCookie(token: string) {
 
 // --- ACTIONS ---
 
+// Types for Signup State
+export type SignupState = {
+  message: string;
+  errors?: Record<string, string[]>;
+  success?: boolean;
+  step?: number;
+  email?: string;
+  timestamp?: number;
+};
+
 /**
  * Registers a new user via the auth-service API.
  */
-export async function registerUser(prevState: any, formData: FormData) {
+export async function registerUser(prevState: SignupState, formData: FormData): Promise<SignupState> {
   const rawData = Object.fromEntries(formData.entries());
 
   const validated = SignupSchema.safeParse({
@@ -90,13 +100,80 @@ export async function registerUser(prevState: any, formData: FormData) {
       };
     }
 
-    // Registration successful
+    // Registration successful - Step 3: Verify OTP
+    return { success: true, step: 3, email, message: "OTP Sent", timestamp: Date.now() };
+
   } catch (error) {
     console.error("Registration Error:", error);
     return { message: "Network error. Please try again." };
   }
+}
 
-  redirect("/login?success=true");
+/**
+ * Verifies the OTP for a user.
+ */
+export async function verifyOtp(prevState: any, formData: FormData) {
+  const email = formData.get("email") as string;
+  const otp = formData.get("otp") as string;
+
+  if (!email || !otp || otp.length !== 6) {
+    return { message: "Invalid OTP" };
+  }
+
+  let token: string | null = null;
+  let redirectPath = "/doctor";
+
+  try {
+    const response = await fetch(`${AUTH_SERVICE_URL}/auth/verify-otp`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email, otp }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      return { message: errorData.detail || "Verification failed" };
+    }
+
+    const data = await response.json();
+    token = data.access_token;
+    await setAuthCookie(token!);
+
+  } catch (error) {
+    console.error("Verify OTP Error:", error);
+    return { message: "Network error" };
+  }
+
+  // Determine redirect path
+  if (token) {
+    try {
+      const [, payloadBase64] = token.split(".");
+      const payloadString = Buffer.from(payloadBase64, "base64").toString();
+      const payload = JSON.parse(payloadString);
+      const role = payload.global_role;
+      if (role === "ADMIN") redirectPath = "/admin";
+    } catch { }
+  }
+
+  redirect(redirectPath);
+}
+
+/**
+ * Resends the OTP.
+ */
+export async function resendOtp(email: string) {
+  try {
+    const response = await fetch(`${AUTH_SERVICE_URL}/auth/resend-otp`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
 }
 
 /**
