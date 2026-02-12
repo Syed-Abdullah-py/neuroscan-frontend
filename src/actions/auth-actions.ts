@@ -339,10 +339,8 @@ export async function getUserWorkspaces() {
     const resolvedActiveId = activeMember?.workspace_id;
     console.log('[Auth] getUserWorkspaces - resolvedActiveId:', resolvedActiveId);
 
-    // IMPORTANT: If no cookie was set, try to persist the resolved workspace ID.
-    // This may fail in Server Component context (cookies are read-only there),
-    // so we wrap it in a try-catch and let it succeed silently.
-    if (!activeWorkspaceId && resolvedActiveId) {
+    // IMPORTANT: If no cookie was set OR if it's stale (not in memberships), persist the resolved ID.
+    if (resolvedActiveId && resolvedActiveId !== activeWorkspaceId) {
       try {
         cookieStore.set("active_workspace", resolvedActiveId, {
           httpOnly: true,
