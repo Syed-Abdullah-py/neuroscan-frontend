@@ -1,48 +1,35 @@
 "use client"
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { Search, User, MoreHorizontal, Pencil, Trash2, X } from "lucide-react"
 import { getAllPatients, deletePatient, updatePatient } from "@/features/admin/actions/patient-actions"
 import { cn } from "@/lib/utils"
 import { motion, AnimatePresence, Variants } from "framer-motion"
+import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { Skeleton } from "@/components/ui/skeleton"
 
 export function PatientManagement({ workspaceId, headerActions, searchQuery }: { workspaceId: string, headerActions?: React.ReactNode, searchQuery?: string }) {
-    const [patients, setPatients] = useState<any[]>([])
-    const [loading, setLoading] = useState(true)
+    const queryClient = useQueryClient();
     const [search, setSearch] = useState("")
 
     // Actions State
     const [editingPatient, setEditingPatient] = useState<any>(null)
     const [actionLoading, setActionLoading] = useState(false)
 
-    useEffect(() => {
-        loadHeader()
-    }, [workspaceId])
-
-    const loadHeader = async () => {
-        console.log('[PatientManagement] loadHeader called, workspaceId:', workspaceId)
-        if (!workspaceId) {
-            console.warn('[PatientManagement] No workspaceId provided, skipping patient load')
-            setLoading(false)
-            return
-        }
-        try {
-            console.log('[PatientManagement] Loading patients for workspace:', workspaceId)
-            const data = await getAllPatients(workspaceId)
-            console.log('[PatientManagement] Loaded patients:', data?.length, 'patients')
-            setPatients(data)
-        } catch (error) {
-            console.error('[PatientManagement] Error loading patients:', error)
-        } finally {
-            setLoading(false)
-        }
-    }
+    const { data: patients = [], isLoading: loading } = useQuery({
+        queryKey: ['patients', workspaceId],
+        queryFn: async () => {
+            const data = await getAllPatients(workspaceId);
+            return data || [];
+        },
+        enabled: !!workspaceId
+    });
 
     const handleDelete = async (id: string) => {
         if (!confirm("Are you sure you want to delete this patient? This will also remove their cases.")) return
         setActionLoading(true)
         try {
             await deletePatient(id)
-            setPatients(patients.filter(p => p.id !== id))
+            queryClient.setQueryData(['patients', workspaceId], (old: any[]) => old?.filter(p => p.id !== id))
         } catch (e) {
             console.error("Delete failed:", e)
             alert("Failed to delete patient: " + (e instanceof Error ? e.message : String(e)))
@@ -53,7 +40,7 @@ export function PatientManagement({ workspaceId, headerActions, searchQuery }: {
 
     const activeSearch = searchQuery ?? search;
 
-    const filtered = patients.filter(p =>
+    const filtered = patients.filter((p: any) =>
         p.firstName.toLowerCase().includes(activeSearch.toLowerCase()) ||
         p.lastName.toLowerCase().includes(activeSearch.toLowerCase()) ||
         p.phoneNumber.includes(activeSearch)
@@ -119,11 +106,31 @@ export function PatientManagement({ workspaceId, headerActions, searchQuery }: {
                     </thead>
                     <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                         {loading ? (
-                            <tr><td colSpan={5} className="p-8 text-center text-slate-500">Loading directory...</td></tr>
+                            <>
+                                {[1, 2, 3, 4, 5].map((row) => (
+                                    <tr key={row}>
+                                        <td className="p-4">
+                                            <div className="flex flex-col gap-1">
+                                                <Skeleton className="h-4 w-32" />
+                                                <Skeleton className="h-3 w-20" />
+                                            </div>
+                                        </td>
+                                        <td className="p-4"><Skeleton className="h-4 w-24" /></td>
+                                        <td className="p-4"><Skeleton className="h-4 w-24" /></td>
+                                        <td className="p-4"><Skeleton className="h-4 w-32" /></td>
+                                        <td className="p-4 text-right">
+                                            <div className="flex items-center justify-end gap-2">
+                                                <Skeleton className="h-8 w-8 rounded-lg" />
+                                                <Skeleton className="h-8 w-8 rounded-lg" />
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </>
                         ) : filtered.length === 0 ? (
                             <tr><td colSpan={5} className="p-8 text-center text-slate-500">No patients found.</td></tr>
                         ) : (
-                            filtered.map(p => (
+                            filtered.map((p: any) => (
                                 <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/50 group">
                                     <td className="p-4 font-medium text-slate-900 dark:text-white">
                                         {p.firstName} {p.lastName}
@@ -182,7 +189,7 @@ export function PatientManagement({ workspaceId, headerActions, searchQuery }: {
                                 setActionLoading(true)
                                 try {
                                     const updated = await updatePatient(editingPatient.id, data)
-                                    setPatients(patients.map(p => p.id === updated.id ? updated : p))
+                                    queryClient.setQueryData(['patients', workspaceId], (old: any[]) => old?.map(p => p.id === updated.id ? updated : p))
                                     setEditingPatient(null)
                                 } catch (err) {
                                     console.error("Update failed:", err)

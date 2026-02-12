@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { FileText, Plus, User, Stethoscope, Calendar, AlertCircle, CheckCircle2, Clock } from "lucide-react";
 import { getAllCasesForWorkspace } from "@/features/cases/actions/case-actions";
-import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 import { motion, Variants } from "framer-motion";
+import { useQuery } from "@tanstack/react-query";
+import { Skeleton } from "@/components/ui/skeleton";
 
 type Case = {
     id: string;
@@ -50,22 +51,14 @@ const itemVariants: Variants = {
 };
 
 export function CasesView({ workspaceId }: { workspaceId: string }) {
-    const [cases, setCases] = useState<Case[]>([]);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        async function fetchCases() {
-            try {
-                const data = await getAllCasesForWorkspace(workspaceId);
-                setCases(data as Case[]);
-            } catch (error) {
-                console.error("Failed to fetch cases:", error);
-            } finally {
-                setLoading(false);
-            }
-        }
-        fetchCases();
-    }, [workspaceId]);
+    const { data: cases = [], isLoading } = useQuery({
+        queryKey: ['cases', workspaceId],
+        queryFn: async () => {
+            const data = await getAllCasesForWorkspace(workspaceId);
+            return data as Case[];
+        },
+        enabled: !!workspaceId
+    });
 
     const getStatusBadge = (status: string) => {
         const styles = {
@@ -121,11 +114,35 @@ export function CasesView({ workspaceId }: { workspaceId: string }) {
                 </Link>
             </motion.div>
 
-            {loading ? (
-                <motion.div variants={itemVariants} className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-12 text-center">
-                    <div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto mb-4" />
-                    <p className="text-slate-500">Loading cases...</p>
-                </motion.div>
+            {isLoading ? (
+                <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+                    <div className="bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 p-4 flex">
+                        <Skeleton className="h-4 w-1/6" />
+                        <Skeleton className="h-4 w-1/6 ml-4" />
+                        <Skeleton className="h-4 w-1/6 ml-4" />
+                        <Skeleton className="h-4 w-1/6 ml-4" />
+                        <Skeleton className="h-4 w-1/6 ml-4" />
+                        <Skeleton className="h-4 w-20 ml-auto" />
+                    </div>
+                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {[1, 2, 3, 4, 5].map((row) => (
+                            <div key={row} className="p-6 flex items-center justify-between">
+                                <div className="flex items-center gap-3 w-1/6">
+                                    <Skeleton className="w-10 h-10 rounded-full" />
+                                    <div className="flex flex-col gap-1">
+                                        <Skeleton className="h-4 w-24" />
+                                        <Skeleton className="h-3 w-16" />
+                                    </div>
+                                </div>
+                                <div className="w-1/6 px-4"><Skeleton className="h-6 w-16 rounded-md" /></div>
+                                <div className="w-1/6 px-4"><Skeleton className="h-6 w-20 rounded-full" /></div>
+                                <div className="w-1/6 px-4"><Skeleton className="h-4 w-24" /></div>
+                                <div className="w-1/6 px-4"><Skeleton className="h-4 w-24" /></div>
+                                <div className="w-20 pl-4 text-right"><Skeleton className="h-8 w-16 rounded-lg ml-auto" /></div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
             ) : cases.length === 0 ? (
                 <motion.div variants={itemVariants} className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-8 text-center">
                     <div className="mx-auto w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-4">
