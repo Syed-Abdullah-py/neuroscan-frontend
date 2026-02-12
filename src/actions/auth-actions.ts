@@ -427,15 +427,25 @@ export async function getJoinRequests(workspaceId?: string) {
 /**
  * Resolves a join request (approve or reject).
  */
-export async function resolveJoinRequest(requestId: string, action: "approve" | "reject"): Promise<{ success: boolean, message?: string }> {
+export async function resolveJoinRequest(requestId: string, action: "approve" | "reject", role?: string): Promise<{ success: boolean, message?: string }> {
   const token = await getAuthToken();
   if (!token) return { success: false, message: "Not authenticated" };
 
   try {
-    const response = await fetch(`${AUTH_SERVICE_URL}/join-requests/${requestId}/${action}`, {
+    const options: RequestInit = {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-    });
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json"
+      },
+    };
+
+    if (action === "approve") {
+      if (!role) return { success: false, message: "Role is required for approval" };
+      options.body = JSON.stringify({ role });
+    }
+
+    const response = await fetch(`${AUTH_SERVICE_URL}/join-requests/${requestId}/${action}`, options);
 
     if (!response.ok) {
       const error = await response.json();

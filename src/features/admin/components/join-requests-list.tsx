@@ -1,9 +1,13 @@
-"use client";
-
-import { Check, X, User, RefreshCw } from "lucide-react";
+import { Check, X, User, RefreshCw, ChevronDown } from "lucide-react";
 import { resolveJoinRequest } from "@/actions/auth-actions";
-import { useTransition } from "react";
+import { useTransition, useState } from "react";
 import { useRouter } from "next/navigation";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 // Define strict types for the props
 type JoinRequest = {
@@ -23,12 +27,19 @@ interface JoinRequestsListProps {
 export function JoinRequestsList({ requests, currentUserEmail }: JoinRequestsListProps) {
     const [isPending, startTransition] = useTransition();
     const router = useRouter();
+    const [selectedRoles, setSelectedRoles] = useState<Record<string, string>>({});
 
     const handleResolve = (id: string, action: "approve" | "reject") => {
+        const role = selectedRoles[id] || "DOCTOR"; // Default to DOCTOR
+
         startTransition(async () => {
-            await resolveJoinRequest(id, action);
+            await resolveJoinRequest(id, action, role);
             router.refresh();
         });
+    };
+
+    const setRole = (id: string, role: string) => {
+        setSelectedRoles(prev => ({ ...prev, [id]: role }));
     };
 
     if (requests.length === 0) {
@@ -59,6 +70,28 @@ export function JoinRequestsList({ requests, currentUserEmail }: JoinRequestsLis
                         </div>
                     </div>
                     <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1">
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <button
+                                        className="h-8 px-2 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-md flex items-center gap-1 hover:bg-slate-50 dark:hover:bg-slate-800"
+                                        disabled={isPending}
+                                    >
+                                        {(selectedRoles[req.id] === "ADMIN" ? "Admin" : "Doctor")}
+                                        <ChevronDown size={12} className="opacity-50" />
+                                    </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => setRole(req.id, "DOCTOR")}>
+                                        Doctor
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => setRole(req.id, "ADMIN")}>
+                                        Admin
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        </div>
+
                         <button
                             onClick={() => handleResolve(req.id, "reject")}
                             disabled={isPending}
