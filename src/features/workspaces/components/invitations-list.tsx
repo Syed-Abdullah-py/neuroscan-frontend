@@ -28,15 +28,25 @@ export function InvitationsList({ invitations }: InvitationsListProps) {
 
     const handleAction = (id: string, action: "ACCEPT" | "REJECT") => {
         // Optimistically remove from list
+        const previousInvitations = optimisticInvitations;
         setOptimisticInvitations(prev => prev.filter(inv => inv.id !== id));
 
         startTransition(async () => {
+            let result;
             if (action === "ACCEPT") {
-                await acceptInvitation(id);
+                result = await acceptInvitation(id);
             } else {
-                await rejectInvitation(id);
+                result = await rejectInvitation(id);
             }
-            router.refresh();
+
+            if (!result.success) {
+                // Revert if failed
+                setOptimisticInvitations(previousInvitations);
+                // Optionally show error toast here
+                console.error(result.message);
+            } else {
+                router.refresh();
+            }
         });
     };
 
