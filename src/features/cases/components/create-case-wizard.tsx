@@ -202,10 +202,8 @@ export function CreateCaseWizard({ workspaceId, onSuccess, mode = 'case' }: { wo
 
     // Effect to fetch doctors on mount for auto-assignment
     useEffect(() => {
-        if (doctors.length === 0) {
-            fetchDoctors()
-        }
-    }, [])
+        fetchDoctors()
+    }, [workspaceId])
 
     return (
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl shadow-slate-200/50 dark:shadow-black/20 overflow-hidden max-w-3xl w-full mx-auto relative">

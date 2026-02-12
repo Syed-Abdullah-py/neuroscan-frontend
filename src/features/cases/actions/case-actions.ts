@@ -125,8 +125,12 @@ export async function getAssignedCases() {
 }
 
 export async function getDoctorsForDropdown(workspaceId: string) {
+    console.log(`[getDoctorsForDropdown] Fetching for workspace: ${workspaceId}`);
     const token = await getAuthToken();
-    if (!token) return [];
+    if (!token) {
+        console.error("[getDoctorsForDropdown] No token");
+        return [];
+    }
 
     try {
         const response = await fetch(`${AUTH_SERVICE_URL}/workspaces/${workspaceId}/members`, {
@@ -136,24 +140,31 @@ export async function getDoctorsForDropdown(workspaceId: string) {
             cache: 'no-store'
         });
 
-        if (!response.ok) return [];
+        if (!response.ok) {
+            console.error(`[getDoctorsForDropdown] Fetch failed: ${response.status} ${response.statusText}`);
+            return [];
+        }
 
         const members = await response.json();
-        // Filter for DOCTORS and transform
-        // Note: Backend MemberSchema now includes 'user' object.
-        // We need to map it to what frontend expects.
-        // Frontend likely expects objects with 'user' property.
+        console.log(`[getDoctorsForDropdown] Found ${members.length} total members`);
 
-        return members
-            .filter((m: any) => m.role === 'DOCTOR')
-            .map((m: any) => ({
-                id: m.id,
-                user: m.user,
-                _count: { assignedCases: 0 } // Stats not yet available in members list. 
-                // TODO: Add stats to members endpoint or separate stats call.
-                // For now, sorting might break if we rely on _count.
-                // Let's mock _count or return 0.
-            }));
+        // Filter: Allow DOCTOR, ADMIN, OWNER to be assigned cases?
+        // Usually only doctors, but let's be permissive for now or check data.
+        // If data has role="DOCTOR", it should work.
+
+        const eligible = members.filter((m: any) => {
+            const role = m.role?.toUpperCase();
+            return role === 'DOCTOR' || role === 'ADMIN' || role === 'OWNER';
+        });
+
+        console.log(`[getDoctorsForDropdown] Eligible members: ${eligible.length}`);
+
+        return eligible.map((m: any) => ({
+            id: m.id,
+            user: m.user,
+            role: m.role, // Pass role to frontend for display if needed
+            _count: { assignedCases: 0 }
+        }));
     } catch (error) {
         console.error("Get Doctors Error:", error);
         return [];
