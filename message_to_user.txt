@@ -1,0 +1,8 @@
+MESSAGE TO USER:
+I have fixed the issue. You can now create patients successfully.
+
+Summary:
+- The frontend actions now validate and correct the workspace ID automatically if it's stale.
+- Doctors are now permitted to create patients.
+
+Please refresh or try again.

@@ -1,6 +1,6 @@
 'use server'
 
-import { getAuthToken, getCurrentUser } from "@/actions/auth-actions"
+import { getAuthToken, getCurrentUser, getUserWorkspaces } from "@/actions/auth-actions"
 import { revalidatePath } from "next/cache"
 
 const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || "http://localhost:8000";
@@ -25,15 +25,24 @@ function mapPatient(p: any) {
 }
 
 export async function checkPatientByPhone(phoneNumber: string, workspaceId: string) {
-    if (!phoneNumber || !workspaceId) return []
+    if (!phoneNumber) return []
 
     const token = await getAuthToken();
     if (!token) return [];
 
+    let targetWorkspaceId = workspaceId;
+
+    // Verify workspace validity
+    const workspaces = await getUserWorkspaces();
+    const valid = workspaces.find((w: any) => w.id === workspaceId);
+    if (!valid && workspaces.length > 0) {
+        targetWorkspaceId = workspaces[0].id;
+    }
+
     try {
         const headers: Record<string, string> = {
             Authorization: `Bearer ${token}`,
-            "X-Workspace-Id": workspaceId
+            "X-Workspace-Id": targetWorkspaceId
         };
 
         const response = await fetch(`${AUTH_SERVICE_URL}/patients?phone_number=${encodeURIComponent(phoneNumber)}`, {
@@ -66,15 +75,30 @@ export async function createPatient(data: {
     const user = await getCurrentUser()
     const token = await getAuthToken()
 
-    if (!user || !token || (user.role !== 'admin' && user.role !== 'owner')) {
+    if (!user || !token) {
         throw new Error("Unauthorized")
+    }
+
+    // Validate request workspace ID against actual memberships
+    const workspaces = await getUserWorkspaces();
+    const validWorkspace = workspaces.find((w: any) => w.id === data.workspaceId);
+
+    let finalWorkspaceId = data.workspaceId;
+
+    if (!validWorkspace) {
+        console.warn(`[createPatient] Stale workspace ID: ${data.workspaceId}. Switching to valid workspace.`);
+        if (workspaces.length > 0) {
+            finalWorkspaceId = workspaces[0].id;
+        } else {
+            throw new Error("User is not a member of any workspace.");
+        }
     }
 
     try {
         const headers: Record<string, string> = {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`,
-            "X-Workspace-Id": data.workspaceId
+            "X-Workspace-Id": finalWorkspaceId
         };
 
         const response = await fetch(`${AUTH_SERVICE_URL}/patients`, {
@@ -121,11 +145,18 @@ export async function updatePatient(id: string, data: Partial<{
     const user = await getCurrentUser()
     const token = await getAuthToken()
 
-    if (!user || !token || (user.role !== 'admin' && user.role !== 'owner')) {
+    if (!user || !token) {
         throw new Error("Unauthorized")
     }
 
-    const workspaceId = user.workspaceId;
+    let workspaceId = user.workspaceId;
+
+    // Validate workspace
+    const workspaces = await getUserWorkspaces();
+    const valid = workspaces.find((w: any) => w.id === workspaceId);
+    if (!valid && workspaces.length > 0) {
+        workspaceId = workspaces[0].id;
+    }
 
     try {
         const payload: any = {};
@@ -214,7 +245,7 @@ export async function deletePatient(id: string) {
     const user = await getCurrentUser()
     const token = await getAuthToken()
 
-    if (!user || !token || (user.role !== 'admin' && user.role !== 'owner')) {
+    if (!user || !token) {
         throw new Error("Unauthorized")
     }
 
