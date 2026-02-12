@@ -427,7 +427,7 @@ export async function getJoinRequests(workspaceId?: string) {
 /**
  * Resolves a join request (approve or reject).
  */
-export async function resolveJoinRequest(requestId: string, action: "approve" | "reject", role?: string): Promise<{ success: boolean, message?: string }> {
+export async function resolveJoinRequest(requestId: string, action: "approve" | "reject"): Promise<{ success: boolean, message?: string }> {
   const token = await getAuthToken();
   if (!token) return { success: false, message: "Not authenticated" };
 
@@ -441,8 +441,8 @@ export async function resolveJoinRequest(requestId: string, action: "approve" | 
     };
 
     if (action === "approve") {
-      if (!role) return { success: false, message: "Role is required for approval" };
-      options.body = JSON.stringify({ role });
+      // Backend expects a JoinRequestApprove model (even if empty)
+      options.body = JSON.stringify({});
     }
 
     const response = await fetch(`${AUTH_SERVICE_URL}/join-requests/${requestId}/${action}`, options);
