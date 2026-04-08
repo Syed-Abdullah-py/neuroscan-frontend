@@ -2,8 +2,8 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-
-const AUTH_SERVICE_URL = process.env.AUTH_SERVICE_URL || "http://localhost:8000";
+import { authApi } from "@/lib/api/auth.api";
+import { ApiError } from "@/lib/api/client";
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -16,6 +16,10 @@ export type SignupState = {
     timestamp?: number;
 };
 
+export type LoginState = {
+    message: string;
+};
+
 // ── Cookie helpers ─────────────────────────────────────────────────────────
 
 async function setSessionCookie(token: string) {
@@ -23,7 +27,8 @@ async function setSessionCookie(token: string) {
     cookieStore.set("session", token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
-        maxAge: 60 * 60 * 24 * 30, // 30 days — matches backend ACCESS_TOKEN_EXPIRE_MINUTES
+        // Match backend ACCESS_TOKEN_EXPIRE_MINUTES (43200 min = 30 days)
+        maxAge: 60 * 60 * 24 * 30,
         path: "/",
         sameSite: "lax",
     });
@@ -31,9 +36,17 @@ async function setSessionCookie(token: string) {
 
 export async function getAuthToken(): Promise<string | null> {
     const cookieStore = await cookies();
-    return cookieStore.get("session")?.value || null;
+    return cookieStore.get("session")?.value ?? null;
 }
 
+// ── Session user ───────────────────────────────────────────────────────────
+
+/**
+ * Decodes the JWT from the session cookie WITHOUT a network call.
+ * Used in layouts and server components where we only need basic
+ * user info (id, email, name, globalRole).
+ * JWT signature is verified by middleware — we trust it here.
+ */
 export async function getCurrentUser() {
     const token = await getAuthToken();
     if (!token) return null;
@@ -44,28 +57,39 @@ export async function getCurrentUser() {
             Buffer.from(payloadBase64, "base64").toString()
         );
 
+        // Check expiry manually
+        if (payload.exp && payload.exp * 1000 < Date.now()) {
+            return null;
+        }
+
         const cookieStore = await cookies();
         const activeWorkspaceId = cookieStore.get("active_workspace")?.value;
 
-        const globalRole = payload.global_role || "";
-        const name = payload.name || payload.email?.split("@")[0] || "User";
+        const globalRole = (payload.global_role as string) || "RADIOLOGIST";
+        const name =
+            (payload.name as string) ||
+            (payload.email as string)?.split("@")[0] ||
+            "User";
 
         return {
             id: payload.sub as string,
             email: payload.email as string,
             name,
-            globalRole: globalRole as string,
+            globalRole: globalRole as "ADMIN" | "RADIOLOGIST",
             avatar: name.charAt(0).toUpperCase(),
-            workspaceId: activeWorkspaceId || undefined,
+            workspaceId: activeWorkspaceId,
         };
     } catch {
         return null;
     }
 }
 
-// ── Auth actions ───────────────────────────────────────────────────────────
+// ── Login ──────────────────────────────────────────────────────────────────
 
-export async function loginUser(prevState: any, formData: FormData) {
+export async function loginUser(
+    prevState: LoginState,
+    formData: FormData
+): Promise<LoginState> {
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
 
@@ -73,34 +97,20 @@ export async function loginUser(prevState: any, formData: FormData) {
         return { message: "Email and password are required." };
     }
 
-    let token: string | null = null;
-
     try {
-        const response = await fetch(`${AUTH_SERVICE_URL}/auth/login`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email, password }),
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            return {
-                message:
-                    typeof errorData.detail === "string"
-                        ? errorData.detail
-                        : "Invalid email or password.",
-            };
+        const data = await authApi.login(email, password);
+        await setSessionCookie(data.access_token);
+    } catch (err) {
+        if (err instanceof ApiError) {
+            return { message: err.message };
         }
-
-        const data = await response.json();
-        token = data.access_token;
-        await setSessionCookie(token!);
-    } catch {
-        return { message: "Network error. Please try again." };
+        return { message: "Network error. Is the backend running?" };
     }
 
     redirect("/dashboard");
 }
+
+// ── Register ───────────────────────────────────────────────────────────────
 
 export async function registerUser(
     prevState: SignupState,
@@ -112,36 +122,36 @@ export async function registerUser(
     const lastName = formData.get("lastName") as string;
     const role = formData.get("role") as string;
     const termsAccepted = formData.get("termsAccepted");
+    const confirmPassword = formData.get("confirmPassword") as string;
+
+    // Validation
+    if (!email || !password || !firstName || !lastName) {
+        return { message: "All fields are required." };
+    }
+
+    if (password !== confirmPassword) {
+        return { message: "Passwords do not match." };
+    }
+
+    if (password.length < 8) {
+        return { message: "Password must be at least 8 characters." };
+    }
 
     if (termsAccepted !== "on") {
         return { message: "You must accept the terms and conditions." };
     }
 
-    if (!email || !password || !firstName || !lastName) {
-        return { message: "All fields are required." };
+    if (!role || !["radiologist", "admin"].includes(role)) {
+        return { message: "Please select a valid role." };
     }
 
     try {
-        const response = await fetch(`${AUTH_SERVICE_URL}/auth/register`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                email,
-                password,
-                name: `${firstName} ${lastName}`,
-                global_role: role === "admin" ? "ADMIN" : "RADIOLOGIST",
-            }),
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            return {
-                message:
-                    typeof errorData.detail === "string"
-                        ? errorData.detail
-                        : "Registration failed. Please try again.",
-            };
-        }
+        await authApi.register(
+            email,
+            password,
+            `${firstName} ${lastName}`.trim(),
+            role === "admin" ? "ADMIN" : "RADIOLOGIST"
+        );
 
         return {
             success: true,
@@ -150,43 +160,35 @@ export async function registerUser(
             message: "OTP sent to your email.",
             timestamp: Date.now(),
         };
-    } catch {
-        return { message: "Network error. Please try again." };
+    } catch (err) {
+        if (err instanceof ApiError) {
+            return { message: err.message };
+        }
+        return { message: "Network error. Is the backend running?" };
     }
 }
 
-export async function verifyOtp(prevState: any, formData: FormData) {
+// ── OTP ────────────────────────────────────────────────────────────────────
+
+export async function verifyOtp(
+    prevState: any,
+    formData: FormData
+): Promise<{ message: string }> {
     const email = formData.get("email") as string;
     const otp = formData.get("otp") as string;
 
     if (!email || !otp || otp.length !== 6) {
-        return { message: "Invalid OTP." };
+        return { message: "Please enter the 6-digit code." };
     }
 
-    let token: string | null = null;
-
     try {
-        const response = await fetch(`${AUTH_SERVICE_URL}/auth/verify-otp`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email, otp }),
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}));
-            return {
-                message:
-                    typeof errorData.detail === "string"
-                        ? errorData.detail
-                        : "Verification failed.",
-            };
+        const data = await authApi.verifyOtp(email, otp);
+        await setSessionCookie(data.access_token);
+    } catch (err) {
+        if (err instanceof ApiError) {
+            return { message: err.message };
         }
-
-        const data = await response.json();
-        token = data.access_token;
-        await setSessionCookie(token!);
-    } catch {
-        return { message: "Network error. Please try again." };
+        return { message: "Network error. Is the backend running?" };
     }
 
     redirect("/dashboard");
@@ -194,16 +196,14 @@ export async function verifyOtp(prevState: any, formData: FormData) {
 
 export async function resendOtp(email: string): Promise<boolean> {
     try {
-        const response = await fetch(`${AUTH_SERVICE_URL}/auth/resend-otp`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email }),
-        });
-        return response.ok;
+        await authApi.resendOtp(email);
+        return true;
     } catch {
         return false;
     }
 }
+
+// ── Logout ─────────────────────────────────────────────────────────────────
 
 export async function logoutUser() {
     const cookieStore = await cookies();
