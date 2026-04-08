@@ -8,27 +8,24 @@ import {
   Users,
   FileText,
   Settings,
-  Building2
+  Building2,
 } from "lucide-react";
 import WorkspaceSwitcher from "@/components/layout/workspace-switcher";
-
-// ... existing imports ...
-
 import { LogoutButton } from "@/features/auth/components/logout-button";
 
 const adminRoutes = [
-  { name: "Overview", href: "/admin", icon: LayoutDashboard },
-  { name: "Patients", href: "/admin/patients", icon: Users },
-  { name: "Cases", href: "/admin/cases", icon: FileText },
-  { name: "Workspaces", href: "/admin/workspaces", icon: Building2 },
-  { name: "Settings", href: "/admin/settings", icon: Settings },
-  // Management moved to Workspaces
+  { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Patients", href: "/dashboard/patients", icon: Users },
+  { name: "Cases", href: "/dashboard/cases", icon: FileText },
+  { name: "Workspaces", href: "/dashboard/workspaces", icon: Building2 },
+  { name: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
 
 const doctorRoutes = [
-  { name: "Overview", href: "/doctor", icon: LayoutDashboard },
-  { name: "Workspaces", href: "/doctor/workspaces", icon: Building2 },
-  { name: "Settings", href: "/doctor/settings", icon: Settings },
+  { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Cases", href: "/dashboard/cases", icon: FileText },
+  { name: "Workspaces", href: "/dashboard/workspaces", icon: Building2 },
+  { name: "Settings", href: "/dashboard/settings", icon: Settings },
 ];
 
 type UserSummary = {
@@ -36,39 +33,41 @@ type UserSummary = {
   name: string | null;
   email: string;
   avatar: string;
-  role?: string;
   globalRole?: string | null;
   workspaceId?: string;
 };
 
-// Add workspaces prop
-export function Sidebar({ role = "admin", user, workspaces = [] }: { role?: "admin" | "doctor", user?: UserSummary | null, workspaces?: any[] }) {
+export function Sidebar({
+  user,
+  workspaces = [],
+}: {
+  user?: UserSummary | null;
+  workspaces?: any[];
+}) {
   const pathname = usePathname();
-  const isWorkspaceAdmin = user?.role === "owner" || user?.role === "admin" || user?.role === "ADMIN";
+
+  // Derive effective role from globalRole
+  // ADMIN global role → admin routes; RADIOLOGIST → doctor routes
   const isGlobalAdmin = user?.globalRole === "ADMIN";
-
-  // We need to fix the logic:
-  // If user.workspaceId is missing, rely entirely on globalRole.
-  const effectiveRole = user?.workspaceId
-    ? (isWorkspaceAdmin ? "admin" : "doctor")
-    : (isGlobalAdmin ? "admin" : "doctor");
-
-  const routes = effectiveRole === "doctor" ? doctorRoutes : adminRoutes;
+  const routes = isGlobalAdmin ? adminRoutes : doctorRoutes;
 
   return (
-    <aside className="hidden md:flex flex-col w-75 border-r border-neutral-200 dark:border-slate-700/50 bg-neutral-50 dark:bg-gray-900 h-screen fixed left-0 top-0 z-40">
-      {/* Header with Workspace Switcher */}
+    <aside className="hidden md:flex flex-col w-64 border-r border-neutral-200 dark:border-slate-700/50 bg-neutral-50 dark:bg-gray-900 h-screen fixed left-0 top-0 z-40">
+      {/* Workspace Switcher */}
       <div className="h-20 flex items-center px-4 border-b border-neutral-200 dark:border-slate-700/50">
-        <WorkspaceSwitcher items={workspaces} userRole={user?.globalRole ?? undefined} />
+        <WorkspaceSwitcher
+          items={workspaces}
+          userRole={user?.globalRole ?? undefined}
+        />
       </div>
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-6 px-4 space-y-1">
         {routes.map((route) => {
-          // FIXED: Exact match for overview pages, prefix match for others
           const isActive =
             pathname === route.href ||
-            (pathname?.startsWith(route.href + "/") && route.href !== "/admin" && route.href !== "/doctor");
+            (route.href !== "/dashboard" &&
+              pathname?.startsWith(route.href + "/"));
 
           return (
             <Link
@@ -84,7 +83,9 @@ export function Sidebar({ role = "admin", user, workspaces = [] }: { role?: "adm
               <route.icon
                 className={cn(
                   "w-4 h-4",
-                  isActive ? "text-black dark:text-white" : "text-neutral-400 dark:text-slate-500"
+                  isActive
+                    ? "text-black dark:text-white"
+                    : "text-neutral-400 dark:text-slate-500"
                 )}
                 strokeWidth={2}
               />
@@ -94,13 +95,10 @@ export function Sidebar({ role = "admin", user, workspaces = [] }: { role?: "adm
         })}
       </nav>
 
-      {/* Footer Area */}
+      {/* Footer */}
       <div className="p-4 border-t border-neutral-200 dark:border-slate-700/50 space-y-4">
-
-        {/* The Logout Button */}
         <LogoutButton />
 
-        {/* User Profile Info */}
         <div className="flex items-center gap-3 px-3">
           <div className="w-8 h-8 rounded-full bg-neutral-200 dark:bg-slate-700 flex items-center justify-center">
             <span className="text-xs font-bold text-neutral-600 dark:text-slate-300">
@@ -111,11 +109,9 @@ export function Sidebar({ role = "admin", user, workspaces = [] }: { role?: "adm
             <p className="text-sm font-medium text-black dark:text-white truncate">
               {user?.name || "User"}
             </p>
-            <div className="flex items-center gap-1.5">
-              <span className="text-[10px] uppercase font-bold text-neutral-600 dark:text-slate-400 bg-neutral-200 dark:bg-slate-700/50 px-1.5 py-0.5 rounded">
-                {user?.globalRole || user?.role || "USER"}
-              </span>
-            </div>
+            <span className="text-[10px] uppercase font-bold text-neutral-600 dark:text-slate-400 bg-neutral-200 dark:bg-slate-700/50 px-1.5 py-0.5 rounded">
+              {user?.globalRole || "USER"}
+            </span>
           </div>
         </div>
       </div>
