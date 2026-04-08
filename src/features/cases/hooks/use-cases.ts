@@ -1,90 +1,62 @@
 "use client";
 
-import {
-    useQuery,
-    useMutation,
-    useQueryClient,
-} from "@tanstack/react-query";
-import { casesApi } from "@/lib/api/cases.api";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { makeCasesClient } from "@/lib/api/cases.client";
 import { useWorkspace } from "@/providers/workspace-provider";
 import type { CaseUpdate } from "@/lib/types/case.types";
 
-// ── Query keys ─────────────────────────────────────────────────────────────
-
 export const caseKeys = {
     all: ["cases"] as const,
-    list: (workspaceId: string) =>
-        [...caseKeys.all, workspaceId, "list"] as const,
-    stats: (workspaceId: string) =>
-        [...caseKeys.all, workspaceId, "stats"] as const,
-    recent: (workspaceId: string) =>
-        [...caseKeys.all, workspaceId, "recent"] as const,
+    list: (workspaceId: string) => [...caseKeys.all, workspaceId, "list"] as const,
+    stats: (workspaceId: string) => [...caseKeys.all, workspaceId, "stats"] as const,
+    recent: (workspaceId: string) => [...caseKeys.all, workspaceId, "recent"] as const,
     detail: (workspaceId: string, caseId: string) =>
         [...caseKeys.all, workspaceId, caseId] as const,
 };
 
-// ── Queries ────────────────────────────────────────────────────────────────
-
 export function useCases() {
-    const { activeWorkspaceId } = useWorkspace();
-
+    const { token, activeWorkspaceId } = useWorkspace();
     return useQuery({
         queryKey: caseKeys.list(activeWorkspaceId ?? ""),
-        queryFn: () => casesApi.list(activeWorkspaceId!),
-        enabled: !!activeWorkspaceId,
+        queryFn: () => makeCasesClient(token, activeWorkspaceId!).list(),
+        enabled: !!activeWorkspaceId && !!token,
     });
 }
 
 export function useCaseStats() {
-    const { activeWorkspaceId } = useWorkspace();
-
+    const { token, activeWorkspaceId } = useWorkspace();
     return useQuery({
         queryKey: caseKeys.stats(activeWorkspaceId ?? ""),
-        queryFn: () => casesApi.stats(activeWorkspaceId!),
-        enabled: !!activeWorkspaceId,
+        queryFn: () => makeCasesClient(token, activeWorkspaceId!).stats(),
+        enabled: !!activeWorkspaceId && !!token,
     });
 }
 
 export function useRecentCases() {
-    const { activeWorkspaceId } = useWorkspace();
-
+    const { token, activeWorkspaceId } = useWorkspace();
     return useQuery({
         queryKey: caseKeys.recent(activeWorkspaceId ?? ""),
-        queryFn: () => casesApi.recent(activeWorkspaceId!),
-        enabled: !!activeWorkspaceId,
+        queryFn: () => makeCasesClient(token, activeWorkspaceId!).recent(),
+        enabled: !!activeWorkspaceId && !!token,
     });
 }
 
 export function useCase(caseId: string | undefined) {
-    const { activeWorkspaceId } = useWorkspace();
-
+    const { token, activeWorkspaceId } = useWorkspace();
     return useQuery({
         queryKey: caseKeys.detail(activeWorkspaceId ?? "", caseId ?? ""),
-        queryFn: () => casesApi.get(caseId!, activeWorkspaceId!),
-        enabled: !!activeWorkspaceId && !!caseId,
+        queryFn: () => makeCasesClient(token, activeWorkspaceId!).get(caseId!),
+        enabled: !!activeWorkspaceId && !!caseId && !!token,
     });
 }
-
-// ── Mutations ──────────────────────────────────────────────────────────────
 
 export function useCreateCase() {
     const qc = useQueryClient();
     const { activeWorkspaceId } = useWorkspace();
-
+    // Case creation uses multipart — handled by server action, not clientFetch
+    // This mutation just triggers cache invalidation after the action completes
     return useMutation({
-        mutationFn: ({
-            patientId,
-            scans,
-            options,
-        }: {
-            patientId: string;
-            scans: File[];
-            options?: {
-                priority?: string;
-                assignedToMemberId?: string;
-                notes?: string;
-            };
-        }) => casesApi.create(patientId, scans, activeWorkspaceId!, options),
+        mutationFn: async (_: void) => { },
         onSuccess: () => {
             qc.invalidateQueries({ queryKey: caseKeys.list(activeWorkspaceId!) });
             qc.invalidateQueries({ queryKey: caseKeys.stats(activeWorkspaceId!) });
@@ -95,16 +67,10 @@ export function useCreateCase() {
 
 export function useUpdateCase() {
     const qc = useQueryClient();
-    const { activeWorkspaceId } = useWorkspace();
-
+    const { token, activeWorkspaceId } = useWorkspace();
     return useMutation({
-        mutationFn: ({
-            caseId,
-            data,
-        }: {
-            caseId: string;
-            data: CaseUpdate;
-        }) => casesApi.update(caseId, data, activeWorkspaceId!),
+        mutationFn: ({ caseId, data }: { caseId: string; data: CaseUpdate }) =>
+            makeCasesClient(token, activeWorkspaceId!).update(caseId, data),
         onSuccess: (updated) => {
             qc.invalidateQueries({ queryKey: caseKeys.list(activeWorkspaceId!) });
             qc.invalidateQueries({ queryKey: caseKeys.stats(activeWorkspaceId!) });
@@ -119,11 +85,10 @@ export function useUpdateCase() {
 
 export function useDeleteCase() {
     const qc = useQueryClient();
-    const { activeWorkspaceId } = useWorkspace();
-
+    const { token, activeWorkspaceId } = useWorkspace();
     return useMutation({
         mutationFn: (caseId: string) =>
-            casesApi.delete(caseId, activeWorkspaceId!),
+            makeCasesClient(token, activeWorkspaceId!).delete(caseId),
         onSuccess: (_, caseId) => {
             qc.invalidateQueries({ queryKey: caseKeys.list(activeWorkspaceId!) });
             qc.invalidateQueries({ queryKey: caseKeys.stats(activeWorkspaceId!) });

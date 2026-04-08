@@ -11,31 +11,25 @@ import {
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 
-// ── Types ──────────────────────────────────────────────────────────────────
-
 interface WorkspaceContextValue {
-    /** The currently active workspace ID, or undefined if none */
     activeWorkspaceId: string | undefined;
-    /** Switch to a different workspace — updates cookie + invalidates all queries */
+    token: string;
     switchWorkspace: (workspaceId: string) => void;
     isSwitching: boolean;
 }
 
-// ── Context ────────────────────────────────────────────────────────────────
-
 const WorkspaceContext = createContext<WorkspaceContextValue | null>(null);
-
-// ── Provider ───────────────────────────────────────────────────────────────
 
 interface WorkspaceProviderProps {
     children: ReactNode;
-    /** Initial active workspace ID, resolved server-side and passed as prop */
     initialWorkspaceId?: string;
+    token: string;
 }
 
 export function WorkspaceProvider({
     children,
     initialWorkspaceId,
+    token,
 }: WorkspaceProviderProps) {
     const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | undefined>(initialWorkspaceId);
     const [isSwitching, startTransition] = useTransition();
@@ -47,19 +41,12 @@ export function WorkspaceProvider({
             if (workspaceId === activeWorkspaceId) return;
 
             startTransition(async () => {
-                // Update cookie via server action
                 const { setActiveWorkspaceCookie } = await import(
                     "@/features/workspaces/actions/workspace.actions"
                 );
                 await setActiveWorkspaceCookie(workspaceId);
-
-                // Update local state immediately for instant UI response
                 setActiveWorkspaceId(workspaceId);
-
-                // Invalidate all workspace-scoped queries so they refetch with new ID
                 await queryClient.invalidateQueries();
-
-                // Refresh server components (layouts, page.tsx) to pick up new cookie
                 router.refresh();
             });
         },
@@ -68,14 +55,12 @@ export function WorkspaceProvider({
 
     return (
         <WorkspaceContext.Provider
-            value={{ activeWorkspaceId, switchWorkspace, isSwitching }}
+            value={{ activeWorkspaceId, token, switchWorkspace, isSwitching }}
         >
             {children}
         </WorkspaceContext.Provider>
     );
 }
-
-// ── Hook ───────────────────────────────────────────────────────────────────
 
 export function useWorkspace() {
     const ctx = useContext(WorkspaceContext);

@@ -1,81 +1,56 @@
 "use client";
 
-import {
-    useQuery,
-    useMutation,
-    useQueryClient,
-} from "@tanstack/react-query";
-import { patientsApi } from "@/lib/api/patients.api";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { makePatientsClient } from "@/lib/api/patients.client";
 import { useWorkspace } from "@/providers/workspace-provider";
 import type { PatientCreate, PatientUpdate } from "@/lib/types/patient.types";
 
-// ── Query keys ─────────────────────────────────────────────────────────────
-
 export const patientKeys = {
     all: ["patients"] as const,
-    list: (workspaceId: string) =>
-        [...patientKeys.all, workspaceId, "list"] as const,
+    list: (workspaceId: string) => [...patientKeys.all, workspaceId, "list"] as const,
     detail: (workspaceId: string, patientId: string) =>
         [...patientKeys.all, workspaceId, patientId] as const,
 };
 
-// ── Queries ────────────────────────────────────────────────────────────────
-
 export function usePatients() {
-    const { activeWorkspaceId } = useWorkspace();
-
+    const { token, activeWorkspaceId } = useWorkspace();
     return useQuery({
         queryKey: patientKeys.list(activeWorkspaceId ?? ""),
-        queryFn: () => patientsApi.list(activeWorkspaceId!),
-        enabled: !!activeWorkspaceId,
+        queryFn: () => makePatientsClient(token, activeWorkspaceId!).list(),
+        enabled: !!activeWorkspaceId && !!token,
     });
 }
 
 export function usePatient(patientId: string | undefined) {
-    const { activeWorkspaceId } = useWorkspace();
-
+    const { token, activeWorkspaceId } = useWorkspace();
     return useQuery({
         queryKey: patientKeys.detail(activeWorkspaceId ?? "", patientId ?? ""),
-        queryFn: () => patientsApi.get(patientId!, activeWorkspaceId!),
-        enabled: !!activeWorkspaceId && !!patientId,
+        queryFn: () =>
+            makePatientsClient(token, activeWorkspaceId!).get(patientId!),
+        enabled: !!activeWorkspaceId && !!patientId && !!token,
     });
 }
 
-// ── Mutations ──────────────────────────────────────────────────────────────
-
 export function useCreatePatient() {
     const qc = useQueryClient();
-    const { activeWorkspaceId } = useWorkspace();
-
+    const { token, activeWorkspaceId } = useWorkspace();
     return useMutation({
         mutationFn: (data: PatientCreate) =>
-            patientsApi.create(data, activeWorkspaceId!),
+            makePatientsClient(token, activeWorkspaceId!).create(data),
         onSuccess: () => {
-            qc.invalidateQueries({
-                queryKey: patientKeys.list(activeWorkspaceId!),
-            });
+            qc.invalidateQueries({ queryKey: patientKeys.list(activeWorkspaceId!) });
         },
     });
 }
 
 export function useUpdatePatient() {
     const qc = useQueryClient();
-    const { activeWorkspaceId } = useWorkspace();
-
+    const { token, activeWorkspaceId } = useWorkspace();
     return useMutation({
-        mutationFn: ({
-            patientId,
-            data,
-        }: {
-            patientId: string;
-            data: PatientUpdate;
-        }) => patientsApi.update(patientId, data, activeWorkspaceId!),
+        mutationFn: ({ patientId, data }: { patientId: string; data: PatientUpdate }) =>
+            makePatientsClient(token, activeWorkspaceId!).update(patientId, data),
         onSuccess: (updated) => {
-            // Update the list cache directly — no need to refetch
-            qc.invalidateQueries({
-                queryKey: patientKeys.list(activeWorkspaceId!),
-            });
-            // Also update the detail cache if it exists
+            qc.invalidateQueries({ queryKey: patientKeys.list(activeWorkspaceId!) });
             qc.setQueryData(
                 patientKeys.detail(activeWorkspaceId!, updated.id),
                 updated
@@ -86,15 +61,12 @@ export function useUpdatePatient() {
 
 export function useDeletePatient() {
     const qc = useQueryClient();
-    const { activeWorkspaceId } = useWorkspace();
-
+    const { token, activeWorkspaceId } = useWorkspace();
     return useMutation({
         mutationFn: (patientId: string) =>
-            patientsApi.delete(patientId, activeWorkspaceId!),
+            makePatientsClient(token, activeWorkspaceId!).delete(patientId),
         onSuccess: (_, patientId) => {
-            qc.invalidateQueries({
-                queryKey: patientKeys.list(activeWorkspaceId!),
-            });
+            qc.invalidateQueries({ queryKey: patientKeys.list(activeWorkspaceId!) });
             qc.removeQueries({
                 queryKey: patientKeys.detail(activeWorkspaceId!, patientId),
             });
