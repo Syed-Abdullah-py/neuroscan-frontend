@@ -1,17 +1,63 @@
-export default function DashboardPage() {
+import { redirect } from "next/navigation";
+import { getCurrentUser } from "@/features/auth/actions/auth.actions";
+import { workspacesApi } from "@/lib/api/workspaces.api";
+import { casesApi } from "@/lib/api/cases.api";
+import { patientsApi } from "@/lib/api/patients.api";
+import { ApiError } from "@/lib/api/client";
+import { DashboardShell } from "@/features/dashboard/components/dashboard-shell";
+
+export default async function DashboardPage() {
+    const user = await getCurrentUser();
+    if (!user) redirect("/login");
+
+    // Resolve active workspace
+    let memberships: any[] = [];
+    try {
+        memberships = await workspacesApi.list();
+    } catch (err) {
+        const e = err as ApiError;
+        if (e?.status === 401) redirect("/login");
+    }
+
+    const activeWorkspace =
+        memberships.find((m) => m.workspace_id === user.workspaceId) ??
+        memberships[0];
+
+    const workspaceId = activeWorkspace?.workspace_id;
+
+    // Prefetch data server-side so the page renders with content immediately
+    // All errors are caught — the client hooks will retry if needed
+    const [stats, recentCases, members, joinRequests] = await Promise.all([
+        workspaceId
+            ? casesApi.stats(workspaceId).catch(() => null)
+            : Promise.resolve(null),
+        workspaceId
+            ? casesApi.recent(workspaceId).catch(() => [])
+            : Promise.resolve([]),
+        workspaceId
+            ? workspacesApi.listMembers(workspaceId).catch(() => [])
+            : Promise.resolve([]),
+        workspaceId && (activeWorkspace?.role === "OWNER" || activeWorkspace?.role === "ADMIN")
+            ? workspacesApi.listJoinRequests(workspaceId).catch(() => [])
+            : Promise.resolve([]),
+    ]);
+
     return (
-        <div className="flex items-center justify-center min-h-[60vh]">
-            <div className="text-center space-y-3">
-                <div className="w-12 h-12 rounded-2xl bg-neutral-100 dark:bg-slate-800 flex items-center justify-center mx-auto">
-                    <span className="text-2xl">🧠</span>
-                </div>
-                <h1 className="text-xl font-bold text-black dark:text-white">
-                    Dashboard
-                </h1>
-                <p className="text-sm text-neutral-500">
-                    Coming in Phase 5.
-                </p>
-            </div>
-        </div>
+        <DashboardShell
+            user={{
+                id: user.id,
+                name: user.name,
+                email: user.email,
+                globalRole: user.globalRole,
+                avatar: user.avatar,
+                workspaceId,
+            }}
+            workspaceRole={activeWorkspace?.role ?? null}
+            workspaceId={workspaceId ?? null}
+            initialStats={stats}
+            initialRecentCases={recentCases as any[]}
+            initialMembers={members as any[]}
+            initialJoinRequests={joinRequests as any[]}
+        />
     );
 }
