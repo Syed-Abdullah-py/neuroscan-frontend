@@ -7,45 +7,99 @@ import { patientKeys } from "@/features/patients/hooks/use-patients";
 import { caseKeys } from "@/features/cases/hooks/use-cases";
 import type { WorkspaceSSEEvent } from "@/lib/types/workspace.types";
 
-/**
- * Connects to the SSE proxy at /api/events and invalidates
- * the relevant React Query caches when workspace events arrive.
- *
- * The EventSource connects to our Next.js API route which injects
- * the Authorization header server-side — browsers can't set custom
- * headers on EventSource directly.
- */
 export function useWorkspaceEvents(workspaceId: string | undefined) {
     const qc = useQueryClient();
     const esRef = useRef<EventSource | null>(null);
-    // Track reconnect attempts to implement exponential backoff
     const reconnectDelay = useRef(1000);
+
+    const handleEvent = useCallback(
+        (event: WorkspaceSSEEvent) => {
+            if (!workspaceId) return;
+
+            switch (event.type) {
+                case "member.invited":
+                    // Invalidate the workspace's sent invitations list (admin sees this)
+                    qc.invalidateQueries({
+                        queryKey: workspaceKeys.invitations(workspaceId),
+                    });
+                    break;
+
+                case "member.joined":
+                    qc.invalidateQueries({
+                        queryKey: workspaceKeys.members(workspaceId),
+                    });
+                    qc.invalidateQueries({
+                        queryKey: workspaceKeys.joinRequests(workspaceId),
+                    });
+                    qc.invalidateQueries({
+                        queryKey: workspaceKeys.lists(),
+                    });
+                    break;
+
+                case "member.removed":
+                    qc.invalidateQueries({
+                        queryKey: workspaceKeys.members(workspaceId),
+                    });
+                    break;
+
+                case "patient.created":
+                    qc.invalidateQueries({
+                        queryKey: patientKeys.list(workspaceId),
+                    });
+                    break;
+
+                case "case.created":
+                    qc.invalidateQueries({
+                        queryKey: caseKeys.list(workspaceId),
+                    });
+                    qc.invalidateQueries({
+                        queryKey: caseKeys.stats(workspaceId),
+                    });
+                    qc.invalidateQueries({
+                        queryKey: caseKeys.recent(workspaceId),
+                    });
+                    break;
+
+                case "case.updated":
+                    qc.invalidateQueries({
+                        queryKey: caseKeys.list(workspaceId),
+                    });
+                    qc.invalidateQueries({
+                        queryKey: caseKeys.stats(workspaceId),
+                    });
+                    qc.invalidateQueries({
+                        queryKey: caseKeys.recent(workspaceId),
+                    });
+                    break;
+            }
+        },
+        [workspaceId, qc]
+    );
 
     const connect = useCallback(() => {
         if (!workspaceId) return;
 
-        // Close any existing connection before opening a new one
         esRef.current?.close();
 
-        const url = `/api/events?workspaceId=${workspaceId}`;
-        const es = new EventSource(url);
+        const es = new EventSource(`/api/events?workspaceId=${workspaceId}`);
         esRef.current = es;
 
         es.onopen = () => {
-            // Reset backoff on successful connection
             reconnectDelay.current = 1000;
         };
 
+        // Handle both generic messages and named events
         es.onmessage = (event) => {
+            // Skip keepalive comments
+            if (!event.data || event.data.trim() === "") return;
             try {
                 const parsed = JSON.parse(event.data) as WorkspaceSSEEvent;
                 handleEvent(parsed);
             } catch {
-                // Malformed event — ignore
+                // Not JSON — ignore (heartbeat comments come through here too)
             }
         };
 
-        // Handle named events from the backend
         const eventTypes: WorkspaceSSEEvent["type"][] = [
             "member.invited",
             "member.joined",
@@ -58,10 +112,10 @@ export function useWorkspaceEvents(workspaceId: string | undefined) {
         eventTypes.forEach((type) => {
             es.addEventListener(type, (event: MessageEvent) => {
                 try {
-                    const parsed = JSON.parse(event.data) as WorkspaceSSEEvent;
+                    const parsed = JSON.parse(event.data);
                     handleEvent({ ...parsed, type });
                 } catch {
-                    // Ignore
+                    handleEvent({ type, payload: {} });
                 }
             });
         });
@@ -69,58 +123,36 @@ export function useWorkspaceEvents(workspaceId: string | undefined) {
         es.onerror = () => {
             es.close();
             esRef.current = null;
-
-            // Exponential backoff: 1s → 2s → 4s → 8s → max 30s
             const delay = Math.min(reconnectDelay.current, 30000);
             reconnectDelay.current = delay * 2;
-
             setTimeout(connect, delay);
         };
-    }, [workspaceId]); // eslint-disable-line react-hooks/exhaustive-deps
-
-    function handleEvent(event: WorkspaceSSEEvent) {
-        switch (event.type) {
-            case "member.invited":
-            case "member.joined":
-            case "member.removed":
-                qc.invalidateQueries({
-                    queryKey: workspaceKeys.members(workspaceId!),
-                });
-                qc.invalidateQueries({
-                    queryKey: workspaceKeys.joinRequests(workspaceId!),
-                });
-                qc.invalidateQueries({
-                    queryKey: workspaceKeys.invitations(workspaceId!),
-                });
-                break;
-
-            case "patient.created":
-                qc.invalidateQueries({
-                    queryKey: patientKeys.list(workspaceId!),
-                });
-                break;
-
-            case "case.created":
-            case "case.updated":
-                qc.invalidateQueries({
-                    queryKey: caseKeys.list(workspaceId!),
-                });
-                qc.invalidateQueries({
-                    queryKey: caseKeys.stats(workspaceId!),
-                });
-                qc.invalidateQueries({
-                    queryKey: caseKeys.recent(workspaceId!),
-                });
-                break;
-        }
-    }
+    }, [workspaceId, handleEvent]);
 
     useEffect(() => {
         connect();
-
         return () => {
             esRef.current?.close();
             esRef.current = null;
         };
     }, [connect]);
+}
+
+/**
+ * Polls the user's own invitations every 30 seconds.
+ * SSE can't deliver cross-workspace notifications to users
+ * who aren't yet members — polling is the correct pattern here.
+ */
+export function useInvitationPolling() {
+    const qc = useQueryClient();
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            qc.invalidateQueries({
+                queryKey: workspaceKeys.myInvitations(),
+            });
+        }, 30_000);
+
+        return () => clearInterval(interval);
+    }, [qc]);
 }
