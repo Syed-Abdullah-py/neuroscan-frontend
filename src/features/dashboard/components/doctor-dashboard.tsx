@@ -134,7 +134,7 @@ export function DoctorDashboard({
                         </h2>
                     </div>
                     <Link
-                        href="/dashboard/cases"
+                        href="/cases"
                         className="text-xs font-bold text-neutral-500 hover:text-black dark:hover:text-white transition-colors"
                     >
                         View all →
@@ -221,7 +221,7 @@ export function DoctorDashboard({
                                             </td>
                                             <td className="py-3.5 px-5 text-right">
                                                 <Link
-                                                    href={`/dashboard/cases/${c.id}`}
+                                                    href={`/cases/${c.id}`}
                                                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-slate-700 text-xs font-bold text-black dark:text-white hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black hover:border-black dark:hover:border-white transition-all"
                                                 >
                                                     Open

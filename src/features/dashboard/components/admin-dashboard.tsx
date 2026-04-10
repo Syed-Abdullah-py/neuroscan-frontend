@@ -259,28 +259,28 @@ export function AdminDashboard({
                     <div className="grid grid-cols-2 gap-3">
                         {[
                             {
-                                href: "/dashboard/patients/new",
+                                href: "/patients/new",
                                 icon: UserPlus,
                                 label: "Add Patient",
                                 sub: "Register new patient",
                                 color: "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400",
                             },
                             {
-                                href: "/dashboard/cases/new",
+                                href: "/cases/new",
                                 icon: FileText,
                                 label: "New Case",
                                 sub: "Create diagnostic case",
                                 color: "bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400",
                             },
                             {
-                                href: "/dashboard/workspaces",
+                                href: "/workspaces",
                                 icon: Users,
                                 label: "Manage Team",
                                 sub: "Members & invitations",
                                 color: "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400",
                             },
                             {
-                                href: "/dashboard/cases",
+                                href: "/cases",
                                 icon: Activity,
                                 label: "All Cases",
                                 sub: "View case list",
@@ -331,7 +331,7 @@ export function AdminDashboard({
                             />
                         </div>
                         <Link
-                            href="/dashboard/patients/new"
+                            href="/patients/new"
                             className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-black dark:bg-white text-white dark:text-black text-xs font-bold hover:opacity-90 transition-all"
                         >
                             <UserPlus className="w-3.5 h-3.5" />
@@ -407,7 +407,7 @@ export function AdminDashboard({
                                         </td>
                                         <td className="py-3.5 px-5 text-right">
                                             <Link
-                                                href={`/dashboard/patients`}
+                                                href={`/patients`}
                                                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-slate-700 text-xs font-bold text-black dark:text-white hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black hover:border-black dark:hover:border-white transition-all"
                                             >
                                                 View
@@ -422,7 +422,7 @@ export function AdminDashboard({
                     {filteredPatients.length > 10 && (
                         <div className="px-5 py-3 border-t border-neutral-100 dark:border-slate-700/50 bg-neutral-50/50 dark:bg-gray-900/30">
                             <Link
-                                href="/dashboard/patients"
+                                href="/patients"
                                 className="text-xs font-bold text-neutral-500 hover:text-black dark:hover:text-white transition-colors"
                             >
                                 View all {filteredPatients.length} patients →
@@ -442,7 +442,7 @@ export function AdminDashboard({
                         </h2>
                     </div>
                     <Link
-                        href="/dashboard/cases"
+                        href="/cases"
                         className="text-xs font-bold text-neutral-500 hover:text-black dark:hover:text-white transition-colors"
                     >
                         View all →
@@ -530,7 +530,7 @@ function CaseRow({ caseItem: c }: { caseItem: any }) {
             </td>
             <td className="py-3.5 px-5 text-right">
                 <Link
-                    href={`/dashboard/cases/${c.id}`}
+                    href={`/cases/${c.id}`}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-slate-700 text-xs font-bold text-black dark:text-white hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black hover:border-black dark:hover:border-white transition-all"
                 >
                     Open
