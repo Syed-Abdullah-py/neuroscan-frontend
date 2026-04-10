@@ -7,18 +7,20 @@ function makeQueryClient() {
     return new QueryClient({
         defaultOptions: {
             queries: {
-                // Data is considered fresh for 30 seconds
-                staleTime: 30 * 1000,
-                // Keep unused data in cache for 5 minutes
-                gcTime: 5 * 60 * 1000,
-                // Don't retry on 4xx errors — they won't fix themselves
+                // Data stays fresh for 5 minutes — prevents redundant refetches
+                // on tab switch, component remount, or navigation
+                staleTime: 5 * 60 * 1000,
+                // Keep unused cache entries for 10 minutes
+                gcTime: 10 * 60 * 1000,
+                // Don't retry 4xx — they won't self-heal
                 retry: (failureCount, error: any) => {
                     if (error?.status >= 400 && error?.status < 500) return false;
                     return failureCount < 2;
                 },
-                // Don't refetch when window regains focus in a medical app
-                // — doctors shouldn't see data flicker mid-read
+                // Medical app — don't refetch mid-read when user switches tabs
                 refetchOnWindowFocus: false,
+                // But do refetch when network comes back after being offline
+                refetchOnReconnect: true,
             },
             mutations: {
                 retry: false,
@@ -27,15 +29,10 @@ function makeQueryClient() {
     });
 }
 
-// Singleton for server — prevents new client on every server render
-let browserQueryClient: QueryClient | undefined = undefined;
+let browserQueryClient: QueryClient | undefined;
 
 function getQueryClient() {
-    if (typeof window === "undefined") {
-        // Server: always make a new client
-        return makeQueryClient();
-    }
-    // Browser: reuse existing client
+    if (typeof window === "undefined") return makeQueryClient();
     if (!browserQueryClient) browserQueryClient = makeQueryClient();
     return browserQueryClient;
 }
@@ -45,9 +42,7 @@ export default function QueryProvider({
 }: {
     children: React.ReactNode;
 }) {
-    // useState ensures client isn't recreated on re-renders
     const [queryClient] = useState(() => getQueryClient());
-
     return (
         <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     );
