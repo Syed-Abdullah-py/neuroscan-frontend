@@ -1,20 +1,14 @@
 import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/features/auth/actions/auth.actions";
+import { getWorkspaceContext } from "@/lib/api/request-cache";
 import { workspacesApi } from "@/lib/api/workspaces.api";
 import { WorkspacesShell } from "@/features/workspaces/components/workspaces-shell";
+import type { WorkspaceRole } from "@/lib/types/workspace.types";
 
 export default async function WorkspacesPage() {
-    const user = await getCurrentUser();
-    if (!user) redirect("/login");
+    const ctx = await getWorkspaceContext();
+    if (!ctx?.user) redirect("/login");
 
-    const memberships = await workspacesApi.list().catch(() => []);
-
-    const activeWorkspace =
-        memberships.find((m) => m.workspace_id === user.workspaceId) ??
-        memberships[0];
-
-    const workspaceId = activeWorkspace?.workspace_id;
-    const workspaceRole = activeWorkspace?.role ?? null;
+    const { user, memberships, workspaceId, workspaceRole } = ctx;
 
     const [members, joinRequests, myInvitations, sentInvitations] =
         await Promise.all([
@@ -41,9 +35,9 @@ export default async function WorkspacesPage() {
                 globalRole: user.globalRole,
                 workspaceId,
             }}
-            memberships={memberships as any[]}
+            memberships={memberships}
             workspaceId={workspaceId ?? null}
-            workspaceRole={workspaceRole}
+            workspaceRole={(workspaceRole ?? null) as WorkspaceRole | null}
             initialMembers={members as any[]}
             initialJoinRequests={joinRequests as any[]}
             initialMyInvitations={myInvitations as any[]}

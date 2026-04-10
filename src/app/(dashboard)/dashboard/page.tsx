@@ -1,32 +1,16 @@
 import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/features/auth/actions/auth.actions";
-import { workspacesApi } from "@/lib/api/workspaces.api";
+import { getWorkspaceContext } from "@/lib/api/request-cache";
 import { casesApi } from "@/lib/api/cases.api";
-import { patientsApi } from "@/lib/api/patients.api";
-import { ApiError } from "@/lib/api/client";
+import { workspacesApi } from "@/lib/api/workspaces.api";
 import { DashboardShell } from "@/features/dashboard/components/dashboard-shell";
+import type { WorkspaceRole } from "@/lib/types/workspace.types";
 
 export default async function DashboardPage() {
-    const user = await getCurrentUser();
-    if (!user) redirect("/login");
+    const ctx = await getWorkspaceContext();
+    if (!ctx?.user) redirect("/login");
 
-    // Resolve active workspace
-    let memberships: any[] = [];
-    try {
-        memberships = await workspacesApi.list();
-    } catch (err) {
-        const e = err as ApiError;
-        if (e?.status === 401) redirect("/login");
-    }
+    const { user, workspaceId, workspaceRole } = ctx;
 
-    const activeWorkspace =
-        memberships.find((m) => m.workspace_id === user.workspaceId) ??
-        memberships[0];
-
-    const workspaceId = activeWorkspace?.workspace_id;
-
-    // Prefetch data server-side so the page renders with content immediately
-    // All errors are caught — the client hooks will retry if needed
     const [stats, recentCases, members, joinRequests] = await Promise.all([
         workspaceId
             ? casesApi.stats(workspaceId).catch(() => null)
@@ -37,7 +21,8 @@ export default async function DashboardPage() {
         workspaceId
             ? workspacesApi.listMembers(workspaceId).catch(() => [])
             : Promise.resolve([]),
-        workspaceId && (activeWorkspace?.role === "OWNER" || activeWorkspace?.role === "ADMIN")
+        workspaceId &&
+            (workspaceRole === "OWNER" || workspaceRole === "ADMIN")
             ? workspacesApi.listJoinRequests(workspaceId).catch(() => [])
             : Promise.resolve([]),
     ]);
@@ -52,7 +37,7 @@ export default async function DashboardPage() {
                 avatar: user.avatar,
                 workspaceId,
             }}
-            workspaceRole={activeWorkspace?.role ?? null}
+            workspaceRole={(workspaceRole ?? null) as WorkspaceRole | null}
             workspaceId={workspaceId ?? null}
             initialStats={stats}
             initialRecentCases={recentCases as any[]}
