@@ -1,0 +1,1 @@
+export { WorkspacesPageSkeleton as default } from "@/components/skeletons";

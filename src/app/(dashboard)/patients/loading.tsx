@@ -1,0 +1,1 @@
+export { PatientsPageSkeleton as default } from "@/components/skeletons";

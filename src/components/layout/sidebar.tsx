@@ -1,14 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { useState, useTransition } from "react";
 import {
   LayoutDashboard,
   Users,
   FileText,
   Settings,
   Building2,
+  Loader2,
 } from "lucide-react";
 import WorkspaceSwitcher from "@/components/layout/workspace-switcher";
 import { LogoutButton } from "@/features/auth/components/logout-button";
@@ -45,11 +47,25 @@ export function Sidebar({
   workspaces?: any[];
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
 
-  // Derive effective role from globalRole
-  // ADMIN global role → admin routes; RADIOLOGIST → doctor routes
   const isGlobalAdmin = user?.globalRole === "ADMIN";
   const routes = isGlobalAdmin ? adminRoutes : doctorRoutes;
+
+  const handleNav = (href: string) => {
+    if (href === pathname) return;
+    setPendingHref(href);
+    startTransition(() => {
+      router.push(href);
+    });
+  };
+
+  // Clear pending state once navigation settles
+  if (pendingHref && !isPending) {
+    setPendingHref(null);
+  }
 
   return (
     <aside className="hidden md:flex flex-col w-64 border-r border-neutral-200 dark:border-slate-700/50 bg-neutral-50 dark:bg-gray-900 h-screen fixed left-0 top-0 z-40">
@@ -67,30 +83,39 @@ export function Sidebar({
           const isActive =
             pathname === route.href ||
             (route.href !== "/dashboard" &&
-              pathname?.startsWith(route.href));
+              pathname?.startsWith(route.href + "/"));
+
+          const isLoading = pendingHref === route.href && isPending;
 
           return (
-            <Link
+            <button
               key={route.href}
-              href={route.href}
+              onClick={() => handleNav(route.href)}
               className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all",
-                isActive
+                "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all text-left",
+                isActive || isLoading
                   ? "bg-neutral-200 dark:bg-slate-700/50 text-black dark:text-white"
                   : "text-neutral-600 dark:text-slate-400 hover:bg-neutral-100 dark:hover:bg-slate-700/30 hover:text-black dark:hover:text-slate-200"
               )}
             >
-              <route.icon
-                className={cn(
-                  "w-4 h-4",
-                  isActive
-                    ? "text-black dark:text-white"
-                    : "text-neutral-400 dark:text-slate-500"
-                )}
-                strokeWidth={2}
-              />
+              {isLoading ? (
+                <Loader2
+                  className="w-4 h-4 animate-spin text-neutral-400 dark:text-slate-500"
+                  strokeWidth={2}
+                />
+              ) : (
+                <route.icon
+                  className={cn(
+                    "w-4 h-4",
+                    isActive
+                      ? "text-black dark:text-white"
+                      : "text-neutral-400 dark:text-slate-500"
+                  )}
+                  strokeWidth={2}
+                />
+              )}
               {route.name}
-            </Link>
+            </button>
           );
         })}
       </nav>
@@ -98,7 +123,6 @@ export function Sidebar({
       {/* Footer */}
       <div className="p-4 border-t border-neutral-200 dark:border-slate-700/50 space-y-4">
         <LogoutButton />
-
         <div className="flex items-center gap-3 px-3">
           <div className="w-8 h-8 rounded-full bg-neutral-200 dark:bg-slate-700 flex items-center justify-center">
             <span className="text-xs font-bold text-neutral-600 dark:text-slate-300">

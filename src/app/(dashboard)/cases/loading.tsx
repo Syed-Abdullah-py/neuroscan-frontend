@@ -1,0 +1,1 @@
+export { CasesPageSkeleton as default } from "@/components/skeletons";
