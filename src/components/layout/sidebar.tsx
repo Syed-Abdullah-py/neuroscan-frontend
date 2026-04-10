@@ -15,17 +15,17 @@ import { LogoutButton } from "@/features/auth/components/logout-button";
 
 const adminRoutes = [
   { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Patients", href: "/dashboard/patients", icon: Users },
-  { name: "Cases", href: "/dashboard/cases", icon: FileText },
-  { name: "Workspaces", href: "/dashboard/workspaces", icon: Building2 },
-  { name: "Settings", href: "/dashboard/settings", icon: Settings },
+  { name: "Patients", href: "/patients", icon: Users },
+  { name: "Cases", href: "/cases", icon: FileText },
+  { name: "Workspaces", href: "/workspaces", icon: Building2 },
+  { name: "Settings", href: "/settings", icon: Settings },
 ];
 
 const doctorRoutes = [
   { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Cases", href: "/dashboard/cases", icon: FileText },
-  { name: "Workspaces", href: "/dashboard/workspaces", icon: Building2 },
-  { name: "Settings", href: "/dashboard/settings", icon: Settings },
+  { name: "Cases", href: "/cases", icon: FileText },
+  { name: "Workspaces", href: "/workspaces", icon: Building2 },
+  { name: "Settings", href: "/settings", icon: Settings },
 ];
 
 type UserSummary = {
@@ -67,7 +67,7 @@ export function Sidebar({
           const isActive =
             pathname === route.href ||
             (route.href !== "/dashboard" &&
-              pathname?.startsWith(route.href + "/"));
+              pathname?.startsWith(route.href));
 
           return (
             <Link
