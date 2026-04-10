@@ -1,0 +1,1 @@
+export { CaseDetailSkeleton as default } from "@/components/skeletons";

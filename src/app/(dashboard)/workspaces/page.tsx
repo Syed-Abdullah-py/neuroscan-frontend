@@ -1,19 +1,13 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/features/auth/actions/auth.actions";
 import { workspacesApi } from "@/lib/api/workspaces.api";
-import { ApiError } from "@/lib/api/client";
 import { WorkspacesShell } from "@/features/workspaces/components/workspaces-shell";
 
 export default async function WorkspacesPage() {
     const user = await getCurrentUser();
     if (!user) redirect("/login");
 
-    const [memberships, myInvitations, discoverableWorkspaces] =
-        await Promise.all([
-            workspacesApi.list().catch(() => []),
-            workspacesApi.myInvitations().catch(() => []),
-            workspacesApi.discover().catch(() => []),
-        ]);
+    const memberships = await workspacesApi.list().catch(() => []);
 
     const activeWorkspace =
         memberships.find((m) => m.workspace_id === user.workspaceId) ??
@@ -22,20 +16,21 @@ export default async function WorkspacesPage() {
     const workspaceId = activeWorkspace?.workspace_id;
     const workspaceRole = activeWorkspace?.role ?? null;
 
-    // Load members + invitations + join requests only if in a workspace
-    const [members, sentInvitations, joinRequests] = await Promise.all([
-        workspaceId
-            ? workspacesApi.listMembers(workspaceId).catch(() => [])
-            : Promise.resolve([]),
-        workspaceId &&
-            (workspaceRole === "OWNER" || workspaceRole === "ADMIN")
-            ? workspacesApi.listInvitations(workspaceId).catch(() => [])
-            : Promise.resolve([]),
-        workspaceId &&
-            (workspaceRole === "OWNER" || workspaceRole === "ADMIN")
-            ? workspacesApi.listJoinRequests(workspaceId).catch(() => [])
-            : Promise.resolve([]),
-    ]);
+    const [members, joinRequests, myInvitations, sentInvitations] =
+        await Promise.all([
+            workspaceId
+                ? workspacesApi.listMembers(workspaceId).catch(() => [])
+                : Promise.resolve([]),
+            workspaceId &&
+                (workspaceRole === "OWNER" || workspaceRole === "ADMIN")
+                ? workspacesApi.listJoinRequests(workspaceId).catch(() => [])
+                : Promise.resolve([]),
+            workspacesApi.myInvitations().catch(() => []),
+            workspaceId &&
+                (workspaceRole === "OWNER" || workspaceRole === "ADMIN")
+                ? workspacesApi.listInvitations(workspaceId).catch(() => [])
+                : Promise.resolve([]),
+        ]);
 
     return (
         <WorkspacesShell
@@ -46,14 +41,13 @@ export default async function WorkspacesPage() {
                 globalRole: user.globalRole,
                 workspaceId,
             }}
+            memberships={memberships as any[]}
+            workspaceId={workspaceId ?? null}
             workspaceRole={workspaceRole}
-            activeWorkspaceName={activeWorkspace?.workspace_name ?? null}
-            memberships={memberships}
-            members={members}
-            sentInvitations={sentInvitations}
-            myInvitations={myInvitations}
-            joinRequests={joinRequests}
-            discoverableWorkspaces={discoverableWorkspaces}
+            initialMembers={members as any[]}
+            initialJoinRequests={joinRequests as any[]}
+            initialMyInvitations={myInvitations as any[]}
+            initialSentInvitations={sentInvitations as any[]}
         />
     );
 }

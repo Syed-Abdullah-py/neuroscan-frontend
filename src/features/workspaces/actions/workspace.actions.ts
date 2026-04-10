@@ -17,179 +17,136 @@ export async function setActiveWorkspaceCookie(workspaceId: string) {
         path: "/",
         sameSite: "lax",
     });
+    revalidatePath("/", "layout");
 }
 
 // ── Workspace CRUD ─────────────────────────────────────────────────────────
 
-export async function createWorkspaceAction(
-    _prev: { success: boolean; message: string },
-    formData: FormData
-): Promise<{ success: boolean; message: string }> {
-    const name = (formData.get("name") as string)?.trim();
-    if (!name || name.length < 2) {
-        return { success: false, message: "Workspace name must be at least 2 characters." };
-    }
-
+export async function createWorkspaceAction(name: string) {
     try {
-        const workspace = await workspacesApi.create(name);
-        await setActiveWorkspaceCookie(workspace.id);
-        revalidatePath("/dashboard", "layout");
-        return { success: true, message: "Workspace created." };
+        const ws = await workspacesApi.create(name);
+        await setActiveWorkspaceCookie(ws.id);
+        revalidatePath("/workspaces");
+        revalidatePath("/dashboard");
+        return { success: true, message: "" };
     } catch (err) {
-        const e = err as ApiError;
-        return { success: false, message: e.message || "Failed to create workspace." };
+        if (err instanceof ApiError) return { success: false, message: err.message };
+        return { success: false, message: "Failed to create workspace." };
     }
 }
 
-export async function updateWorkspaceAction(
-    workspaceId: string,
-    name: string
-): Promise<{ success: boolean; message: string }> {
-    if (!name?.trim()) {
-        return { success: false, message: "Name is required." };
-    }
+export async function updateWorkspaceAction(workspaceId: string, name: string) {
     try {
-        await workspacesApi.update(workspaceId, name.trim());
-        revalidatePath("/dashboard", "layout");
+        await workspacesApi.update(workspaceId, name);
+        revalidatePath("/workspaces");
         return { success: true, message: "Workspace updated." };
     } catch (err) {
-        const e = err as ApiError;
-        return { success: false, message: e.message || "Failed to update." };
+        if (err instanceof ApiError) return { success: false, message: err.message };
+        return { success: false, message: "Failed to update workspace." };
     }
 }
 
-export async function deleteWorkspaceAction(
-    workspaceId: string
-): Promise<{ success: boolean; message: string }> {
+export async function deleteWorkspaceAction(workspaceId: string) {
     try {
         await workspacesApi.delete(workspaceId);
-
-        // Clear active workspace cookie if it was this one
         const cookieStore = await cookies();
         if (cookieStore.get("active_workspace")?.value === workspaceId) {
             cookieStore.delete("active_workspace");
         }
-
-        revalidatePath("/dashboard", "layout");
-        return { success: true, message: "Workspace deleted." };
+        revalidatePath("/workspaces");
     } catch (err) {
-        const e = err as ApiError;
-        return { success: false, message: e.message || "Failed to delete." };
+        if (err instanceof ApiError) return { success: false, message: err.message };
+        return { success: false, message: "Failed to delete workspace." };
     }
+    redirect("/workspaces");
 }
 
 // ── Members ────────────────────────────────────────────────────────────────
 
-export async function removeMemberAction(
-    workspaceId: string,
-    userId: string
-): Promise<{ success: boolean; message: string }> {
+export async function removeMemberAction(workspaceId: string, userId: string) {
     try {
         await workspacesApi.removeMember(workspaceId, userId);
-        revalidatePath("/dashboard/workspaces");
+        revalidatePath("/workspaces");
         return { success: true, message: "Member removed." };
     } catch (err) {
-        const e = err as ApiError;
-        return { success: false, message: e.message || "Failed to remove member." };
+        if (err instanceof ApiError) return { success: false, message: err.message };
+        return { success: false, message: "Failed to remove member." };
     }
 }
 
 // ── Invitations ────────────────────────────────────────────────────────────
 
-export async function inviteMemberAction(
-    workspaceId: string,
-    email: string
-): Promise<{ success: boolean; message: string }> {
-    if (!email?.includes("@")) {
-        return { success: false, message: "Valid email required." };
-    }
+export async function inviteMemberAction(workspaceId: string, email: string) {
     try {
-        await workspacesApi.invite(workspaceId, email.trim().toLowerCase());
-        revalidatePath("/dashboard/workspaces");
-        return { success: true, message: `Invitation sent to ${email}.` };
+        await workspacesApi.invite(workspaceId, email);
+        revalidatePath("/workspaces");
+        return { success: true, message: "Invitation sent." };
     } catch (err) {
-        const e = err as ApiError;
-        return { success: false, message: e.message || "Failed to send invitation." };
+        if (err instanceof ApiError) return { success: false, message: err.message };
+        return { success: false, message: "Failed to send invitation." };
     }
 }
 
-export async function acceptInvitationAction(
-    invitationId: string
-): Promise<{ success: boolean; message: string }> {
+export async function acceptInvitationAction(invitationId: string) {
     try {
-        await workspacesApi.acceptInvitation(invitationId);
-        revalidatePath("/dashboard", "layout");
-        return { success: true, message: "Invitation accepted." };
+        const result = await workspacesApi.acceptInvitation(invitationId);
+        revalidatePath("/workspaces");
+        revalidatePath("/dashboard");
+        return { success: true, message: result.message };
     } catch (err) {
-        const e = err as ApiError;
-        return { success: false, message: e.message || "Failed to accept." };
+        if (err instanceof ApiError) return { success: false, message: err.message };
+        return { success: false, message: "Failed to accept invitation." };
     }
 }
 
-export async function rejectInvitationAction(
-    invitationId: string
-): Promise<{ success: boolean; message: string }> {
+export async function rejectInvitationAction(invitationId: string) {
     try {
-        await workspacesApi.rejectInvitation(invitationId);
-        revalidatePath("/dashboard/workspaces");
-        return { success: true, message: "Invitation declined." };
+        const result = await workspacesApi.rejectInvitation(invitationId);
+        revalidatePath("/workspaces");
+        return { success: true, message: result.message };
     } catch (err) {
-        const e = err as ApiError;
-        return { success: false, message: e.message || "Failed to reject." };
+        if (err instanceof ApiError) return { success: false, message: err.message };
+        return { success: false, message: "Failed to reject invitation." };
     }
 }
 
 // ── Join requests ──────────────────────────────────────────────────────────
 
-export async function requestJoinAction(
-    workspaceId: string
-): Promise<{ success: boolean; message: string }> {
-    try {
-        await workspacesApi.requestJoin(workspaceId);
-        return { success: true, message: "Join request sent." };
-    } catch (err) {
-        const e = err as ApiError;
-        return { success: false, message: e.message || "Failed to send request." };
-    }
-}
-
 export async function approveJoinRequestAction(
     requestId: string,
     workspaceId: string
-): Promise<{ success: boolean; message: string }> {
+) {
     try {
         await workspacesApi.approveJoinRequest(requestId, workspaceId);
-        revalidatePath("/dashboard/workspaces");
+        revalidatePath("/workspaces");
         return { success: true, message: "Request approved." };
     } catch (err) {
-        const e = err as ApiError;
-        return { success: false, message: e.message || "Failed to approve." };
+        if (err instanceof ApiError) return { success: false, message: err.message };
+        return { success: false, message: "Failed to approve request." };
     }
 }
 
 export async function rejectJoinRequestAction(
     requestId: string,
     workspaceId: string
-): Promise<{ success: boolean; message: string }> {
+) {
     try {
         await workspacesApi.rejectJoinRequest(requestId, workspaceId);
-        revalidatePath("/dashboard/workspaces");
+        revalidatePath("/workspaces");
         return { success: true, message: "Request rejected." };
     } catch (err) {
-        const e = err as ApiError;
-        return { success: false, message: e.message || "Failed to reject." };
+        if (err instanceof ApiError) return { success: false, message: err.message };
+        return { success: false, message: "Failed to reject request." };
     }
 }
 
-// ── Shim for legacy imports in auth-actions.ts ─────────────────────────────
-
-export async function switchWorkspace(
-    workspaceId: string
-): Promise<{ success: boolean; message?: string }> {
+export async function requestJoinAction(workspaceId: string) {
     try {
-        await setActiveWorkspaceCookie(workspaceId);
-        return { success: true };
-    } catch {
-        return { success: false, message: "Failed to switch workspace." };
+        await workspacesApi.requestJoin(workspaceId);
+        revalidatePath("/workspaces");
+        return { success: true, message: "Join request sent." };
+    } catch (err) {
+        if (err instanceof ApiError) return { success: false, message: err.message };
+        return { success: false, message: "Failed to send join request." };
     }
 }

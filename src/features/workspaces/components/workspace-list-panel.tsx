@@ -43,10 +43,7 @@ export function WorkspaceListPanel({
     const handleCreate = () => {
         if (!name.trim()) return;
         startTransition(async () => {
-            const res = await createWorkspaceAction(
-                { success: false, message: "" },
-                (() => { const fd = new FormData(); fd.set("name", name); return fd; })()
-            );
+            const res = await createWorkspaceAction(name);
             setMsg({ text: res.message, ok: res.success });
             if (res.success) {
                 setName("");
