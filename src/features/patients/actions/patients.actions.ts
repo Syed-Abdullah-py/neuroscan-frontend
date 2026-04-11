@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { patientsApi } from "@/lib/api/patients.api";
 import { ApiError } from "@/lib/api/client";
 import { getCurrentUser } from "@/features/auth/actions/auth.actions";
@@ -69,7 +68,7 @@ export async function createPatientAction(
 
     revalidatePath("/patients");
     revalidatePath("/dashboard");
-    redirect("/patients");
+    return { success: true, message: "" };
 }
 
 // ── Update ─────────────────────────────────────────────────────────────────

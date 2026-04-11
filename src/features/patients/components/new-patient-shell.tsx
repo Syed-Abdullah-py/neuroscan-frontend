@@ -1,6 +1,8 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import { ArrowLeft, Loader2, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -19,11 +21,21 @@ interface NewPatientShellProps {
     workspaceRole: WorkspaceRole | null;
 }
 
-export function NewPatientShell({ workspaceRole }: NewPatientShellProps) {
+export function NewPatientShell({ workspaceRole: _ }: NewPatientShellProps) {
     const [state, action, isPending] = useActionState(
         createPatientAction,
         initialState
     );
+    const router = useRouter();
+    const queryClient = useQueryClient();
+
+    // On success: remove cached data entirely so initialData from the server render is used
+    useEffect(() => {
+        if (state.success) {
+            queryClient.removeQueries({ queryKey: ["patients"] });
+            router.push("/patients");
+        }
+    }, [state.success]);
 
     return (
         <div className="max-w-2xl mx-auto space-y-6">

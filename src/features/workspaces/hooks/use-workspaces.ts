@@ -139,12 +139,14 @@ export function useRejectInvitation() {
     });
 }
 
-export function useJoinRequests(workspaceId: string | undefined) {
+export function useJoinRequests(workspaceId: string | undefined, initialData?: any[]) {
     const { token } = useWorkspace();
     return useQuery({
         queryKey: workspaceKeys.joinRequests(workspaceId ?? ""),
         queryFn: () => makeWorkspacesClient(token).listJoinRequests(workspaceId!),
         enabled: !!workspaceId && !!token,
+        initialData: initialData,
+        initialDataUpdatedAt: initialData ? Date.now() : undefined,
     });
 }
 

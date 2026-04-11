@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { makeCasesClient } from "@/lib/api/cases.client";
 import { useWorkspace } from "@/providers/workspace-provider";
-import type { CaseUpdate } from "@/lib/types/case.types";
+import type { Case, CaseStats, CaseUpdate } from "@/lib/types/case.types";
 
 export const caseKeys = {
     all: ["cases"] as const,
@@ -14,30 +14,37 @@ export const caseKeys = {
         [...caseKeys.all, workspaceId, caseId] as const,
 };
 
-export function useCases() {
+export function useCases(initialData?: Case[]) {
     const { token, activeWorkspaceId } = useWorkspace();
     return useQuery({
         queryKey: caseKeys.list(activeWorkspaceId ?? ""),
         queryFn: () => makeCasesClient(token, activeWorkspaceId!).list(),
         enabled: !!activeWorkspaceId && !!token,
+        // Seed the cache with server-fetched data so isLoading is false on first render
+        initialData: initialData,
+        initialDataUpdatedAt: initialData ? Date.now() : undefined,
     });
 }
 
-export function useCaseStats() {
+export function useCaseStats(initialData?: CaseStats | null) {
     const { token, activeWorkspaceId } = useWorkspace();
     return useQuery({
         queryKey: caseKeys.stats(activeWorkspaceId ?? ""),
         queryFn: () => makeCasesClient(token, activeWorkspaceId!).stats(),
         enabled: !!activeWorkspaceId && !!token,
+        initialData: initialData ?? undefined,
+        initialDataUpdatedAt: initialData ? Date.now() : undefined,
     });
 }
 
-export function useRecentCases() {
+export function useRecentCases(initialData?: any[]) {
     const { token, activeWorkspaceId } = useWorkspace();
     return useQuery({
         queryKey: caseKeys.recent(activeWorkspaceId ?? ""),
         queryFn: () => makeCasesClient(token, activeWorkspaceId!).recent(),
         enabled: !!activeWorkspaceId && !!token,
+        initialData: initialData,
+        initialDataUpdatedAt: initialData ? Date.now() : undefined,
     });
 }
 

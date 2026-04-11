@@ -1,10 +1,12 @@
 "use client";
 
-import { useActionState, useState, useRef } from "react";
+import { useActionState, useState, useRef, startTransition, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import {
   ArrowLeft, Upload, FileText, X,
-  Loader2, AlertCircle, CheckCircle2, ChevronDown,
+  Loader2, AlertCircle, CheckCircle2, ChevronDown, Phone, UserCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createCaseAction, type CaseFormState } from "@/features/cases/actions/case.actions";
@@ -22,10 +24,30 @@ export function NewCaseShell({ patients, members }: NewCaseShellProps) {
   const [state, action, isPending] = useActionState(createCaseAction, initialState);
   const [files, setFiles] = useState<File[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
+  const router = useRouter();
+  const queryClient = useQueryClient();
+
+  // Patient search state
+  const [phoneQuery, setPhoneQuery] = useState("");
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+
+  // On success: remove cached data entirely so initialData from the server render is used
+  useEffect(() => {
+    if (state.success) {
+      queryClient.removeQueries({ queryKey: ["cases"] });
+      router.push("/cases");
+    }
+  }, [state.success]);
 
   const doctors = members.filter(
     (m) => m.role === "DOCTOR" || m.role === "ADMIN" || m.role === "OWNER"
   );
+
+  // Filter patients by phone number as the user types
+  const trimmed = phoneQuery.trim();
+  const filteredPatients = trimmed.length > 0
+    ? patients.filter((p) => p.phone_number.replace(/\s+/g, "").includes(trimmed.replace(/\s+/g, "")))
+    : [];
 
   const handleFiles = (selected: FileList | null) => {
     if (!selected) return;
@@ -47,16 +69,20 @@ export function NewCaseShell({ patients, members }: NewCaseShellProps) {
 
   // Inject files into form action — useActionState doesn't support
   // files directly, so we build FormData manually
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (files.length !== 4) return;
+    if (files.length !== 4 || !selectedPatient) return;
 
     const fd = new FormData(e.currentTarget);
+    // Ensure the selected patient id is in the form data
+    fd.set("patient_id", selectedPatient.id);
     // Remove any old scan entries, add the real File objects
     fd.delete("scans");
     files.forEach((f) => fd.append("scans", f));
-    // Trigger the server action
-    action(fd);
+    // Wrap in startTransition so isPending updates correctly
+    startTransition(() => {
+      action(fd);
+    });
   };
 
   return (
@@ -84,11 +110,15 @@ export function NewCaseShell({ patients, members }: NewCaseShellProps) {
             </div>
           )}
 
-          {/* Patient */}
+          {/* Patient — phone search then select */}
           <div>
             <label className={labelCls}>
               Patient <span className="text-red-500">*</span>
             </label>
+
+            {/* Hidden input carries the selected id into FormData */}
+            <input type="hidden" name="patient_id" value={selectedPatient?.id ?? ""} />
+
             {patients.length === 0 ? (
               <div className="p-4 rounded-xl border border-dashed border-neutral-300 dark:border-slate-700 text-center">
                 <p className="text-sm text-neutral-500 mb-3">
@@ -102,17 +132,96 @@ export function NewCaseShell({ patients, members }: NewCaseShellProps) {
                 </Link>
               </div>
             ) : (
-              <div className="relative">
-                <select name="patient_id" className={inputCls} required>
-                  <option value="">Select a patient</option>
-                  {patients.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.first_name} {p.last_name}
-                      {p.mrn ? ` — ${p.mrn}` : ""}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
+              <div className="space-y-3">
+                {/* Step 1 — search by phone */}
+                <div className="relative">
+                  <Phone size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                  <input
+                    type="tel"
+                    placeholder="Search by phone number…"
+                    value={phoneQuery}
+                    onChange={(e) => {
+                      setPhoneQuery(e.target.value);
+                      setSelectedPatient(null);
+                    }}
+                    className={cn(inputCls, "pl-10")}
+                  />
+                </div>
+
+                {/* Step 2 — results */}
+                {trimmed.length > 0 && (
+                  filteredPatients.length === 0 ? (
+                    <p className="text-xs text-slate-400 px-1">
+                      No patients match that phone number.
+                    </p>
+                  ) : filteredPatients.length === 1 ? (
+                    // Single match — clickable card to confirm
+                    <button
+                      type="button"
+                      onClick={() => setSelectedPatient(filteredPatients[0])}
+                      className={cn(
+                        "w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-all",
+                        selectedPatient?.id === filteredPatients[0].id
+                          ? "border-blue-500 bg-blue-50 dark:bg-blue-950/30"
+                          : "border-slate-200 dark:border-slate-700 hover:border-blue-400 hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                      )}
+                    >
+                      <UserCheck size={16} className={selectedPatient?.id === filteredPatients[0].id ? "text-blue-500" : "text-slate-400"} />
+                      <div className="min-w-0">
+                        <p className="text-sm font-semibold text-slate-800 dark:text-slate-200 truncate">
+                          {filteredPatients[0].first_name} {filteredPatients[0].last_name}
+                        </p>
+                        <p className="text-xs text-slate-400">
+                          {filteredPatients[0].phone_number}
+                          {filteredPatients[0].mrn ? ` · MRN ${filteredPatients[0].mrn}` : ""}
+                        </p>
+                      </div>
+                      {selectedPatient?.id === filteredPatients[0].id && (
+                        <CheckCircle2 size={16} className="text-blue-500 ml-auto shrink-0" />
+                      )}
+                    </button>
+                  ) : (
+                    // Multiple matches — dropdown
+                    <div className="relative">
+                      <select
+                        className={inputCls}
+                        value={selectedPatient?.id ?? ""}
+                        onChange={(e) => {
+                          const p = filteredPatients.find((x) => x.id === e.target.value) ?? null;
+                          setSelectedPatient(p);
+                        }}
+                      >
+                        <option value="">
+                          {filteredPatients.length} patients found — select one
+                        </option>
+                        {filteredPatients.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.first_name} {p.last_name}
+                            {p.mrn ? ` — MRN ${p.mrn}` : ""} · {p.phone_number}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
+                    </div>
+                  )
+                )}
+
+                {/* Selected patient confirmation badge */}
+                {selectedPatient && (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 rounded-xl">
+                    <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
+                    <p className="text-xs font-medium text-emerald-700 dark:text-emerald-400 truncate">
+                      {selectedPatient.first_name} {selectedPatient.last_name} selected
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => { setSelectedPatient(null); setPhoneQuery(""); }}
+                      className="ml-auto text-emerald-400 hover:text-emerald-600 transition-colors"
+                    >
+                      <X size={13} />
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -250,7 +359,7 @@ export function NewCaseShell({ patients, members }: NewCaseShellProps) {
             </Link>
             <button
               type="submit"
-              disabled={isPending || files.length !== 4 || patients.length === 0}
+              disabled={isPending || files.length !== 4 || !selectedPatient}
               className="flex-1 py-3 rounded-xl bg-black dark:bg-white text-white dark:text-black text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2 hover:opacity-90 transition-all"
             >
               {isPending && <Loader2 size={14} className="animate-spin" />}
