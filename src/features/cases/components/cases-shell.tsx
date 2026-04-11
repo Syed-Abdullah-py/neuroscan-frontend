@@ -53,7 +53,9 @@ export function CasesShell({
     const [statusFilter, setStatusFilter] = useState("ALL");
     const [priorityFilter, setPriorityFilter] = useState("ALL");
 
-    const { data: cases = initialCases, isLoading } = useCases();
+    // Pass initialCases so React Query seeds the cache immediately —
+    // isLoading is false from the first render, no skeleton flash on navigation.
+    const { data: cases = [], isLoading } = useCases(initialCases);
     const deleteCase = useDeleteCase();
 
     const isAdmin = workspaceRole === "OWNER" || workspaceRole === "ADMIN";
@@ -265,7 +267,7 @@ function CaseRow({
             <td className="py-3.5 px-4">
                 <div className="flex items-center gap-1.5 text-xs text-neutral-500">
                     <Calendar size={12} />
-                    {new Date(c.created_at).toLocaleDateString()}
+                    {new Date(c.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
                 </div>
             </td>
             <td className="py-3.5 px-4">

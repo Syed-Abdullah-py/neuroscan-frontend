@@ -1,7 +1,6 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { casesApi } from "@/lib/api/cases.api";
 import { ApiError } from "@/lib/api/client";
 import { getCurrentUser } from "@/features/auth/actions/auth.actions";
@@ -56,7 +55,7 @@ export async function createCaseAction(
 
     revalidatePath("/cases");
     revalidatePath("/dashboard");
-    redirect("/cases");
+    return { success: true, message: "" };
 }
 
 export async function updateCaseAction(

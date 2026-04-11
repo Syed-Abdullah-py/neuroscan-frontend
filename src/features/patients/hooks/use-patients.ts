@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { makePatientsClient } from "@/lib/api/patients.client";
 import { useWorkspace } from "@/providers/workspace-provider";
-import type { PatientCreate, PatientUpdate } from "@/lib/types/patient.types";
+import type { Patient, PatientCreate, PatientUpdate } from "@/lib/types/patient.types";
 
 export const patientKeys = {
     all: ["patients"] as const,
@@ -12,12 +12,14 @@ export const patientKeys = {
         [...patientKeys.all, workspaceId, patientId] as const,
 };
 
-export function usePatients() {
+export function usePatients(initialData?: Patient[]) {
     const { token, activeWorkspaceId } = useWorkspace();
     return useQuery({
         queryKey: patientKeys.list(activeWorkspaceId ?? ""),
         queryFn: () => makePatientsClient(token, activeWorkspaceId!).list(),
         enabled: !!activeWorkspaceId && !!token,
+        initialData: initialData,
+        initialDataUpdatedAt: initialData ? Date.now() : undefined,
     });
 }
 

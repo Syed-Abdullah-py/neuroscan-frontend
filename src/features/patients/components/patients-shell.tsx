@@ -39,7 +39,9 @@ export function PatientsShell({
     const [search, setSearch] = useState("");
     const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
 
-    const { data: patients = initialPatients, isLoading } = usePatients();
+    // Pass initialPatients so React Query seeds the cache immediately —
+    // isLoading is false from the first render, no skeleton flash on navigation.
+    const { data: patients = [], isLoading } = usePatients(initialPatients);
 
     const isAdmin =
         workspaceRole === "OWNER" || workspaceRole === "ADMIN";

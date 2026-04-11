@@ -57,11 +57,15 @@ export async function apiFetch<T>(
         headers["Content-Type"] = "application/json";
     }
 
+    const isGet = !rest.method || rest.method.toUpperCase() === "GET";
+
     const response = await fetch(`${AUTH_SERVICE_URL}${path}`, {
         ...rest,
         headers: { ...headers, ...(extraHeaders as Record<string, string>) },
         body: body !== undefined ? JSON.stringify(body) : undefined,
-        cache: "no-store",
+        ...(isGet
+            ? { next: { revalidate: 30 } }
+            : { cache: "no-store" }),
     });
 
     if (response.status === 204) return undefined as T;

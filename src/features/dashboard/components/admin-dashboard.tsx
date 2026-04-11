@@ -93,10 +93,10 @@ export function AdminDashboard({
 }: AdminDashboardProps) {
     const [search, setSearch] = useState("");
 
-    // React Query — initialData from server prevents loading flash
-    const { data: stats } = useCaseStats();
-    const { data: recentCases = initialRecentCases } = useRecentCases();
-    const { data: joinRequests = initialJoinRequests } = useJoinRequests(workspaceId);
+    // Seed React Query cache with server data so isLoading is false on first render.
+    const { data: stats } = useCaseStats(initialStats);
+    const { data: recentCases = [] } = useRecentCases(initialRecentCases);
+    const { data: joinRequests = [] } = useJoinRequests(workspaceId, initialJoinRequests);
     const { data: patients = [] } = usePatients();
 
     const approve = useApproveJoinRequest();

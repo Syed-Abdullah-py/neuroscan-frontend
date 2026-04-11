@@ -31,8 +31,9 @@ export function DoctorDashboard({
     initialStats,
     initialRecentCases,
 }: DoctorDashboardProps) {
-    const { data: stats } = useCaseStats();
-    const { data: recentCases = initialRecentCases } = useRecentCases();
+    // Seed React Query cache with server data so isLoading is false on first render.
+    const { data: stats } = useCaseStats(initialStats);
+    const { data: recentCases = [] } = useRecentCases(initialRecentCases);
 
     const displayStats = stats ?? initialStats;
     const firstName = user.name.split(" ")[0];
