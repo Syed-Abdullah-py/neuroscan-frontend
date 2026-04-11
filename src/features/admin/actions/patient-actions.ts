@@ -201,7 +201,7 @@ export async function getAllPatients(workspaceId: string) {
     const user = await getCurrentUser()
     const token = await getAuthToken()
 
-    console.log('[getAllPatients] User:', user?.email, 'Role:', user?.role)
+    console.log('[getAllPatients] User:', user?.email, 'Role:', user?.globalRole)
 
     if (!user || !token) {
         console.error('[getAllPatients] Unauthorized - no user or token')
