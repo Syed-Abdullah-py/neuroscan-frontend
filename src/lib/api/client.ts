@@ -2,7 +2,7 @@ import "server-only";
 import { cookies } from "next/headers";
 
 const AUTH_SERVICE_URL =
-    process.env.AUTH_SERVICE_URL || "http://localhost:8000";
+    (process.env.AUTH_SERVICE_URL || "http://localhost:8000").replace(/\/$/, "");
 
 export class ApiError extends Error {
     constructor(
