@@ -29,7 +29,7 @@ export {
 
 // These are now handled by React Query hooks + client API
 // Kept as stubs so any remaining old imports don't crash the build
-export async function getUserWorkspaces() { return []; }
+export async function getUserWorkspaces(): Promise<{ id: string; membershipId?: string }[]> { return []; }
 export async function switchWorkspace(_id: string) { return { success: true }; }
 export async function getJoinRequests(_wid?: string) { return []; }
 export async function getTeamMembers(_wid?: string) { return []; }
