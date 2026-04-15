@@ -4,7 +4,7 @@ import { useState } from "react";
 import { WorkspaceManager } from "./workspace-manager";
 import { WorkspaceSettings } from "@/features/admin/components/workspace-settings";
 import { TeamManagement } from "@/features/admin/components/team-management";
-import { Building2, Settings, Users, Copy, Check, LayoutDashboard, ChevronRight, RefreshCw, Shield, Stethoscope } from "lucide-react";
+import { Building2, Settings, Users, Copy, Check, LayoutDashboard, ChevronRight, RefreshCw, Shield, Stethoscope, Mail, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { JoinRequestsList } from "@/features/admin/components/join-requests-list";
@@ -325,8 +325,11 @@ export function UnifiedWorkspace({ user, workspaces, currentWorkspaceName, membe
                         transition={{ duration: 0.3, delay: 0.3 }}
                         className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-black/20 overflow-hidden p-6 w-full min-w-[355px]"
                     >
-                        <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-4 flex items-center justify-between">
-                            Received Requests
+                        <div className="flex items-center justify-between mb-5">
+                            <div>
+                                <h4 className="text-sm font-bold text-slate-900 dark:text-white">Join Requests</h4>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">People wanting to join</p>
+                            </div>
                             <button
                                 onClick={() => router.refresh()}
                                 className="p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors rounded-full hover:bg-slate-100 dark:hover:bg-slate-800"
@@ -334,21 +337,28 @@ export function UnifiedWorkspace({ user, workspaces, currentWorkspaceName, membe
                             >
                                 <RefreshCw size={14} />
                             </button>
-                        </h4>
+                        </div>
                         <JoinRequestsList requests={joinRequests} currentUserEmail={user.email} />
 
                         {isAdmin && sentInvitations.length > 0 && (
                             <div className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800">
-                                <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">
+                                <h5 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                                    <Clock size={10} />
                                     Pending Sent Invitations
                                 </h5>
                                 <div className="space-y-2">
                                     {sentInvitations.map(inv => (
-                                        <div key={inv.id} className="flex items-center justify-between text-xs p-2 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-100 dark:border-slate-800">
-                                            <span className="font-medium text-slate-600 dark:text-slate-400 truncate max-w-[120px]">
+                                        <div
+                                            key={inv.id}
+                                            className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/40 hover:border-slate-200 dark:hover:border-slate-700 transition-colors"
+                                        >
+                                            <div className="w-7 h-7 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center shrink-0">
+                                                <Mail size={13} className="text-amber-600 dark:text-amber-400" />
+                                            </div>
+                                            <span className="text-xs font-medium text-slate-600 dark:text-slate-300 truncate flex-1 min-w-0">
                                                 {inv.email}
                                             </span>
-                                            <span className="px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 text-[10px] font-bold uppercase">
+                                            <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 shrink-0">
                                                 {inv.role}
                                             </span>
                                         </div>
@@ -366,10 +376,11 @@ export function UnifiedWorkspace({ user, workspaces, currentWorkspaceName, membe
                     transition={{ duration: 0.3, delay: isAdmin ? 0.4 : 0.3 }}
                     className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-black/20 overflow-hidden p-6 w-full min-w-[355px]"
                 >
-                    <div className="flex items-center justify-between mb-4">
-                        <h4 className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                            Workspace Invitations
-                        </h4>
+                    <div className="flex items-center justify-between mb-5">
+                        <div>
+                            <h4 className="text-sm font-bold text-slate-900 dark:text-white">Invitations</h4>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Pending workspace invites</p>
+                        </div>
                         <button
                             onClick={() => router.refresh()}
                             className="p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors rounded-full hover:bg-slate-100 dark:hover:bg-slate-800"

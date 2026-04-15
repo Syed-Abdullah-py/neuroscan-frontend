@@ -45,7 +45,9 @@ export async function apiFetch<T>(
     const activeWorkspaceId =
         workspaceId ?? cookieStore.get("active_workspace")?.value;
 
-    const headers: Record<string, string> = {};
+    const headers: Record<string, string> = {
+        "ngrok-skip-browser-warning": "true",
+    };
 
     if (!noAuth && token) {
         headers["Authorization"] = `Bearer ${token}`;
@@ -69,9 +71,11 @@ export async function apiFetch<T>(
 
     if (response.status === 204) return undefined as T;
 
-    const data = await response.json().catch(() => null);
+    const contentType = response.headers.get("content-type") ?? "";
+    const isJson = contentType.includes("application/json");
+    const data = isJson ? await response.json().catch(() => null) : null;
 
-    if (!response.ok) {
+    if (!response.ok || !isJson) {
         const message =
             typeof data?.detail === "string"
                 ? data.detail
@@ -98,7 +102,7 @@ export async function apiUpload<T>(
     const activeWorkspaceId =
         workspaceId ?? cookieStore.get("active_workspace")?.value;
 
-    const headers: Record<string, string> = {};
+    const headers: Record<string, string> = { "ngrok-skip-browser-warning": "true" };
     if (token) headers["Authorization"] = `Bearer ${token}`;
     if (activeWorkspaceId) headers["X-Workspace-Id"] = activeWorkspaceId;
 

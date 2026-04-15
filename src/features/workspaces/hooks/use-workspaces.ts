@@ -99,6 +99,7 @@ export function useMyInvitations() {
         queryKey: workspaceKeys.myInvitations(),
         queryFn: () => makeWorkspacesClient(token).myInvitations(),
         enabled: !!token,
+        refetchInterval: 3_000,
     });
 }
 

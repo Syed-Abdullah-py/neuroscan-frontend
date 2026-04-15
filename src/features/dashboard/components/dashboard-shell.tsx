@@ -1,6 +1,6 @@
 "use client";
 
-import { useWorkspaceEvents, useInvitationPolling } from "@/features/workspaces/hooks/use-workspace-events";
+import { useWorkspaceEvents } from "@/features/workspaces/hooks/use-workspace-events";
 import { AdminDashboard } from "./admin-dashboard";
 import { DoctorDashboard } from "./doctor-dashboard";
 import { NoWorkspaceState } from "./no-workspace-state";
@@ -34,9 +34,6 @@ export function DashboardShell({
     initialJoinRequests,
 }: DashboardShellProps) {
     useWorkspaceEvents(workspaceId ?? undefined);
-    // Polls /workspaces/invitations/mine every 30s — SSE can't reach
-    // users who aren't yet workspace members
-    useInvitationPolling();
 
     if (!workspaceId) {
         return <NoWorkspaceState globalRole={user.globalRole} />;
