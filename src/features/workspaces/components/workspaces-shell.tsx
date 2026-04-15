@@ -848,6 +848,12 @@ function InvitationsCard({
 }) {
     const accept = useAcceptInvitation();
     const reject = useRejectInvitation();
+    const { switchWorkspace } = useWorkspace();
+
+    const handleAccept = async (inv: any) => {
+        await accept.mutateAsync(inv.id);
+        switchWorkspace(inv.workspace_id);
+    };
 
     return (
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm p-6">
@@ -880,17 +886,21 @@ function InvitationsCard({
                                     <div className="flex gap-1.5 shrink-0">
                                         <button
                                             onClick={() => reject.mutate(inv.id)}
-                                            disabled={reject.isPending}
-                                            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                            disabled={reject.isPending || accept.isPending}
+                                            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-50"
                                         >
                                             <AlertCircle size={14} />
                                         </button>
                                         <button
-                                            onClick={() => accept.mutate(inv.id)}
-                                            disabled={accept.isPending}
-                                            className="p-1.5 text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors"
+                                            onClick={() => handleAccept(inv)}
+                                            disabled={accept.isPending || reject.isPending}
+                                            className="p-1.5 text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors disabled:opacity-50"
                                         >
-                                            <Check size={14} />
+                                            {accept.isPending ? (
+                                                <Loader2 size={14} className="animate-spin" />
+                                            ) : (
+                                                <Check size={14} />
+                                            )}
                                         </button>
                                     </div>
                                 </div>

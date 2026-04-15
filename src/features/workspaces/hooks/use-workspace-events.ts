@@ -137,22 +137,3 @@ export function useWorkspaceEvents(workspaceId: string | undefined) {
         };
     }, [connect]);
 }
-
-/**
- * Polls the user's own invitations every 30 seconds.
- * SSE can't deliver cross-workspace notifications to users
- * who aren't yet members — polling is the correct pattern here.
- */
-export function useInvitationPolling() {
-    const qc = useQueryClient();
-
-    useEffect(() => {
-        const interval = setInterval(() => {
-            qc.invalidateQueries({
-                queryKey: workspaceKeys.myInvitations(),
-            });
-        }, 30_000);
-
-        return () => clearInterval(interval);
-    }, [qc]);
-}

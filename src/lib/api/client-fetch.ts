@@ -32,6 +32,7 @@ export async function clientFetch<T>(
 
     const headers: Record<string, string> = {
         Authorization: `Bearer ${token}`,
+        "ngrok-skip-browser-warning": "true",
         ...(extraHeaders as Record<string, string>),
     };
 
@@ -51,9 +52,11 @@ export async function clientFetch<T>(
 
     if (response.status === 204) return undefined as T;
 
-    const data = await response.json().catch(() => null);
+    const contentType = response.headers.get("content-type") ?? "";
+    const isJson = contentType.includes("application/json");
+    const data = isJson ? await response.json().catch(() => null) : null;
 
-    if (!response.ok) {
+    if (!response.ok || !isJson) {
         const message =
             typeof data?.detail === "string"
                 ? data.detail
