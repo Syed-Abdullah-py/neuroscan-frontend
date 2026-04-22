@@ -87,7 +87,7 @@ export function CaseDetailsView({ caseItem, user, aiData, isDoctor, isAssignedDo
                             </div>
                             <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
                                 <Calendar size={14} />
-                                <span>Created {new Date(caseItem.created_at).toLocaleDateString()}</span>
+                                <span>Created {new Date(caseItem.created_at).toLocaleDateString("en-GB")}</span>
                             </div>
                         </div>
                     </div>
@@ -234,7 +234,7 @@ export function CaseDetailsView({ caseItem, user, aiData, isDoctor, isAssignedDo
                                 <div className="flex justify-between items-center p-3 bg-slate-50 dark:bg-slate-950/50 rounded-lg border border-slate-100 dark:border-slate-800">
                                     <span className="text-sm text-slate-600 dark:text-slate-400">Last Update</span>
                                     <span className="text-sm font-medium text-slate-900 dark:text-white">
-                                        {new Date(caseItem.updated_at).toLocaleDateString()}
+                                        {new Date(caseItem.updated_at).toLocaleDateString("en-GB")}
                                     </span>
                                 </div>
                             </div>

@@ -179,12 +179,12 @@ export function DoctorDashboard({
                                             <td className="py-3.5 px-5">
                                                 <div className="flex items-center gap-3">
                                                     <div className="w-8 h-8 rounded-lg bg-neutral-100 dark:bg-slate-800 flex items-center justify-center text-[11px] font-bold text-neutral-500">
-                                                        {c.patient?.first_name?.[0]}
-                                                        {c.patient?.last_name?.[0]}
+                                                        {c.patient_first_name?.[0]}
+                                                        {c.patient_last_name?.[0]}
                                                     </div>
                                                     <p className="text-sm font-bold text-black dark:text-white">
-                                                        {c.patient?.first_name ?? "Unknown"}{" "}
-                                                        {c.patient?.last_name ?? ""}
+                                                        {c.patient_first_name ?? "—"}{" "}
+                                                        {c.patient_last_name ?? ""}
                                                     </p>
                                                 </div>
                                             </td>
@@ -218,7 +218,7 @@ export function DoctorDashboard({
                                                 </div>
                                             </td>
                                             <td className="py-3.5 px-5 text-xs text-neutral-500">
-                                                {new Date(c.updated_at).toLocaleDateString()}
+                                                {new Date(c.updated_at).toLocaleDateString("en-GB")}
                                             </td>
                                             <td className="py-3.5 px-5 text-right">
                                                 <Link

@@ -34,6 +34,7 @@ export function useCaseStats(initialData?: CaseStats | null) {
         enabled: !!activeWorkspaceId && !!token,
         initialData: initialData ?? undefined,
         initialDataUpdatedAt: initialData ? Date.now() : undefined,
+        refetchInterval: 5000,
     });
 }
 
@@ -45,6 +46,7 @@ export function useRecentCases(initialData?: any[]) {
         enabled: !!activeWorkspaceId && !!token,
         initialData: initialData,
         initialDataUpdatedAt: initialData ? Date.now() : undefined,
+        refetchInterval: 5000,
     });
 }
 

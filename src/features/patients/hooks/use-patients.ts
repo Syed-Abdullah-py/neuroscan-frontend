@@ -20,6 +20,7 @@ export function usePatients(initialData?: Patient[]) {
         enabled: !!activeWorkspaceId && !!token,
         initialData: initialData,
         initialDataUpdatedAt: initialData ? Date.now() : undefined,
+        refetchInterval: 5000,
     });
 }
 

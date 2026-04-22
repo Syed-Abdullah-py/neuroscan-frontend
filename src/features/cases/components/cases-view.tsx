@@ -204,7 +204,7 @@ export function CasesView({ workspaceId }: { workspaceId: string }) {
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-2 text-sm text-slate-500">
                                                 <Calendar size={14} />
-                                                {new Date(caseItem.created_at).toLocaleDateString()}
+                                                {new Date(caseItem.created_at).toLocaleDateString("en-GB")}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-right">

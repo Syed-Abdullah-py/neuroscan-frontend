@@ -148,6 +148,7 @@ export function useJoinRequests(workspaceId: string | undefined, initialData?: a
         enabled: !!workspaceId && !!token,
         initialData: initialData,
         initialDataUpdatedAt: initialData ? Date.now() : undefined,
+        refetchInterval: 5000,
     });
 }
 

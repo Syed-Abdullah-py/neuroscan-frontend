@@ -97,7 +97,7 @@ export function CaseDetailShell({
                         </div>
                         <div className="flex items-center gap-2 text-sm text-slate-500">
                             <Calendar size={14} />
-                            Created {new Date(caseItem.created_at).toLocaleDateString()}
+                            Created {new Date(caseItem.created_at).toLocaleDateString("en-GB")}
                         </div>
                     </div>
                 </div>
@@ -151,7 +151,7 @@ export function CaseDetailShell({
                                     <div className="flex items-center justify-between">
                                         <span className="text-sm text-slate-500">Last Updated</span>
                                         <span className="text-sm text-slate-700 dark:text-slate-300">
-                                            {new Date(caseItem.updated_at).toLocaleDateString()}
+                                            {new Date(caseItem.updated_at).toLocaleDateString("en-GB")}
                                         </span>
                                     </div>
                                 </div>

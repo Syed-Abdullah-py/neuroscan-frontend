@@ -21,7 +21,7 @@ interface DashboardShellProps {
     initialStats: CaseStats | null;
     initialRecentCases: any[];
     initialMembers: any[];
-    initialJoinRequests: any[];
+    initialPatients: any[];
 }
 
 export function DashboardShell({
@@ -31,7 +31,7 @@ export function DashboardShell({
     initialStats,
     initialRecentCases,
     initialMembers,
-    initialJoinRequests,
+    initialPatients,
 }: DashboardShellProps) {
     useWorkspaceEvents(workspaceId ?? undefined);
 
@@ -51,7 +51,7 @@ export function DashboardShell({
                 initialStats={initialStats}
                 initialRecentCases={initialRecentCases}
                 initialMembers={initialMembers}
-                initialJoinRequests={initialJoinRequests}
+                initialPatients={initialPatients}
             />
         );
     }
