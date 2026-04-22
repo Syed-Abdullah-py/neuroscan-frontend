@@ -4,13 +4,12 @@ import Link from "next/link";
 import { motion, type Variants } from "framer-motion";
 import {
     Users, FileText, Activity, UserPlus,
-    Clock, CheckCircle2, AlertCircle,
-    ShieldCheck, Search, ArrowUpRight,
+    Clock, CheckCircle2,
+    Search, ArrowUpRight,
     type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCaseStats, useRecentCases } from "@/features/cases/hooks/use-cases";
-import { useJoinRequests, useApproveJoinRequest, useRejectJoinRequest } from "@/features/workspaces/hooks/use-workspaces";
 import { usePatients } from "@/features/patients/hooks/use-patients";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
@@ -38,7 +37,7 @@ interface AdminDashboardProps {
     initialStats: CaseStats | null;
     initialRecentCases: any[];
     initialMembers: any[];
-    initialJoinRequests: any[];
+    initialPatients: any[];
 }
 
 function StatCard({
@@ -89,18 +88,14 @@ export function AdminDashboard({
     initialStats,
     initialRecentCases,
     initialMembers,
-    initialJoinRequests,
+    initialPatients,
 }: AdminDashboardProps) {
     const [search, setSearch] = useState("");
 
     // Seed React Query cache with server data so isLoading is false on first render.
     const { data: stats } = useCaseStats(initialStats);
     const { data: recentCases = [] } = useRecentCases(initialRecentCases);
-    const { data: joinRequests = [] } = useJoinRequests(workspaceId, initialJoinRequests);
-    const { data: patients = [] } = usePatients();
-
-    const approve = useApproveJoinRequest();
-    const reject = useRejectJoinRequest();
+    const { data: patients = [], isLoading: patientsLoading } = usePatients(initialPatients);
 
     const displayStats = stats ?? initialStats;
     const memberCount = initialMembers.length;
@@ -184,130 +179,6 @@ export function AdminDashboard({
                 />
             </motion.div>
 
-            {/* Join requests + actions row */}
-            <motion.div variants={container} className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-                {/* Join requests card */}
-                <motion.div
-                    variants={item}
-                    className="bg-white dark:bg-gray-900/40 rounded-2xl border border-neutral-200 dark:border-slate-700/50 overflow-hidden"
-                >
-                    <div className="p-5 border-b border-neutral-100 dark:border-slate-700/50 flex justify-between items-center bg-neutral-50/50 dark:bg-gray-800/20">
-                        <div className="flex items-center gap-2">
-                            <div className="p-1.5 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
-                                <ShieldCheck className="w-4 h-4 text-amber-600 dark:text-amber-400" strokeWidth={2} />
-                            </div>
-                            <span className="text-xs font-bold uppercase tracking-wider text-neutral-600 dark:text-neutral-300">
-                                Access Requests
-                            </span>
-                        </div>
-                        {joinRequests.length > 0 && (
-                            <span className="w-5 h-5 bg-amber-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                                {joinRequests.length}
-                            </span>
-                        )}
-                    </div>
-                    <div className="p-4 space-y-3 max-h-60 overflow-y-auto">
-                        {joinRequests.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center py-8 opacity-50">
-                                <CheckCircle2 className="w-6 h-6 text-neutral-400 mb-2" />
-                                <p className="text-xs font-medium text-neutral-500">All caught up</p>
-                            </div>
-                        ) : (
-                            joinRequests.map((req: any) => (
-                                <div
-                                    key={req.id}
-                                    className="flex items-center justify-between p-3 bg-white dark:bg-slate-800 rounded-xl border border-neutral-100 dark:border-slate-700"
-                                >
-                                    <div className="min-w-0 mr-3">
-                                        <p className="text-sm font-bold text-black dark:text-white truncate">
-                                            {req.user_name || "Unknown"}
-                                        </p>
-                                        <p className="text-xs text-neutral-500 truncate">
-                                            {req.user_email}
-                                        </p>
-                                    </div>
-                                    <div className="flex gap-1.5 shrink-0">
-                                        <button
-                                            onClick={() => reject.mutate(req.id)}
-                                            disabled={reject.isPending}
-                                            className="p-1.5 text-neutral-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                                        >
-                                            <AlertCircle className="w-4 h-4" />
-                                        </button>
-                                        <button
-                                            onClick={() => approve.mutate(req.id)}
-                                            disabled={approve.isPending}
-                                            className="p-1.5 text-blue-600 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 rounded-lg transition-colors"
-                                        >
-                                            <CheckCircle2 className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                </div>
-                            ))
-                        )}
-                    </div>
-                </motion.div>
-
-                {/* Quick actions */}
-                <motion.div
-                    variants={item}
-                    className="lg:col-span-2 bg-white dark:bg-gray-900/40 rounded-2xl border border-neutral-200 dark:border-slate-700/50 p-6"
-                >
-                    <h3 className="text-xs font-bold uppercase tracking-wider text-neutral-500 mb-5">
-                        Quick Actions
-                    </h3>
-                    <div className="grid grid-cols-2 gap-3">
-                        {[
-                            {
-                                href: "/patients/new",
-                                icon: UserPlus,
-                                label: "Add Patient",
-                                sub: "Register new patient",
-                                color: "bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400",
-                            },
-                            {
-                                href: "/cases/new",
-                                icon: FileText,
-                                label: "New Case",
-                                sub: "Create diagnostic case",
-                                color: "bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400",
-                            },
-                            {
-                                href: "/workspaces",
-                                icon: Users,
-                                label: "Manage Team",
-                                sub: "Members & invitations",
-                                color: "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400",
-                            },
-                            {
-                                href: "/cases",
-                                icon: Activity,
-                                label: "All Cases",
-                                sub: "View case list",
-                                color: "bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400",
-                            },
-                        ].map((action) => (
-                            <Link
-                                key={action.href}
-                                href={action.href}
-                                className="group flex items-center gap-4 p-4 rounded-xl border border-neutral-200 dark:border-slate-700/50 hover:border-neutral-300 dark:hover:border-slate-600 bg-white dark:bg-gray-900/20 hover:shadow-sm transition-all"
-                            >
-                                <div className={cn("p-2.5 rounded-xl", action.color)}>
-                                    <action.icon className="w-5 h-5" strokeWidth={2} />
-                                </div>
-                                <div className="min-w-0">
-                                    <p className="text-sm font-bold text-black dark:text-white">
-                                        {action.label}
-                                    </p>
-                                    <p className="text-xs text-neutral-500 truncate">{action.sub}</p>
-                                </div>
-                                <ArrowUpRight className="w-4 h-4 text-neutral-300 group-hover:text-neutral-600 dark:group-hover:text-neutral-300 ml-auto shrink-0 transition-colors" />
-                            </Link>
-                        ))}
-                    </div>
-                </motion.div>
-            </motion.div>
-
             {/* Patient table */}
             <motion.div variants={item} className="space-y-4">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -355,7 +226,22 @@ export function AdminDashboard({
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-neutral-100 dark:divide-slate-700/30">
-                            {patients.length === 0 ? (
+                            {patientsLoading ? (
+                                Array.from({ length: 4 }).map((_, i) => (
+                                    <tr key={i}>
+                                        <td className="py-3.5 px-5">
+                                            <div className="flex items-center gap-3">
+                                                <Skeleton className="w-8 h-8 rounded-lg" />
+                                                <Skeleton className="h-4 w-32" />
+                                            </div>
+                                        </td>
+                                        <td className="py-3.5 px-5"><Skeleton className="h-4 w-24" /></td>
+                                        <td className="py-3.5 px-5"><Skeleton className="h-4 w-16" /></td>
+                                        <td className="py-3.5 px-5"><Skeleton className="h-4 w-20" /></td>
+                                        <td className="py-3.5 px-5"><Skeleton className="h-6 w-14 ml-auto" /></td>
+                                    </tr>
+                                ))
+                            ) : patients.length === 0 ? (
                                 <tr>
                                     <td colSpan={5} className="py-16 text-center">
                                         <div className="flex flex-col items-center gap-3 opacity-40">
@@ -507,7 +393,7 @@ function CaseRow({ caseItem: c }: { caseItem: any }) {
         <tr className="group hover:bg-neutral-50 dark:hover:bg-slate-800/30 transition-colors">
             <td className="py-3.5 px-5">
                 <p className="text-sm font-bold text-black dark:text-white">
-                    {c.patient?.first_name ?? "Unknown"} {c.patient?.last_name ?? ""}
+                    {c.patient_first_name ?? "—"} {c.patient_last_name ?? ""}
                 </p>
             </td>
             <td className="py-3.5 px-5">
@@ -526,7 +412,7 @@ function CaseRow({ caseItem: c }: { caseItem: any }) {
                 </span>
             </td>
             <td className="py-3.5 px-5 text-xs text-neutral-500">
-                {new Date(c.created_at).toLocaleDateString()}
+                {new Date(c.created_at).toLocaleDateString("en-GB")}
             </td>
             <td className="py-3.5 px-5 text-right">
                 <Link

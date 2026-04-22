@@ -15,6 +15,8 @@ export interface Case {
     verdict_updated_at: string | null;
     notes: string | null;
     patient_id: string;
+    patient_first_name: string | null;
+    patient_last_name: string | null;
     /**
      * References workspace_members.id — NOT users.id.
      * Use this to compare against the current user's membership ID.

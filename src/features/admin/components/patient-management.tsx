@@ -137,7 +137,7 @@ export function PatientManagement({ workspaceId, headerActions, searchQuery }: {
                                         {p.mrn && <span className="ml-2 text-xs text-slate-400">({p.mrn})</span>}
                                     </td>
                                     <td className="p-4 text-slate-600 dark:text-slate-400">{p.phoneNumber}</td>
-                                    <td className="p-4 text-slate-600 dark:text-slate-400">{new Date(p.dob).toLocaleDateString()}</td>
+                                    <td className="p-4 text-slate-600 dark:text-slate-400">{new Date(p.dob).toLocaleDateString("en-GB")}</td>
                                     <td className="p-4 text-slate-600 dark:text-slate-400">{p.city || "-"}</td>
                                     <td className="p-4 text-right">
                                         <div className="flex items-center justify-end gap-2">

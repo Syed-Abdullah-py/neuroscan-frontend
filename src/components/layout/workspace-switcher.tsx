@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronsUpDown, Brain } from "lucide-react";
+import { Check, ChevronsUpDown, Brain, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useRef, useEffect } from "react";
 import { useWorkspace } from "@/providers/workspace-provider";
@@ -49,20 +49,25 @@ export default function WorkspaceSwitcher({
     return (
         <div className={cn("relative w-full", className)} ref={dropdownRef}>
             <button
-                onClick={() => setOpen(!open)}
-                className="w-full flex items-center justify-between h-14 px-3 border border-neutral-300 dark:border-slate-600/50 bg-white dark:bg-slate-800/50 hover:bg-neutral-50 dark:hover:bg-slate-700/50 rounded-xl transition-all outline-none focus:ring-2 focus:ring-neutral-400/30"
+                onClick={() => !isSwitching && setOpen(!open)}
+                disabled={isSwitching}
+                className="w-full flex items-center justify-between h-14 px-3 border border-neutral-300 dark:border-slate-600/50 bg-white dark:bg-slate-800/50 hover:bg-neutral-50 dark:hover:bg-slate-700/50 rounded-xl transition-all outline-none focus:ring-2 focus:ring-neutral-400/30 disabled:opacity-70 disabled:cursor-not-allowed"
             >
                 <div className="flex items-center gap-3 min-w-0">
                     <div className="w-8 h-8 rounded-lg bg-neutral-200 dark:bg-slate-700 flex items-center justify-center shrink-0">
-                        <span className="font-bold text-sm text-black dark:text-white">
-                            {activeWorkspace?.name?.charAt(0).toUpperCase() ?? (
-                                <Brain className="w-4 h-4" strokeWidth={2} />
-                            )}
-                        </span>
+                        {isSwitching ? (
+                            <Loader2 className="w-4 h-4 animate-spin text-neutral-500 dark:text-slate-400" />
+                        ) : (
+                            <span className="font-bold text-sm text-black dark:text-white">
+                                {activeWorkspace?.name?.charAt(0).toUpperCase() ?? (
+                                    <Brain className="w-4 h-4" strokeWidth={2} />
+                                )}
+                            </span>
+                        )}
                     </div>
                     <div className="flex flex-col min-w-0 text-left">
                         <span className="text-sm font-bold text-black dark:text-white truncate">
-                            {activeWorkspace?.name ?? "Select workspace"}
+                            {isSwitching ? "Switching…" : (activeWorkspace?.name ?? "Select workspace")}
                         </span>
                         <span className="text-[10px] text-neutral-500 dark:text-slate-400 capitalize bg-neutral-100 dark:bg-slate-700/50 px-1.5 py-0.5 rounded-md w-fit">
                             {activeWorkspace?.role?.toLowerCase() ?? "no workspace"}

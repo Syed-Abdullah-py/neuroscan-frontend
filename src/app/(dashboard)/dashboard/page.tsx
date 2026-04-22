@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { getWorkspaceContext } from "@/lib/api/request-cache";
 import { casesApi } from "@/lib/api/cases.api";
+import { patientsApi } from "@/lib/api/patients.api";
 import { workspacesApi } from "@/lib/api/workspaces.api";
 import { DashboardShell } from "@/features/dashboard/components/dashboard-shell";
 import type { WorkspaceRole } from "@/lib/types/workspace.types";
@@ -11,7 +12,7 @@ export default async function DashboardPage() {
 
     const { user, workspaceId, workspaceRole } = ctx;
 
-    const [stats, recentCases, members, joinRequests] = await Promise.all([
+    const [stats, recentCases, members, patients] = await Promise.all([
         workspaceId
             ? casesApi.stats(workspaceId).catch(() => null)
             : Promise.resolve(null),
@@ -21,9 +22,8 @@ export default async function DashboardPage() {
         workspaceId
             ? workspacesApi.listMembers(workspaceId).catch(() => [])
             : Promise.resolve([]),
-        workspaceId &&
-            (workspaceRole === "OWNER" || workspaceRole === "ADMIN")
-            ? workspacesApi.listJoinRequests(workspaceId).catch(() => [])
+        workspaceId
+            ? patientsApi.list(workspaceId).catch(() => [])
             : Promise.resolve([]),
     ]);
 
@@ -42,7 +42,7 @@ export default async function DashboardPage() {
             initialStats={stats}
             initialRecentCases={recentCases as any[]}
             initialMembers={members as any[]}
-            initialJoinRequests={joinRequests as any[]}
+            initialPatients={patients as any[]}
         />
     );
 }

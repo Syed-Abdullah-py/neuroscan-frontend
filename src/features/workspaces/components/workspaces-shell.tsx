@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
     Building2, Users, Settings, LayoutDashboard,
     Copy, Check, RefreshCw, Plus, LogOut,
-    UserPlus, ChevronRight, Loader2, AlertCircle,
+    UserPlus, ChevronRight, Loader2, X,
     CheckCircle2, Search, Trash2, Save,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -65,14 +65,15 @@ export function WorkspacesShell({
     const [panel, setPanel] = useState<Panel>("list");
     const [copied, setCopied] = useState(false);
 
+    const isAdmin = workspaceRole === "OWNER" || workspaceRole === "ADMIN";
+
     // Live data via React Query (seeded from server props)
     const { data: workspaceList = memberships } = useWorkspaces();
     const { data: members = initialMembers } = useWorkspaceMembers(workspaceId ?? undefined);
-    const { data: joinRequests = initialJoinRequests } = useJoinRequests(workspaceId ?? undefined);
+    // Gate admin-only endpoints to avoid 403s for DOCTOR members
+    const { data: joinRequests = initialJoinRequests } = useJoinRequests(isAdmin ? workspaceId ?? undefined : undefined);
     const { data: myInvitations = initialMyInvitations } = useMyInvitations();
-    const { data: sentInvitations = initialSentInvitations } = useWorkspaceInvitations(workspaceId ?? undefined);
-
-    const isAdmin = workspaceRole === "OWNER" || workspaceRole === "ADMIN";
+    const { data: sentInvitations = initialSentInvitations } = useWorkspaceInvitations(isAdmin ? workspaceId ?? undefined : undefined);
     const isOwner = workspaceRole === "OWNER";
 
     const currentWorkspace = workspaceList.find(
@@ -780,61 +781,93 @@ function RequestsCard({
 }) {
     const approve = useApproveJoinRequest();
     const reject = useRejectJoinRequest();
+    const [processingId, setProcessingId] = useState<string | null>(null);
+
+    const handleApprove = async (id: string) => {
+        setProcessingId(id);
+        try { await approve.mutateAsync(id); } finally { setProcessingId(null); }
+    };
+    const handleReject = async (id: string) => {
+        setProcessingId(id);
+        try { await reject.mutateAsync(id); } finally { setProcessingId(null); }
+    };
 
     return (
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm p-6">
             <div className="flex items-center justify-between mb-4">
-                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                    <Users size={13} />
                     Join Requests
                 </h4>
                 {joinRequests.length > 0 && (
-                    <span className="w-5 h-5 bg-amber-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                    <span className="min-w-[20px] h-5 px-1.5 bg-amber-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
                         {joinRequests.length}
                     </span>
                 )}
             </div>
-            <div className="space-y-3">
+            <div className="space-y-2">
                 {joinRequests.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-8 opacity-40">
-                        <CheckCircle2 className="w-6 h-6 text-slate-400 mb-2" />
-                        <p className="text-xs text-slate-500">All clear</p>
+                    <div className="flex flex-col items-center justify-center py-8 gap-2 opacity-40">
+                        <CheckCircle2 className="w-6 h-6 text-slate-400" />
+                        <p className="text-xs text-slate-500 font-medium">All clear</p>
                     </div>
                 ) : (
-                    joinRequests.map((req: any) => (
-                        <div
-                            key={req.id}
-                            className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl"
-                        >
-                            <div className="min-w-0 mr-2">
-                                <p className="text-sm font-bold text-slate-900 dark:text-white truncate">
-                                    {req.user_name || "Unknown"}
-                                </p>
-                                <p className="text-xs text-slate-500 truncate">
-                                    {req.user_email}
-                                </p>
+                    joinRequests.map((req: any) => {
+                        const isProcessing = processingId === req.id;
+                        return (
+                            <div
+                                key={req.id}
+                                className={cn(
+                                    "flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl transition-opacity",
+                                    isProcessing && "opacity-50 pointer-events-none"
+                                )}
+                            >
+                                <div className="flex items-center gap-3 min-w-0 mr-2">
+                                    <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-600 dark:text-slate-300 shrink-0">
+                                        {(req.user_name || "?").charAt(0).toUpperCase()}
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="text-sm font-bold text-slate-900 dark:text-white truncate leading-tight">
+                                            {req.user_name || "Unknown"}
+                                        </p>
+                                        <p className="text-xs text-slate-500 truncate">{req.user_email}</p>
+                                    </div>
+                                </div>
+                                <div className="flex gap-1.5 shrink-0">
+                                    <button
+                                        onClick={() => handleReject(req.id)}
+                                        disabled={!!processingId}
+                                        title="Decline"
+                                        className="h-7 px-2 flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-red-200 dark:hover:border-red-800 transition-all"
+                                    >
+                                        {isProcessing && reject.isPending ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}
+                                        <span>Decline</span>
+                                    </button>
+                                    <button
+                                        onClick={() => handleApprove(req.id)}
+                                        disabled={!!processingId}
+                                        title="Approve"
+                                        className="h-7 px-2 flex items-center gap-1 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition-all shadow-sm shadow-blue-500/20"
+                                    >
+                                        {isProcessing && approve.isPending ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+                                        <span>Approve</span>
+                                    </button>
+                                </div>
                             </div>
-                            <div className="flex gap-1.5 shrink-0">
-                                <button
-                                    onClick={() => reject.mutate(req.id)}
-                                    disabled={reject.isPending}
-                                    className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
-                                >
-                                    <AlertCircle size={14} />
-                                </button>
-                                <button
-                                    onClick={() => approve.mutate(req.id)}
-                                    disabled={approve.isPending}
-                                    className="p-1.5 text-blue-600 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 rounded-lg transition-colors"
-                                >
-                                    <CheckCircle2 size={14} />
-                                </button>
-                            </div>
-                        </div>
-                    ))
+                        );
+                    })
                 )}
             </div>
         </div>
     );
+}
+
+function expiryLabel(expiresAt: string): string {
+    const diff = new Date(expiresAt).getTime() - Date.now();
+    const days = Math.ceil(diff / (1000 * 60 * 60 * 24));
+    if (days <= 0) return "Expired";
+    if (days === 1) return "Expires tomorrow";
+    return `Expires in ${days} days`;
 }
 
 function InvitationsCard({
@@ -849,95 +882,140 @@ function InvitationsCard({
     const accept = useAcceptInvitation();
     const reject = useRejectInvitation();
     const { switchWorkspace } = useWorkspace();
+    const [processingId, setProcessingId] = useState<string | null>(null);
 
     const handleAccept = async (inv: any) => {
-        await accept.mutateAsync(inv.id);
-        switchWorkspace(inv.workspace_id);
+        setProcessingId(inv.id);
+        try {
+            await accept.mutateAsync(inv.id);
+            switchWorkspace(inv.workspace_id);
+        } finally {
+            setProcessingId(null);
+        }
     };
+
+    const handleReject = async (id: string) => {
+        setProcessingId(id);
+        try { await reject.mutateAsync(id); } finally { setProcessingId(null); }
+    };
+
+    const hasContent = myInvitations.length > 0 || (isAdmin && sentInvitations.length > 0);
 
     return (
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm p-6">
-            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4">
-                Invitations
-            </h4>
+            <div className="flex items-center justify-between mb-4">
+                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                    Invitations
+                </h4>
+                {myInvitations.length > 0 && (
+                    <span className="min-w-[20px] h-5 px-1.5 bg-blue-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                        {myInvitations.length}
+                    </span>
+                )}
+            </div>
 
-            {/* Received */}
+            {!hasContent && (
+                <div className="flex flex-col items-center justify-center py-8 gap-2 opacity-40">
+                    <Building2 className="w-6 h-6 text-slate-400" />
+                    <p className="text-xs text-slate-500 font-medium">No invitations</p>
+                </div>
+            )}
+
+            {/* Received invitations */}
             {myInvitations.length > 0 && (
-                <div className="mb-5">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">
-                        Received
-                    </p>
+                <div className={cn(isAdmin && sentInvitations.length > 0 ? "mb-5" : "")}>
+                    {isAdmin && (
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
+                            Received
+                        </p>
+                    )}
                     <div className="space-y-2">
-                        {myInvitations.map((inv: any) => (
-                            <div
-                                key={inv.id}
-                                className="p-3 bg-blue-50/50 dark:bg-blue-900/10 rounded-xl border border-blue-100 dark:border-blue-900/20"
-                            >
-                                <div className="flex items-center justify-between">
-                                    <div className="min-w-0 mr-2">
-                                        <p className="text-sm font-bold text-slate-900 dark:text-white truncate">
-                                            {inv.workspace_name || "Workspace"}
-                                        </p>
-                                        <p className="text-xs text-slate-500">
-                                            Expires{" "}
-                                            {new Date(inv.expires_at).toLocaleDateString()}
-                                        </p>
+                        {myInvitations.map((inv: any) => {
+                            const isProcessing = processingId === inv.id;
+                            return (
+                                <div
+                                    key={inv.id}
+                                    className={cn(
+                                        "rounded-xl border overflow-hidden transition-opacity",
+                                        "border-blue-200 dark:border-blue-900/40 bg-blue-50/60 dark:bg-blue-900/10",
+                                        isProcessing && "opacity-50 pointer-events-none"
+                                    )}
+                                >
+                                    <div className="flex items-center gap-3 px-3 pt-3 pb-2">
+                                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shrink-0 shadow-md shadow-blue-500/20">
+                                            <Building2 size={16} className="text-white" />
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-sm font-bold text-slate-900 dark:text-white truncate leading-tight">
+                                                {inv.workspace_name || "Workspace"}
+                                            </p>
+                                            <p className={cn(
+                                                "text-[11px] font-medium mt-0.5",
+                                                new Date(inv.expires_at).getTime() - Date.now() < 86400000 * 2
+                                                    ? "text-amber-600 dark:text-amber-400"
+                                                    : "text-slate-500"
+                                            )}>
+                                                {expiryLabel(inv.expires_at)}
+                                            </p>
+                                        </div>
                                     </div>
-                                    <div className="flex gap-1.5 shrink-0">
+                                    <div className="flex gap-2 px-3 pb-3">
                                         <button
-                                            onClick={() => reject.mutate(inv.id)}
-                                            disabled={reject.isPending || accept.isPending}
-                                            className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors disabled:opacity-50"
+                                            onClick={() => handleReject(inv.id)}
+                                            disabled={!!processingId}
+                                            className="flex-1 h-7 flex items-center justify-center gap-1 text-xs font-semibold text-slate-500 hover:text-red-600 bg-white dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-red-200 dark:hover:border-red-800 transition-all"
                                         >
-                                            <AlertCircle size={14} />
+                                            {isProcessing && reject.isPending ? (
+                                                <Loader2 size={12} className="animate-spin" />
+                                            ) : (
+                                                <X size={12} />
+                                            )}
+                                            Decline
                                         </button>
                                         <button
                                             onClick={() => handleAccept(inv)}
-                                            disabled={accept.isPending || reject.isPending}
-                                            className="p-1.5 text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition-colors disabled:opacity-50"
+                                            disabled={!!processingId}
+                                            className="flex-1 h-7 flex items-center justify-center gap-1 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition-all shadow-sm shadow-blue-500/20"
                                         >
-                                            {accept.isPending ? (
-                                                <Loader2 size={14} className="animate-spin" />
+                                            {isProcessing && accept.isPending ? (
+                                                <Loader2 size={12} className="animate-spin" />
                                             ) : (
-                                                <Check size={14} />
+                                                <Check size={12} />
                                             )}
+                                            Accept
                                         </button>
                                     </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
             )}
 
-            {/* Sent (admin only) */}
+            {/* Sent invitations (admin only) */}
             {isAdmin && sentInvitations.length > 0 && (
                 <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
                         Sent
                     </p>
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                         {sentInvitations.map((inv: any) => (
                             <div
                                 key={inv.id}
-                                className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl"
+                                className="flex items-center justify-between px-3 py-2 bg-slate-50 dark:bg-slate-800/50 rounded-xl"
                             >
-                                <p className="text-xs font-medium text-slate-600 dark:text-slate-400 truncate">
-                                    {inv.email}
-                                </p>
-                                <p className="text-[10px] text-slate-400 shrink-0 ml-2">
-                                    {new Date(inv.expires_at).toLocaleDateString()}
-                                </p>
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                                    <p className="text-xs font-medium text-slate-600 dark:text-slate-400 truncate">
+                                        {inv.email}
+                                    </p>
+                                </div>
+                                <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-1.5 py-0.5 rounded-md shrink-0 ml-2">
+                                    {expiryLabel(inv.expires_at)}
+                                </span>
                             </div>
                         ))}
                     </div>
-                </div>
-            )}
-
-            {myInvitations.length === 0 && sentInvitations.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-8 opacity-40">
-                    <Building2 className="w-6 h-6 text-slate-400 mb-2" />
-                    <p className="text-xs text-slate-500">No invitations</p>
                 </div>
             )}
         </div>

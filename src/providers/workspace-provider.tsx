@@ -8,8 +8,6 @@ import {
     useCallback,
     type ReactNode,
 } from "react";
-import { useRouter } from "next/navigation";
-import { useQueryClient } from "@tanstack/react-query";
 
 interface WorkspaceContextValue {
     activeWorkspaceId: string | undefined;
@@ -33,8 +31,6 @@ export function WorkspaceProvider({
 }: WorkspaceProviderProps) {
     const [activeWorkspaceId, setActiveWorkspaceId] = useState<string | undefined>(initialWorkspaceId);
     const [isSwitching, startTransition] = useTransition();
-    const router = useRouter();
-    const queryClient = useQueryClient();
 
     const switchWorkspace = useCallback(
         (workspaceId: string) => {
@@ -45,12 +41,10 @@ export function WorkspaceProvider({
                     "@/features/workspaces/actions/workspace.actions"
                 );
                 await setActiveWorkspaceCookie(workspaceId);
-                setActiveWorkspaceId(workspaceId);
-                await queryClient.invalidateQueries();
-                router.refresh();
+                window.location.reload();
             });
         },
-        [activeWorkspaceId, queryClient, router]
+        [activeWorkspaceId]
     );
 
     return (

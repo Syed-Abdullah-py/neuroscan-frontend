@@ -3,6 +3,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { authApi } from "@/lib/api/auth.api";
+import { workspacesApi } from "@/lib/api/workspaces.api";
 import { ApiError } from "@/lib/api/client";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -32,6 +33,21 @@ async function setSessionCookie(token: string) {
         path: "/",
         sameSite: "lax",
     });
+}
+
+async function seedActiveWorkspaceCookie() {
+    const cookieStore = await cookies();
+    if (cookieStore.get("active_workspace")) return;
+    const memberships = await workspacesApi.list().catch(() => []);
+    if (memberships.length > 0) {
+        cookieStore.set("active_workspace", memberships[0].workspace_id, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === "production",
+            maxAge: 60 * 60 * 24 * 30,
+            path: "/",
+            sameSite: "lax",
+        });
+    }
 }
 
 export async function getAuthToken(): Promise<string | null> {
@@ -100,6 +116,7 @@ export async function loginUser(
     try {
         const data = await authApi.login(email, password);
         await setSessionCookie(data.access_token);
+        await seedActiveWorkspaceCookie();
     } catch (err) {
         if (err instanceof ApiError) {
             return { message: err.message };
@@ -184,6 +201,7 @@ export async function verifyOtp(
     try {
         const data = await authApi.verifyOtp(email, otp);
         await setSessionCookie(data.access_token);
+        await seedActiveWorkspaceCookie();
     } catch (err) {
         if (err instanceof ApiError) {
             return { message: err.message };
