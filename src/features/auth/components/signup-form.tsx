@@ -10,6 +10,7 @@ import {
     AlertCircle,
     Loader2,
 } from "lucide-react";
+import { GoogleSignInButton } from "@/features/auth/components/google-sign-in-button";
 import Link from "next/link";
 import { useState, useActionState, useEffect, useRef } from "react";
 import {
@@ -257,6 +258,24 @@ export function SignupForm({
 
             {/* ── Step 2: Details form ───────────────────────────────────────── */}
             {currentStep === 2 && (
+                <div className="space-y-5">
+                    {/* Google signup — role already selected in Step 1 */}
+                    <GoogleSignInButton
+                        global_role={selectedRole === "admin" ? "ADMIN" : "RADIOLOGIST"}
+                    />
+
+                    {/* Divider */}
+                    <div className="relative">
+                        <div className="absolute inset-0 flex items-center">
+                            <div className="w-full border-t border-neutral-200 dark:border-neutral-800" />
+                        </div>
+                        <div className="relative flex justify-center text-xs">
+                            <span className="bg-white dark:bg-neutral-900 px-3 text-neutral-400 font-medium uppercase tracking-wider">
+                                or fill in your details
+                            </span>
+                        </div>
+                    </div>
+
                 <form action={formAction} className="space-y-5">
                     <div className="grid grid-cols-2 gap-4">
                         <div>
@@ -428,6 +447,7 @@ export function SignupForm({
                     {/* Hidden role field */}
                     <input type="hidden" name="role" value={selectedRole || ""} />
                 </form>
+                </div>
             )}
 
             {/* ── Step 3: OTP verification ───────────────────────────────────── */}

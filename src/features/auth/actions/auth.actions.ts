@@ -221,6 +221,28 @@ export async function resendOtp(email: string): Promise<boolean> {
     }
 }
 
+// ── Google OAuth ───────────────────────────────────────────────────────────
+
+export async function googleAuthAction(
+    id_token: string,
+    global_role?: "ADMIN" | "RADIOLOGIST"
+): Promise<{ error?: string; redirectTo?: string }> {
+    try {
+        const data = await authApi.googleAuth(id_token, global_role);
+        await setSessionCookie(data.access_token);
+        await seedActiveWorkspaceCookie();
+        return { redirectTo: "/dashboard" };
+    } catch (err) {
+        if (err instanceof ApiError) {
+            if (err.message === "GOOGLE_USER_NOT_FOUND") {
+                return { error: "No account found. Please sign up first." };
+            }
+            return { error: err.message };
+        }
+        return { error: "Network error. Is the backend running?" };
+    }
+}
+
 // ── Logout ─────────────────────────────────────────────────────────────────
 
 export async function logoutUser() {

@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { GoogleSignInButton } from "@/features/auth/components/google-sign-in-button";
 
 const initialState = { message: "" };
 
@@ -62,6 +63,21 @@ export function LoginForm() {
                     <span className="font-medium">{state.message}</span>
                 </div>
             )}
+
+            {/* Google sign-in */}
+            <GoogleSignInButton />
+
+            {/* Divider */}
+            <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-neutral-200 dark:border-neutral-800" />
+                </div>
+                <div className="relative flex justify-center text-xs">
+                    <span className="bg-white dark:bg-neutral-900 px-3 text-neutral-400 font-medium uppercase tracking-wider">
+                        or continue with email
+                    </span>
+                </div>
+            </div>
 
             <form action={formAction} className="space-y-5">
                 {/* Email */}

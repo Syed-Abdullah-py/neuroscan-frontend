@@ -4,6 +4,7 @@ import "./globals.css";
 import { cn } from "@/lib/utils";
 import { ThemeProvider } from "@/components/theme-provider";
 import QueryProvider from "@/providers/query-provider";
+import { GoogleProvider } from "@/providers/google-provider";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
@@ -36,14 +37,16 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={cn("h-full bg-background font-sans antialiased", inter.variable)}>
         <QueryProvider>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="system"
-            enableSystem
-            disableTransitionOnChange
-          >
-            {children}
-          </ThemeProvider>
+          <GoogleProvider>
+            <ThemeProvider
+              attribute="class"
+              defaultTheme="system"
+              enableSystem
+              disableTransitionOnChange
+            >
+              {children}
+            </ThemeProvider>
+          </GoogleProvider>
         </QueryProvider>
       </body>
     </html>
