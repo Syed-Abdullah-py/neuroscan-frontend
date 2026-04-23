@@ -55,4 +55,17 @@ export const authApi = {
             noWorkspace: true,
         });
     },
+
+    /** POST /auth/google — verify Google id_token and sign in or create account */
+    googleAuth(
+        id_token: string,
+        global_role?: "ADMIN" | "RADIOLOGIST"
+    ): Promise<TokenResponse> {
+        return apiFetch<TokenResponse>("/auth/google", {
+            method: "POST",
+            body: { id_token, global_role },
+            noAuth: true,
+            noWorkspace: true,
+        });
+    },
 };
