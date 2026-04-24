@@ -14,21 +14,36 @@ import { Suspense, useRef, useLayoutEffect, useState, useEffect } from "react";
 import { Loader2, Move3d, MousePointer2, Settings2, Maximize2, Minimize2, RotateCcw, PauseCircle } from "lucide-react";
 import * as THREE from "three";
 
+// ── Shared types (exported for use by the case detail shell) ───────────────
+
+export type LayerKey = "brain_surface" | "ncr" | "edema" | "enhancing";
+
+export interface ThreeDViewerProps {
+    visible?: Record<LayerKey, boolean>;
+    autoRotate?: boolean;
+}
+
+// ── Internal constants ─────────────────────────────────────────────────────
+
 const NODE_MATERIALS: Record<string, { color: number; emissive: number; emissiveIntensity: number }> = {
-    ncr: { color: 0xdc3232, emissive: 0xdc3232, emissiveIntensity: 0.5 },
-    edema: { color: 0xe6c832, emissive: 0xe6c832, emissiveIntensity: 0.5 },
-    enhancing: { color: 0x32c8dc, emissive: 0x32c8dc, emissiveIntensity: 0.5 },
+    ncr:           { color: 0xdc3232, emissive: 0xdc3232, emissiveIntensity: 0.5 },
+    edema:         { color: 0xe6c832, emissive: 0xe6c832, emissiveIntensity: 0.5 },
+    enhancing:     { color: 0x32c8dc, emissive: 0x32c8dc, emissiveIntensity: 0.5 },
     brain_surface: { color: 0xa0a0a0, emissive: 0x000000, emissiveIntensity: 0 },
 };
 
-type LayerKey = "brain_surface" | "ncr" | "edema" | "enhancing";
-
 const LAYERS: { key: LayerKey; label: string; desc: string; hex: string }[] = [
-    { key: "brain_surface", label: "Brain Surface", desc: "Outer tissue", hex: "#a0a0a0" },
-    { key: "ncr", label: "Necrotic Core", desc: "Dead tissue", hex: "#dc3232" },
-    { key: "edema", label: "Edema", desc: "Swelling", hex: "#e6c832" },
-    { key: "enhancing", label: "Active Tumor", desc: "Growing cells", hex: "#32c8dc" },
+    { key: "brain_surface", label: "Brain Surface", desc: "Outer tissue",  hex: "#a0a0a0" },
+    { key: "ncr",           label: "Necrotic Core", desc: "Dead tissue",   hex: "#dc3232" },
+    { key: "edema",         label: "Edema",          desc: "Swelling",     hex: "#e6c832" },
+    { key: "enhancing",     label: "Active Tumor",   desc: "Growing cells",hex: "#32c8dc" },
 ];
+
+const ALL_VISIBLE: Record<LayerKey, boolean> = {
+    brain_surface: true, ncr: true, edema: true, enhancing: true,
+};
+
+// ── BrainModel ─────────────────────────────────────────────────────────────
 
 function BrainModel({
     visible,
@@ -94,21 +109,24 @@ function BrainModel({
     );
 }
 
-export function ThreeDViewer() {
+// ── ThreeDViewer ───────────────────────────────────────────────────────────
+
+export function ThreeDViewer({ visible: visibleProp, autoRotate: autoRotateProp }: ThreeDViewerProps = {}) {
+    const controlled = visibleProp !== undefined;
+
+    // Internal state — only used when no external props are provided
+    const [internalVisible, setInternalVisible] = useState<Record<LayerKey, boolean>>(ALL_VISIBLE);
+    const [internalRotate, setInternalRotate] = useState(true);
     const [panelOpen, setPanelOpen] = useState(false);
+
     const [isFullscreen, setIsFullscreen] = useState(false);
-    const [autoRotate, setAutoRotate] = useState(true);
     const containerRef = useRef<HTMLDivElement>(null);
 
-    const [visible, setVisible] = useState<Record<LayerKey, boolean>>({
-        brain_surface: true,
-        ncr: true,
-        edema: true,
-        enhancing: true,
-    });
+    const visible    = visibleProp    ?? internalVisible;
+    const autoRotate = autoRotateProp ?? internalRotate;
 
     const toggle = (key: LayerKey) =>
-        setVisible((prev) => ({ ...prev, [key]: !prev[key] }));
+        setInternalVisible((prev) => ({ ...prev, [key]: !prev[key] }));
 
     const toggleFullscreen = () => {
         if (!document.fullscreenElement) {
@@ -157,24 +175,19 @@ export function ThreeDViewer() {
             >
                 <Canvas shadows dpr={[1, 2]} gl={{ antialias: false }}>
                     <PerspectiveCamera makeDefault position={[-100, 0, 180]} fov={50} />
-
                     <ambientLight intensity={2.5} color="#ffffff" />
                     <spotLight position={[50, 50, 50]} angle={0.2} penumbra={1} intensity={5000} color="#00e5ff" castShadow />
                     <pointLight position={[-20, -20, -20]} intensity={2000} color="#bd00ff" />
                     <spotLight position={[0, 50, -50]} intensity={3000} color="white" />
                     <pointLight position={[0, -50, 50]} intensity={1500} color="#ffffff" />
-
                     <Environment preset="city" blur={1} />
-
                     <Float speed={2} rotationIntensity={0.2} floatIntensity={0.2}>
                         <BrainModel visible={visible} rotating={autoRotate} />
                     </Float>
-
                     <EffectComposer enableNormalPass={false} multisampling={0}>
                         <SMAA />
                         <Vignette eskil={false} offset={0.2} darkness={0.4} />
                     </EffectComposer>
-
                     <OrbitControls
                         enablePan={false}
                         minPolarAngle={Math.PI / 4}
@@ -185,7 +198,7 @@ export function ThreeDViewer() {
                 </Canvas>
             </Suspense>
 
-            {/* Top-left: LIVE badge */}
+            {/* LIVE badge */}
             <div className="absolute top-4 left-4 z-10 flex items-center gap-2 px-3 py-1.5 rounded-full border border-cyan-500/25 backdrop-blur-md"
                 style={{ background: "rgba(0,180,255,0.08)" }}>
                 <span className="relative flex h-2 w-2">
@@ -195,7 +208,7 @@ export function ThreeDViewer() {
                 <span className="text-[10px] font-bold text-cyan-300 tracking-[0.2em] uppercase">Live View</span>
             </div>
 
-            {/* Top-right: fullscreen + settings */}
+            {/* Top-right controls */}
             <div className="absolute top-4 right-4 z-20 flex items-center gap-2">
                 <button
                     onClick={toggleFullscreen}
@@ -206,67 +219,70 @@ export function ThreeDViewer() {
                     {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                 </button>
 
-                <button
-                    onClick={() => setPanelOpen((v) => !v)}
-                    className={`p-2 rounded-xl border backdrop-blur-md transition-all ${panelOpen
-                        ? "border-cyan-500/50 text-cyan-300"
-                        : "border-slate-600/40 text-slate-400 hover:text-slate-200 hover:border-slate-500/60"
+                {/* Settings panel only shown in standalone (uncontrolled) mode */}
+                {!controlled && (
+                    <button
+                        onClick={() => setPanelOpen((v) => !v)}
+                        className={`p-2 rounded-xl border backdrop-blur-md transition-all ${
+                            panelOpen
+                                ? "border-cyan-500/50 text-cyan-300"
+                                : "border-slate-600/40 text-slate-400 hover:text-slate-200 hover:border-slate-500/60"
                         }`}
-                    style={{ background: panelOpen ? "rgba(0,180,255,0.12)" : "rgba(15,23,42,0.65)" }}
-                >
-                    <Settings2 className="w-4 h-4" />
-                </button>
+                        style={{ background: panelOpen ? "rgba(0,180,255,0.12)" : "rgba(15,23,42,0.65)" }}
+                    >
+                        <Settings2 className="w-4 h-4" />
+                    </button>
+                )}
             </div>
 
-            {/* Settings panel */}
-            {panelOpen && (
+            {/* Settings panel (standalone only) */}
+            {!controlled && panelOpen && (
                 <div
                     className="absolute top-14 right-4 z-10 w-52 rounded-2xl border border-white/[0.07] backdrop-blur-xl shadow-2xl overflow-hidden"
                     style={{ background: "rgba(6,12,24,0.92)" }}
                 >
-                    {/* Rotation toggle — full-width pill at top */}
                     <div className="px-3 pt-3 pb-2">
                         <button
-                            onClick={() => setAutoRotate((v) => !v)}
-                            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-all ${autoRotate
+                            onClick={() => setInternalRotate((v) => !v)}
+                            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-all ${
+                                internalRotate
                                     ? "border-slate-600/50 hover:border-slate-500/70 text-slate-300 hover:text-white"
                                     : "border-cyan-500/40 text-cyan-300 bg-cyan-500/[0.08]"
-                                }`}
+                            }`}
                         >
                             <div className="flex items-center gap-2">
-                                {autoRotate
+                                {internalRotate
                                     ? <PauseCircle className="w-3.5 h-3.5" />
                                     : <RotateCcw className="w-3.5 h-3.5" />}
                                 <span className="text-[11px] font-semibold tracking-wide">
-                                    {autoRotate ? "Stop Rotation" : "Resume Rotation"}
+                                    {internalRotate ? "Stop Rotation" : "Resume Rotation"}
                                 </span>
                             </div>
-                            {/* State pill */}
-                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md tracking-wider ${autoRotate ? "bg-green-500/20 text-green-400" : "bg-slate-700/60 text-slate-500"
-                                }`}>
-                                {autoRotate ? "ON" : "OFF"}
+                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md tracking-wider ${
+                                internalRotate ? "bg-green-500/20 text-green-400" : "bg-slate-700/60 text-slate-500"
+                            }`}>
+                                {internalRotate ? "ON" : "OFF"}
                             </span>
                         </button>
                     </div>
 
                     <div className="mx-3 h-px bg-white/[0.06]" />
 
-                    {/* Layers section */}
                     <div className="px-3 pt-2.5 pb-3">
                         <p className="text-[9px] font-semibold text-slate-500 uppercase tracking-[0.18em] mb-2 px-1">
                             Layers
                         </p>
                         <div className="flex flex-col gap-0.5">
                             {LAYERS.map(({ key, label, desc, hex }) => {
-                                const on = visible[key];
+                                const on = internalVisible[key];
                                 return (
                                     <button
                                         key={key}
                                         onClick={() => toggle(key)}
-                                        className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-xl transition-all text-left ${on ? "hover:bg-white/[0.04]" : "opacity-50 hover:opacity-70"
-                                            }`}
+                                        className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-xl transition-all text-left ${
+                                            on ? "hover:bg-white/[0.04]" : "opacity-50 hover:opacity-70"
+                                        }`}
                                     >
-                                        {/* Swatch */}
                                         <span
                                             className="w-2.5 h-2.5 rounded-full flex-shrink-0 ring-1 ring-white/10"
                                             style={{
@@ -282,7 +298,6 @@ export function ThreeDViewer() {
                                             </p>
                                             <p className="text-[9px] text-slate-600 mt-0.5">{desc}</p>
                                         </div>
-                                        {/* Toggle track */}
                                         <div className={`w-6 h-3 rounded-full flex-shrink-0 transition-colors relative ${on ? "bg-cyan-500/40" : "bg-slate-700/60"}`}>
                                             <div className={`absolute top-0.5 w-2 h-2 rounded-full transition-all ${on ? "left-3.5 bg-cyan-300" : "left-0.5 bg-slate-500"}`} />
                                         </div>
@@ -294,7 +309,7 @@ export function ThreeDViewer() {
                 </div>
             )}
 
-            {/* Bottom controls pill */}
+            {/* Bottom controls */}
             <div
                 className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-4 px-5 py-2.5 rounded-full border border-slate-700/30 backdrop-blur-xl shadow-2xl z-10"
                 style={{ background: "rgba(8,15,28,0.70)" }}
