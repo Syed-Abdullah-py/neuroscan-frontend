@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "500mb",
     },
   },
+  transpilePackages: ["@niivue/niivue"],
 };
 
 export default nextConfig;
