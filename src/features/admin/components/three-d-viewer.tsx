@@ -26,17 +26,17 @@ export interface ThreeDViewerProps {
 // ── Internal constants ─────────────────────────────────────────────────────
 
 const NODE_MATERIALS: Record<string, { color: number; emissive: number; emissiveIntensity: number }> = {
-    ncr:           { color: 0xdc3232, emissive: 0xdc3232, emissiveIntensity: 0.5 },
-    edema:         { color: 0xe6c832, emissive: 0xe6c832, emissiveIntensity: 0.5 },
-    enhancing:     { color: 0x32c8dc, emissive: 0x32c8dc, emissiveIntensity: 0.5 },
+    ncr: { color: 0xdc3232, emissive: 0xdc3232, emissiveIntensity: 0.5 },
+    edema: { color: 0xe6c832, emissive: 0xe6c832, emissiveIntensity: 0.5 },
+    enhancing: { color: 0x32c8dc, emissive: 0x32c8dc, emissiveIntensity: 0.5 },
     brain_surface: { color: 0xa0a0a0, emissive: 0x000000, emissiveIntensity: 0 },
 };
 
 const LAYERS: { key: LayerKey; label: string; desc: string; hex: string }[] = [
-    { key: "brain_surface", label: "Brain Surface", desc: "Outer tissue",  hex: "#a0a0a0" },
-    { key: "ncr",           label: "Necrotic Core", desc: "Dead tissue",   hex: "#dc3232" },
-    { key: "edema",         label: "Edema",          desc: "Swelling",     hex: "#e6c832" },
-    { key: "enhancing",     label: "Active Tumor",   desc: "Growing cells",hex: "#32c8dc" },
+    { key: "brain_surface", label: "Brain Surface", desc: "Outer tissue", hex: "#a0a0a0" },
+    { key: "ncr", label: "Necrotic Core", desc: "Dead tissue", hex: "#dc3232" },
+    { key: "edema", label: "Edema", desc: "Swelling", hex: "#e6c832" },
+    { key: "enhancing", label: "Active Tumor", desc: "Growing cells", hex: "#32c8dc" },
 ];
 
 const ALL_VISIBLE: Record<LayerKey, boolean> = {
@@ -122,7 +122,7 @@ export function ThreeDViewer({ visible: visibleProp, autoRotate: autoRotateProp 
     const [isFullscreen, setIsFullscreen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
 
-    const visible    = visibleProp    ?? internalVisible;
+    const visible = visibleProp ?? internalVisible;
     const autoRotate = autoRotateProp ?? internalRotate;
 
     const toggle = (key: LayerKey) =>
@@ -174,7 +174,7 @@ export function ThreeDViewer({ visible: visibleProp, autoRotate: autoRotateProp 
                 }
             >
                 <Canvas shadows dpr={[1, 2]} gl={{ antialias: false }}>
-                    <PerspectiveCamera makeDefault position={[-100, 0, 180]} fov={50} />
+                    <PerspectiveCamera makeDefault position={[-40, 0, 100]} fov={50} />
                     <ambientLight intensity={2.5} color="#ffffff" />
                     <spotLight position={[50, 50, 50]} angle={0.2} penumbra={1} intensity={5000} color="#00e5ff" castShadow />
                     <pointLight position={[-20, -20, -20]} intensity={2000} color="#bd00ff" />
@@ -223,11 +223,10 @@ export function ThreeDViewer({ visible: visibleProp, autoRotate: autoRotateProp 
                 {!controlled && (
                     <button
                         onClick={() => setPanelOpen((v) => !v)}
-                        className={`p-2 rounded-xl border backdrop-blur-md transition-all ${
-                            panelOpen
-                                ? "border-cyan-500/50 text-cyan-300"
-                                : "border-slate-600/40 text-slate-400 hover:text-slate-200 hover:border-slate-500/60"
-                        }`}
+                        className={`p-2 rounded-xl border backdrop-blur-md transition-all ${panelOpen
+                            ? "border-cyan-500/50 text-cyan-300"
+                            : "border-slate-600/40 text-slate-400 hover:text-slate-200 hover:border-slate-500/60"
+                            }`}
                         style={{ background: panelOpen ? "rgba(0,180,255,0.12)" : "rgba(15,23,42,0.65)" }}
                     >
                         <Settings2 className="w-4 h-4" />
@@ -244,11 +243,10 @@ export function ThreeDViewer({ visible: visibleProp, autoRotate: autoRotateProp 
                     <div className="px-3 pt-3 pb-2">
                         <button
                             onClick={() => setInternalRotate((v) => !v)}
-                            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-all ${
-                                internalRotate
-                                    ? "border-slate-600/50 hover:border-slate-500/70 text-slate-300 hover:text-white"
-                                    : "border-cyan-500/40 text-cyan-300 bg-cyan-500/[0.08]"
-                            }`}
+                            className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-all ${internalRotate
+                                ? "border-slate-600/50 hover:border-slate-500/70 text-slate-300 hover:text-white"
+                                : "border-cyan-500/40 text-cyan-300 bg-cyan-500/[0.08]"
+                                }`}
                         >
                             <div className="flex items-center gap-2">
                                 {internalRotate
@@ -258,9 +256,8 @@ export function ThreeDViewer({ visible: visibleProp, autoRotate: autoRotateProp 
                                     {internalRotate ? "Stop Rotation" : "Resume Rotation"}
                                 </span>
                             </div>
-                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md tracking-wider ${
-                                internalRotate ? "bg-green-500/20 text-green-400" : "bg-slate-700/60 text-slate-500"
-                            }`}>
+                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md tracking-wider ${internalRotate ? "bg-green-500/20 text-green-400" : "bg-slate-700/60 text-slate-500"
+                                }`}>
                                 {internalRotate ? "ON" : "OFF"}
                             </span>
                         </button>
@@ -279,9 +276,8 @@ export function ThreeDViewer({ visible: visibleProp, autoRotate: autoRotateProp 
                                     <button
                                         key={key}
                                         onClick={() => toggle(key)}
-                                        className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-xl transition-all text-left ${
-                                            on ? "hover:bg-white/[0.04]" : "opacity-50 hover:opacity-70"
-                                        }`}
+                                        className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-xl transition-all text-left ${on ? "hover:bg-white/[0.04]" : "opacity-50 hover:opacity-70"
+                                            }`}
                                     >
                                         <span
                                             className="w-2.5 h-2.5 rounded-full flex-shrink-0 ring-1 ring-white/10"

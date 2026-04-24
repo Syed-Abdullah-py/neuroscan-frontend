@@ -16,41 +16,50 @@ export function ModalityViewer(props: ModalityViewerProps) {
     return <NiiVueViewer {...props} />;
 }
 
-// ── PNG grid viewer (2×2, all 4 modalities) ────────────────────────────────
 
-const MODALITY_LABELS: Record<string, { label: string; color: string }> = {
-    t1:    { label: "T1",    color: "#60a5fa" },
-    t1ce:  { label: "T1ce",  color: "#a78bfa" },
-    t2:    { label: "T2",    color: "#34d399" },
+// ── 4-modality grid viewer (2×2) — PNG-based ──────────────────────────────
+
+const MODALITY_META: Record<string, { label: string; color: string }> = {
+    t1: { label: "T1", color: "#60a5fa" },
+    t1ce: { label: "T1ce", color: "#a78bfa" },
+    t2: { label: "T2", color: "#34d399" },
     flair: { label: "FLAIR", color: "#fb923c" },
 };
 
+const GRID_MODS = ["t1", "t1ce", "t2", "flair"] as const;
+const BRATS_TOTAL = 155;
+
 export function ModalityGridViewer({
     sliceBase,
-    slice,
     showMask,
+    slice,
+    onLoad,
     onSliceChange: _onSliceChange,
 }: {
-    sliceBase: string;      // e.g. "/brats-slices/BraTS20_Training_001"
-    slice: number;
+    sliceBase: string;
     showMask: boolean;
+    slice: number;
+    onLoad?: (nz: number, mid: number) => void;
     onSliceChange: (s: number) => void;
 }) {
-    const modalities = ["t1", "t1ce", "t2", "flair"] as const;
-    const suffix = showMask ? "_m" : "";
-    const padded = String(slice).padStart(3, "0");
+    useEffect(() => {
+        onLoad?.(BRATS_TOTAL, 0);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    const idx = String(Math.max(0, Math.min(slice, BRATS_TOTAL - 1))).padStart(3, "0");
 
     return (
         <div className="w-full h-full grid grid-cols-2 grid-rows-2 gap-px bg-slate-800/60">
-            {modalities.map((mod) => {
-                const src = `${sliceBase}/${mod}/${padded}${suffix}.png`;
-                const meta = MODALITY_LABELS[mod];
+            {GRID_MODS.map((mod) => {
+                const meta = MODALITY_META[mod];
+                const src = `${sliceBase}/${mod}/${idx}${showMask ? "_m" : ""}.png`;
                 return (
                     <div key={mod} className="relative overflow-hidden flex items-center justify-center" style={{ background: "#050d18" }}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                             src={src}
-                            alt={`${meta.label} slice ${slice}`}
+                            alt={`${meta.label} slice ${slice + 1}`}
                             className="max-h-full max-w-full object-contain"
                             style={{ imageRendering: "pixelated" }}
                             draggable={false}
@@ -68,7 +77,56 @@ export function ModalityGridViewer({
     );
 }
 
-// ── NiiVue viewer ─────────────────────────────────────────────────────────
+// ── Per-modality contact sheet — PNG-based, instant render ────────────────
+
+const CONTACT_COLS = 5; // 5 × 31 = 155
+const SLICE_INDICES = Array.from({ length: BRATS_TOTAL }, (_, i) => i);
+
+export function ModalityContactSheet({
+    sliceBase,
+    modality,
+    showMask,
+}: {
+    sliceBase: string;
+    modality: string;
+    showMask: boolean;
+}) {
+    return (
+        <div className="w-full h-full overflow-y-auto" style={{ background: "#050d18" }}>
+            <div
+                className="grid gap-px p-px"
+                style={{ gridTemplateColumns: `repeat(${CONTACT_COLS}, 1fr)` }}
+            >
+                {SLICE_INDICES.map((sliceIdx) => {
+                    const idx = String(sliceIdx).padStart(3, "0");
+                    const src = `${sliceBase}/${modality}/${idx}${showMask ? "_m" : ""}.png`;
+                    return (
+                        <div
+                            key={sliceIdx}
+                            className="relative aspect-square overflow-hidden group"
+                            style={{ background: "#000" }}
+                        >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                                src={src}
+                                alt={`Slice ${sliceIdx + 1}`}
+                                className="w-full h-full object-cover"
+                                loading="lazy"
+                                draggable={false}
+                            />
+                            <div className="absolute inset-0 ring-1 ring-inset ring-cyan-400/0 group-hover:ring-cyan-400/60 transition-all" />
+                            <span className="absolute bottom-0.5 right-0.5 text-[7px] font-mono leading-none text-white/25 group-hover:text-white/70 transition-colors">
+                                {sliceIdx + 1}
+                            </span>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
+// ── NiiVue single-modality viewer ─────────────────────────────────────────
 
 function NiiVueViewer({
     url,
@@ -79,13 +137,12 @@ function NiiVueViewer({
     onSliceChange,
 }: ModalityViewerProps) {
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const nvRef     = useRef<any>(null);
-    const totalRef  = useRef(1);
-    const aliveRef  = useRef(true);
+    const nvRef = useRef<any>(null);
+    const totalRef = useRef(1);
+    const aliveRef = useRef(true);
     const [loading, setLoading] = useState(true);
-    const [error,   setError]   = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(null);
 
-    // Mount / URL change → init NiiVue and load volumes
     useEffect(() => {
         if (!canvasRef.current) return;
         aliveRef.current = true;
@@ -99,30 +156,26 @@ function NiiVueViewer({
 
                 const nv = new Niivue({
                     isResizeCanvas: true,
-                    backColor:      [0.02, 0.05, 0.09, 1],
+                    backColor: [0.02, 0.05, 0.09, 1],
                     crosshairWidth: 0,
-                    isColorbar:     false,
-                    dragMode:       1,
-                    loadingText:    "",
+                    isColorbar: false,
+                    dragMode: 1,
+                    loadingText: "",
                 });
                 nvRef.current = nv;
                 await nv.attachToCanvas(canvasRef.current);
-                nv.setSliceType(0); // axial
+                nv.setSliceType(0);
 
-                const fetchBuf = async (u: string): Promise<ArrayBuffer> => {
+                const fetchBuf = async (u: string) => {
                     const r = await fetch(u);
-                    if (!r.ok) throw new Error(`HTTP ${r.status} fetching ${u}`);
+                    if (!r.ok) throw new Error(`HTTP ${r.status}`);
                     return r.arrayBuffer();
                 };
 
-                // Pass ArrayBuffer as `url` — NiiVue detects ArrayBuffer and uses
-                // it as dataBuffer directly, skipping all internal fetch/stream logic.
                 const mriBuffer = await fetchBuf(url);
                 const volumes: any[] = [
                     { url: mriBuffer, name: "scan.nii", colormap: "gray" },
                 ];
-
-                // Always load seg (if available) — start invisible, toggle via opacity
                 if (segUrl) {
                     const segBuffer = await fetchBuf(segUrl);
                     volumes.push({ url: segBuffer, name: "seg.nii", colormap: "actc", opacity: showMask ? 0.5 : 0 });
@@ -134,9 +187,8 @@ function NiiVueViewer({
                 const dims: number[] = nv.volumes[0].hdr!.dims;
                 const nz = Math.max(dims[3] ?? 1, 1);
                 totalRef.current = nz;
-                const mid = Math.floor(nz / 2);
-                _seek(nv, mid, nz);
-                onLoad(nz, mid);
+                _seek(nv, 0, nz);
+                onLoad(nz, 0);
                 setLoading(false);
 
                 nv.onLocationChange = (data: any) => {
@@ -145,10 +197,7 @@ function NiiVueViewer({
                     onSliceChange(Math.max(0, Math.min(vz, nz - 1)));
                 };
             } catch (err: any) {
-                if (aliveRef.current) {
-                    setError(err?.message ?? "Failed to load scan");
-                    setLoading(false);
-                }
+                if (aliveRef.current) { setError(err?.message ?? "Failed to load scan"); setLoading(false); }
             }
         })();
 
@@ -156,7 +205,6 @@ function NiiVueViewer({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [url]);
 
-    // Toggle mask — just flip the seg volume opacity; no refetch needed
     useEffect(() => {
         const nv = nvRef.current;
         if (!nv || loading || error || nv.volumes.length < 2) return;
@@ -164,7 +212,6 @@ function NiiVueViewer({
         nv.updateGLVolume();
     }, [showMask, loading, error]);
 
-    // Controlled slice → update crosshair position
     useEffect(() => {
         const nv = nvRef.current;
         if (!nv || loading || error) return;
