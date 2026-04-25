@@ -10,13 +10,17 @@ export type FileUploadState = {
     status: "uploading" | "done" | "error";
 };
 
-type OverallStatus = "uploading" | "creating" | "done" | "error";
+export type OverallStatus = "uploading" | "creating" | "done" | "error";
 
-type UploadContextValue = {
-    active: boolean;
+export type UploadSession = {
+    id: string;
     files: FileUploadState[];
     overallStatus: OverallStatus;
     errorMessage: string | null;
+};
+
+type UploadContextValue = {
+    sessions: UploadSession[];
     startUpload: (
         files: File[],
         meta: {
@@ -26,7 +30,7 @@ type UploadContextValue = {
             notes: string;
         }
     ) => void;
-    dismiss: () => void;
+    dismiss: (id: string) => void;
 };
 
 const UploadContext = createContext<UploadContextValue | null>(null);
@@ -39,22 +43,22 @@ export function useUpload() {
 
 function UploadProviderInner({ children }: { children: React.ReactNode }) {
     const { token, activeWorkspaceId } = useWorkspace();
+    const [sessions, setSessions] = useState<UploadSession[]>([]);
 
-    const [active, setActive] = useState(false);
-    const [files, setFiles] = useState<FileUploadState[]>([]);
-    const [overallStatus, setOverallStatus] = useState<OverallStatus>("uploading");
-    const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-    const setFileProgress = useCallback((index: number, progress: number) => {
-        setFiles((prev) => prev.map((f, i) => (i === index ? { ...f, progress } : f)));
+    const patchSession = useCallback((id: string, patch: Partial<UploadSession>) => {
+        setSessions(prev => prev.map(s => s.id === id ? { ...s, ...patch } : s));
     }, []);
 
-    const setFileStatus = useCallback((index: number, status: FileUploadState["status"]) => {
-        setFiles((prev) =>
-            prev.map((f, i) =>
-                i === index ? { ...f, status, progress: status === "done" ? 100 : f.progress } : f
-            )
-        );
+    const patchFile = useCallback((sessionId: string, fileIdx: number, patch: Partial<FileUploadState>) => {
+        setSessions(prev => prev.map(s =>
+            s.id === sessionId
+                ? { ...s, files: s.files.map((f, i) => i === fileIdx ? { ...f, ...patch } : f) }
+                : s
+        ));
+    }, []);
+
+    const dismiss = useCallback((id: string) => {
+        setSessions(prev => prev.filter(s => s.id !== id));
     }, []);
 
     const startUpload = useCallback(
@@ -62,31 +66,25 @@ function UploadProviderInner({ children }: { children: React.ReactNode }) {
             rawFiles: File[],
             meta: { patientId: string; priority: string; assignedToMemberId: string; notes: string }
         ) => {
-            if (!token || !activeWorkspaceId) {
-                setActive(false);
-                setOverallStatus("error");
-                setErrorMessage("No active workspace session. Please reload.");
-                return;
-            }
+            if (!token || !activeWorkspaceId) return;
 
             const backendUrl = (process.env.NEXT_PUBLIC_AUTH_SERVICE_URL ?? "http://localhost:8000").replace(/\/$/, "");
+            const uploadId = crypto.randomUUID();
             const sessionId = crypto.randomUUID();
 
-            setActive(true);
-            setOverallStatus("uploading");
-            setErrorMessage(null);
-            setFiles(
-                rawFiles.map((f) => ({
+            // Register this session immediately so the toast appears
+            setSessions(prev => [...prev, {
+                id: uploadId,
+                files: rawFiles.map(f => ({
                     name: f.name,
                     sizeMb: parseFloat((f.size / 1024 / 1024).toFixed(1)),
                     progress: 0,
                     status: "uploading",
-                }))
-            );
+                })),
+                overallStatus: "uploading",
+                errorMessage: null,
+            }]);
 
-            // Upload all 4 files in parallel directly to the backend — no Next.js proxy.
-            // Auth via token/workspaceId from workspace context instead of server-side cookies,
-            // eliminating the double-buffer that blocked 17MB files through the proxy.
             const uploads = rawFiles.map(
                 (file, i) =>
                     new Promise<void>((resolve, reject) => {
@@ -98,20 +96,20 @@ function UploadProviderInner({ children }: { children: React.ReactNode }) {
                         const xhr = new XMLHttpRequest();
                         xhr.upload.addEventListener("progress", (ev) => {
                             if (ev.lengthComputable) {
-                                setFileProgress(i, Math.round((ev.loaded / ev.total) * 100));
+                                patchFile(uploadId, i, { progress: Math.round((ev.loaded / ev.total) * 100) });
                             }
                         });
                         xhr.onload = () => {
                             if (xhr.status >= 200 && xhr.status < 300) {
-                                setFileStatus(i, "done");
+                                patchFile(uploadId, i, { status: "done", progress: 100 });
                                 resolve();
                             } else {
-                                setFileStatus(i, "error");
+                                patchFile(uploadId, i, { status: "error" });
                                 reject(new Error(`Scan ${i + 1} upload failed (${xhr.status})`));
                             }
                         };
                         xhr.onerror = () => {
-                            setFileStatus(i, "error");
+                            patchFile(uploadId, i, { status: "error" });
                             reject(new Error(`Scan ${i + 1} network error`));
                         };
                         xhr.open("POST", `${backendUrl}/cases/scan`);
@@ -124,7 +122,7 @@ function UploadProviderInner({ children }: { children: React.ReactNode }) {
 
             Promise.all(uploads)
                 .then(() => {
-                    setOverallStatus("creating");
+                    patchSession(uploadId, { overallStatus: "creating" });
                     const fd = new FormData();
                     fd.append("session_id", sessionId);
                     fd.append("patient_id", meta.patientId);
@@ -145,27 +143,21 @@ function UploadProviderInner({ children }: { children: React.ReactNode }) {
                 .then(async (res) => {
                     const data = await res.json().catch(() => null);
                     if (!res.ok) {
-                        const msg =
-                            typeof data?.detail === "string"
-                                ? data.detail
-                                : `Case creation failed (${res.status})`;
+                        const msg = typeof data?.detail === "string" ? data.detail : `Case creation failed (${res.status})`;
                         throw new Error(msg);
                     }
-                    setOverallStatus("done");
-                    setTimeout(() => setActive(false), 4000);
+                    patchSession(uploadId, { overallStatus: "done" });
+                    setTimeout(() => dismiss(uploadId), 4000);
                 })
                 .catch((err: Error) => {
-                    setOverallStatus("error");
-                    setErrorMessage(err.message ?? "Upload failed");
+                    patchSession(uploadId, { overallStatus: "error", errorMessage: err.message ?? "Upload failed" });
                 });
         },
-        [setFileProgress, setFileStatus, token, activeWorkspaceId]
+        [patchSession, patchFile, dismiss, token, activeWorkspaceId]
     );
 
-    const dismiss = useCallback(() => setActive(false), []);
-
     return (
-        <UploadContext.Provider value={{ active, files, overallStatus, errorMessage, startUpload, dismiss }}>
+        <UploadContext.Provider value={{ sessions, startUpload, dismiss }}>
             {children}
         </UploadContext.Provider>
     );

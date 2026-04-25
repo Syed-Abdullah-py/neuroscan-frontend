@@ -36,14 +36,15 @@ export async function GET(
     }
 
     // Pipe the ReadableStream directly — no buffering in Node memory
-    return new NextResponse(res.body, {
-        status: 200,
-        headers: {
-            "Content-Type": "application/octet-stream",
-            "Cache-Control": "private, max-age=1800",
-            ...(res.headers.get("Content-Disposition")
-                ? { "Content-Disposition": res.headers.get("Content-Disposition")! }
-                : {}),
-        },
-    });
+    const forwardHeaders: Record<string, string> = {
+        "Content-Type": "application/octet-stream",
+        "Cache-Control": "private, max-age=1800",
+    };
+    // Forward Content-Length so the browser can show download progress
+    const contentLength = res.headers.get("Content-Length");
+    if (contentLength) forwardHeaders["Content-Length"] = contentLength;
+    const contentDisposition = res.headers.get("Content-Disposition");
+    if (contentDisposition) forwardHeaders["Content-Disposition"] = contentDisposition;
+
+    return new NextResponse(res.body, { status: 200, headers: forwardHeaders });
 }
