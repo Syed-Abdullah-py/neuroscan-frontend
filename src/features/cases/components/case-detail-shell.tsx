@@ -83,15 +83,8 @@ const STATUS_COLORS: Record<CaseStatus, string> = {
     REVIEWED: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
 };
 
-const BRATS_API = "/api/brats/BraTS20_Training_001/BraTS20_Training_001";
 const BRATS_BASE = "/brats-slices/BraTS20_Training_001";
-const URL_MAP: Record<string, string> = {
-    t1: `${BRATS_API}_t1.nii.gz`,
-    t1ce: `${BRATS_API}_t1ce.nii.gz`,
-    t2: `${BRATS_API}_t2.nii.gz`,
-    flair: `${BRATS_API}_flair.nii.gz`,
-};
-const SEG_URL = `${BRATS_API}_seg.nii.gz`;
+const MODALITY_ORDER = ["t1", "t1ce", "t2", "flair"] as const;
 
 // ── Animation ──────────────────────────────────────────────────────────────
 
@@ -116,12 +109,44 @@ interface CaseDetailShellProps {
 
 // ── ViewerPanel — isolated so slice ticks don't re-render sidebar ──────────
 
-const ViewerPanel = memo(function ViewerPanel({ activeTab }: { activeTab: TabKey }) {
+const ViewerPanel = memo(function ViewerPanel({
+    activeTab,
+    caseId,
+    scanFiles,
+}: {
+    activeTab: TabKey;
+    caseId: string;
+    scanFiles: string[];
+}) {
     const is3D = activeTab === "3d";
     const isGrid = activeTab === "grid";
     const is2D = !is3D && !isGrid;
     const activeMeta = MODALITY_TABS.find(t => t.key === activeTab);
-    const activeUrl = is2D ? URL_MAP[activeTab] : undefined;
+
+    const scanUrls = MODALITY_ORDER.map((_, i) =>
+        scanFiles[i] ? `/api/cases/${caseId}/scans/${i}` : null
+    );
+    const scanNames = scanFiles.map((ref) => ref.split("/").pop() ?? "scan.nii");
+    const tabIndex = MODALITY_ORDER.indexOf(activeTab as typeof MODALITY_ORDER[number]);
+    const activeScanName = is2D && tabIndex >= 0 ? scanNames[tabIndex] : "scan.nii";
+    const hasScan = is2D && tabIndex >= 0 && !!scanFiles[tabIndex];
+
+    // Pre-fetch all 4 scan buffers in parallel on mount — tab switches are then instant
+    const [scanBuffers, setScanBuffers] = useState<(ArrayBuffer | null)[]>([null, null, null, null]);
+    useEffect(() => {
+        if (!scanFiles.length) return;
+        scanUrls.forEach((url, i) => {
+            if (!url) return;
+            fetch(url)
+                .then(r => { if (!r.ok) throw new Error(`${r.status}`); return r.arrayBuffer(); })
+                .then(buf => setScanBuffers(prev => { const next = [...prev]; next[i] = buf; return next; }))
+                .catch(() => {/* buffer stays null; viewer shows its own error state */});
+        });
+        // scanUrls is derived from scanFiles + caseId — only re-fetch if case changes
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [caseId]);
+
+    const activeBuffer = tabIndex >= 0 ? scanBuffers[tabIndex] : null;
 
     const [slice, setSlice] = useState(0);
     const [totalSlices, setTotalSlices] = useState(155);
@@ -345,21 +370,23 @@ const ViewerPanel = memo(function ViewerPanel({ activeTab }: { activeTab: TabKey
                     <ThreeDViewer />
                 ) : isGrid ? (
                     <ModalityGridViewer
-                        sliceBase={BRATS_BASE}
+                        scanBuffers={scanBuffers}
+                        scanNames={scanNames}
                         slice={slice}
                         showMask={showMask}
+                        onLoad={handleVolumeLoad}
                         onSliceChange={setSlice}
                     />
                 ) : isContactSheet ? (
                     <ModalityContactSheet
-                        sliceBase={BRATS_BASE}
+                        sliceBase={scanFiles.length === 0 ? BRATS_BASE : undefined}
                         modality={activeTab}
                         showMask={showMask}
                     />
-                ) : activeUrl ? (
+                ) : hasScan ? (
                     <ModalityViewer
-                        url={activeUrl}
-                        segUrl={SEG_URL}
+                        buffer={activeBuffer}
+                        scanName={activeScanName}
                         showMask={showMask}
                         slice={slice}
                         onLoad={handleVolumeLoad}
@@ -376,7 +403,7 @@ const ViewerPanel = memo(function ViewerPanel({ activeTab }: { activeTab: TabKey
             </div>
 
             {/* Controls panel */}
-            {!is3D && !isFullscreen && (isGrid || isContactSheet || activeUrl) && (
+            {!is3D && !isFullscreen && (isGrid || isContactSheet || hasScan) && (
                 <div className="px-5 py-4 border-t border-slate-200 dark:border-slate-800 space-y-3 bg-white dark:bg-slate-900">
                     {!isContactSheet && (
                         <div className="flex items-center gap-3">
@@ -663,7 +690,11 @@ export function CaseDetailShell({ caseItem, workspaceRole, membershipId }: CaseD
 
                     {/* Viewer — isolated, memoized */}
                     <motion.div variants={fadeUp}>
-                        <ViewerPanel activeTab={activeTab} />
+                        <ViewerPanel
+                            activeTab={activeTab}
+                            caseId={caseItem.id}
+                            scanFiles={fileUrls}
+                        />
                     </motion.div>
 
                     {/* Clinical Notes */}

@@ -1,18 +1,16 @@
 "use client";
 
-import { useActionState, useState, useRef, startTransition, useEffect } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import {
   ArrowLeft, Upload, FileText, X,
-  Loader2, AlertCircle, CheckCircle2, ChevronDown, Phone, UserCheck,
+  CheckCircle2, ChevronDown, Phone, UserCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { createCaseAction, type CaseFormState } from "@/features/cases/actions/case.actions";
+import { useUpload } from "@/providers/upload-provider";
 import type { Patient } from "@/lib/types/patient.types";
-
-const initialState: CaseFormState = { message: "" };
 
 interface NewCaseShellProps {
   workspaceId: string;
@@ -21,23 +19,15 @@ interface NewCaseShellProps {
 }
 
 export function NewCaseShell({ patients, members }: NewCaseShellProps) {
-  const [state, action, isPending] = useActionState(createCaseAction, initialState);
   const [files, setFiles] = useState<File[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { startUpload } = useUpload();
 
   // Patient search state
   const [phoneQuery, setPhoneQuery] = useState("");
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
-
-  // On success: remove cached data entirely so initialData from the server render is used
-  useEffect(() => {
-    if (state.success) {
-      queryClient.removeQueries({ queryKey: ["cases"] });
-      router.push("/cases");
-    }
-  }, [state.success]);
 
   const doctors = members.filter(
     (m) => m.role === "DOCTOR" || m.role === "ADMIN" || m.role === "OWNER"
@@ -67,22 +57,24 @@ export function NewCaseShell({ patients, members }: NewCaseShellProps) {
   const labelCls =
     "text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block";
 
-  // Inject files into form action — useActionState doesn't support
-  // files directly, so we build FormData manually
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (files.length !== 4 || !selectedPatient) return;
 
     const fd = new FormData(e.currentTarget);
-    // Ensure the selected patient id is in the form data
-    fd.set("patient_id", selectedPatient.id);
-    // Remove any old scan entries, add the real File objects
-    fd.delete("scans");
-    files.forEach((f) => fd.append("scans", f));
-    // Wrap in startTransition so isPending updates correctly
-    startTransition(() => {
-      action(fd);
+    const priority = fd.get("priority") as string ?? "normal";
+    const assignedToMemberId = fd.get("assigned_to_member_id") as string ?? "";
+    const notes = fd.get("notes") as string ?? "";
+
+    // Kick off parallel upload via context, then navigate immediately
+    startUpload(files, {
+      patientId: selectedPatient.id,
+      priority,
+      assignedToMemberId,
+      notes,
     });
+    queryClient.removeQueries({ queryKey: ["cases"] });
+    router.push("/cases");
   };
 
   return (
@@ -103,12 +95,6 @@ export function NewCaseShell({ patients, members }: NewCaseShellProps) {
 
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-neutral-200 dark:border-slate-800 p-8">
         <form onSubmit={handleSubmit} className="space-y-6">
-          {state.message && !state.success && (
-            <div className="flex items-start gap-3 p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 rounded-xl text-sm text-red-600 dark:text-red-400">
-              <AlertCircle size={16} className="shrink-0 mt-0.5" />
-              {state.message}
-            </div>
-          )}
 
           {/* Patient — phone search then select */}
           <div>
@@ -359,11 +345,10 @@ export function NewCaseShell({ patients, members }: NewCaseShellProps) {
             </Link>
             <button
               type="submit"
-              disabled={isPending || files.length !== 4 || !selectedPatient}
+              disabled={files.length !== 4 || !selectedPatient}
               className="flex-1 py-3 rounded-xl bg-black dark:bg-white text-white dark:text-black text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2 hover:opacity-90 transition-all"
             >
-              {isPending && <Loader2 size={14} className="animate-spin" />}
-              {isPending ? "Creating..." : "Create Case"}
+              Create Case
             </button>
           </div>
         </form>
