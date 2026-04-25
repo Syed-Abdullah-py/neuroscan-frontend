@@ -7,9 +7,9 @@ import { motion, type Variants } from "framer-motion";
 import {
     ArrowLeft, Brain, User, FileText, Activity, ShieldAlert,
     Calendar, Loader2, AlertCircle, ScanLine, Box,
-    ChevronLeft, ChevronRight, LayoutGrid,
+    ChevronLeft, ChevronRight, ChevronDown, ChevronUp, LayoutGrid,
     Maximize2, Minimize2, Play, Pause, Settings2,
-    SlidersHorizontal,
+    SlidersHorizontal, CheckCircle2, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUpdateCase } from "@/features/cases/hooks/use-cases";
@@ -131,20 +131,92 @@ const ViewerPanel = memo(function ViewerPanel({
     const activeScanName = is2D && tabIndex >= 0 ? scanNames[tabIndex] : "scan.nii";
     const hasScan = is2D && tabIndex >= 0 && !!scanFiles[tabIndex];
 
-    // Pre-fetch all 4 scan buffers in parallel on mount — tab switches are then instant
+    // ── Scan pre-fetch with per-file progress ─────────────────────────────
+    const MODALITY_LABELS = ["T1", "T1ce", "T2", "FLAIR"] as const;
+
+    type FetchStatus = "pending" | "downloading" | "done" | "error";
+    type FileFetchState = { label: string; name: string; sizeMb: number; progress: number; status: FetchStatus };
+
     const [scanBuffers, setScanBuffers] = useState<(ArrayBuffer | null)[]>([null, null, null, null]);
+    const [fetchStates, setFetchStates] = useState<FileFetchState[]>(() =>
+        MODALITY_LABELS.map((label, i) => ({
+            label,
+            name: scanNames[i] ?? `scan_${i}.nii`,
+            sizeMb: 0,
+            progress: 0,
+            status: scanFiles[i] ? "pending" : "done",
+        }))
+    );
+    const [fetchToastCollapsed, setFetchToastCollapsed] = useState(false);
+    const [fetchToastDismissed, setFetchToastDismissed] = useState(false);
+
+    const patchFetch = useCallback((i: number, patch: Partial<FileFetchState>) => {
+        setFetchStates(prev => prev.map((s, j) => j === i ? { ...s, ...patch } : s));
+    }, []);
+
     useEffect(() => {
         if (!scanFiles.length) return;
+        // Reset state for new case
+        setScanBuffers([null, null, null, null]);
+        setFetchStates(MODALITY_LABELS.map((label, i) => ({
+            label,
+            name: scanNames[i] ?? `scan_${i}.nii`,
+            sizeMb: 0,
+            progress: 0,
+            status: scanFiles[i] ? "pending" : "done",
+        })));
+        setFetchToastDismissed(false);
+
+        const controllers = scanUrls.map(() => new AbortController());
+
         scanUrls.forEach((url, i) => {
             if (!url) return;
-            fetch(url)
-                .then(r => { if (!r.ok) throw new Error(`${r.status}`); return r.arrayBuffer(); })
-                .then(buf => setScanBuffers(prev => { const next = [...prev]; next[i] = buf; return next; }))
-                .catch(() => {/* buffer stays null; viewer shows its own error state */});
+            patchFetch(i, { status: "downloading" });
+            fetch(url, { signal: controllers[i].signal })
+                .then(res => {
+                    if (!res.ok) throw new Error(`${res.status}`);
+                    const total = parseInt(res.headers.get("Content-Length") ?? "0", 10);
+                    if (total > 0) patchFetch(i, { sizeMb: parseFloat((total / 1024 / 1024).toFixed(1)) });
+                    const reader = res.body!.getReader();
+                    const chunks: Uint8Array[] = [];
+                    let received = 0;
+                    const read = (): Promise<ArrayBuffer> =>
+                        reader.read().then(({ done, value }) => {
+                            if (done) {
+                                const buf = new Uint8Array(received);
+                                let off = 0;
+                                for (const c of chunks) { buf.set(c, off); off += c.length; }
+                                return buf.buffer;
+                            }
+                            chunks.push(value!);
+                            received += value!.length;
+                            if (total > 0) patchFetch(i, { progress: Math.round((received / total) * 100) });
+                            return read();
+                        });
+                    return read();
+                })
+                .then(buf => {
+                    setScanBuffers(prev => { const next = [...prev]; next[i] = buf; return next; });
+                    patchFetch(i, { progress: 100, status: "done" });
+                })
+                .catch(err => {
+                    if (err?.name === "AbortError") return;
+                    patchFetch(i, { status: "error" });
+                });
         });
-        // scanUrls is derived from scanFiles + caseId — only re-fetch if case changes
+
+        return () => controllers.forEach(c => c.abort());
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [caseId]);
+
+    // Auto-dismiss fetch toast 3 s after all files finish
+    useEffect(() => {
+        if (!scanFiles.length) return;
+        if (fetchStates.every(s => s.status === "done" || s.status === "error")) {
+            const t = setTimeout(() => setFetchToastDismissed(true), 3000);
+            return () => clearTimeout(t);
+        }
+    }, [fetchStates, scanFiles.length]);
 
     const activeBuffer = tabIndex >= 0 ? scanBuffers[tabIndex] : null;
 
@@ -196,7 +268,116 @@ const ViewerPanel = memo(function ViewerPanel({
     const isContactSheet = is2D && viewMode === "contact";
     const slicePct = (slice / Math.max(totalSlices - 1, 1)) * 100;
 
+    const showFetchToast = !fetchToastDismissed && scanFiles.length > 0;
+    const allFetchDone = fetchStates.every(s => s.status === "done" || s.status === "error");
+
     return (
+        <>
+        {showFetchToast && (
+            <div className={cn(
+                "fixed bottom-6 right-6 z-50 w-[320px] rounded-2xl shadow-2xl overflow-hidden border bg-white dark:bg-slate-900",
+                allFetchDone
+                    ? "border-emerald-200 dark:border-emerald-800/60"
+                    : "border-slate-200 dark:border-slate-700"
+            )}>
+                {/* Toast header */}
+                <div className={cn(
+                    "flex items-center justify-between px-4 py-3",
+                    allFetchDone ? "bg-emerald-50 dark:bg-emerald-950/40" : "bg-slate-50 dark:bg-slate-800/60"
+                )}>
+                    <div className="flex items-center gap-2.5 min-w-0">
+                        <div className={cn(
+                            "flex items-center justify-center w-7 h-7 rounded-full shrink-0",
+                            allFetchDone ? "bg-emerald-100 dark:bg-emerald-900/50" : "bg-blue-100 dark:bg-blue-900/50"
+                        )}>
+                            {allFetchDone
+                                ? <CheckCircle2 size={14} className="text-emerald-600 dark:text-emerald-400" />
+                                : <Loader2 size={14} className="animate-spin text-blue-600 dark:text-blue-400" />}
+                        </div>
+                        <div className="min-w-0">
+                            <p className={cn(
+                                "text-sm font-semibold",
+                                allFetchDone ? "text-emerald-700 dark:text-emerald-300" : "text-slate-800 dark:text-slate-100"
+                            )}>
+                                {allFetchDone ? "Scans ready" : `Loading scans — ${Math.round(fetchStates.reduce((s, f) => s + f.progress, 0) / fetchStates.length)}%`}
+                            </p>
+                            {!allFetchDone && (
+                                <p className="text-xs text-slate-500 mt-0.5">
+                                    {fetchStates.filter(s => s.status === "done").length} of {fetchStates.length} ready
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0 ml-2">
+                        <button
+                            onClick={() => setFetchToastCollapsed(v => !v)}
+                            title={fetchToastCollapsed ? "Expand" : "Collapse"}
+                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                        >
+                            {fetchToastCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                        </button>
+                        {allFetchDone && (
+                            <button
+                                onClick={() => setFetchToastDismissed(true)}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                            >
+                                <X size={14} />
+                            </button>
+                        )}
+                    </div>
+                </div>
+
+                {/* Overall progress strip */}
+                {!allFetchDone && (
+                    <div className="h-1 bg-slate-100 dark:bg-slate-800">
+                        <div
+                            className="h-full bg-blue-500 transition-all duration-300"
+                            style={{ width: `${Math.round(fetchStates.reduce((s, f) => s + f.progress, 0) / fetchStates.length)}%` }}
+                        />
+                    </div>
+                )}
+
+                {/* Per-file rows */}
+                {!fetchToastCollapsed && (
+                    <div className="px-4 py-3 space-y-2.5">
+                        {fetchStates.map((f, i) => (
+                            <div key={i} className="space-y-1">
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <span className="text-[10px] font-bold uppercase tracking-wider shrink-0 w-8 tabular-nums"
+                                        style={{ color: ["#60a5fa","#a78bfa","#34d399","#fb923c"][i] }}>
+                                        {f.label}
+                                    </span>
+                                    <span className="text-xs text-slate-600 dark:text-slate-400 truncate flex-1">{f.name}</span>
+                                    {f.sizeMb > 0 && (
+                                        <span className="text-xs text-slate-400 shrink-0 tabular-nums">{f.sizeMb} MB</span>
+                                    )}
+                                    {f.status === "done" && <CheckCircle2 size={12} className="text-emerald-500 shrink-0" />}
+                                    {f.status === "error" && <AlertCircle size={12} className="text-red-500 shrink-0" />}
+                                    {(f.status === "downloading" || f.status === "pending") && (
+                                        <span className="text-xs tabular-nums text-blue-600 dark:text-blue-400 shrink-0 w-7 text-right">
+                                            {f.progress > 0 ? `${f.progress}%` : "…"}
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="h-1 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                                    <div
+                                        className={cn(
+                                            "h-full rounded-full transition-all duration-200",
+                                            f.status === "error" ? "bg-red-500"
+                                                : f.status === "done" ? "bg-emerald-500"
+                                                : f.status === "pending" ? "bg-slate-300 dark:bg-slate-600"
+                                                : "bg-blue-500"
+                                        )}
+                                        style={{ width: `${f.status === "pending" ? 0 : f.progress}%` }}
+                                    />
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        )}
+
         <div
             ref={viewerCardRef}
             className={cn(
@@ -474,6 +655,7 @@ const ViewerPanel = memo(function ViewerPanel({
                 </div>
             )}
         </div>
+        </>
     );
 });
 
