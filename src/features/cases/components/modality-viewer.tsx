@@ -3,9 +3,11 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader2 } from "lucide-react";
 
+// ── ModalityViewer (single modality, NiiVue-based) ────────────────────────
+
 interface ModalityViewerProps {
-    url: string;
-    segUrl?: string;
+    buffer: ArrayBuffer | null;  // null = still downloading
+    scanName?: string;
     showMask?: boolean;
     slice: number;
     onLoad: (totalSlices: number, initialSlice: number) => void;
@@ -17,7 +19,7 @@ export function ModalityViewer(props: ModalityViewerProps) {
 }
 
 
-// ── 4-modality grid viewer (2×2) — PNG-based ──────────────────────────────
+// ── 4-modality grid viewer (2×2) ──────────────────────────────────────────
 
 const MODALITY_META: Record<string, { label: string; color: string }> = {
     t1: { label: "T1", color: "#60a5fa" },
@@ -30,23 +32,66 @@ const GRID_MODS = ["t1", "t1ce", "t2", "flair"] as const;
 const BRATS_TOTAL = 155;
 
 export function ModalityGridViewer({
+    scanBuffers,
+    scanNames,
     sliceBase,
     showMask,
     slice,
     onLoad,
     onSliceChange: _onSliceChange,
 }: {
-    sliceBase: string;
+    scanBuffers?: (ArrayBuffer | null)[];
+    scanNames?: string[];
+    sliceBase?: string;
     showMask: boolean;
     slice: number;
     onLoad?: (nz: number, mid: number) => void;
     onSliceChange: (s: number) => void;
 }) {
-    useEffect(() => {
-        onLoad?.(BRATS_TOTAL, 0);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    const isRealData = !!scanBuffers;
 
+    // Must be before any early return — rules of hooks
+    useEffect(() => {
+        if (!isRealData) onLoad?.(BRATS_TOTAL, 0);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isRealData]);
+
+    if (isRealData) {
+        return (
+            <div className="w-full h-full grid grid-cols-2 grid-rows-2 gap-px bg-slate-800/60">
+                {GRID_MODS.map((mod, i) => {
+                    const buf = scanBuffers[i] ?? null;
+                    const meta = MODALITY_META[mod];
+                    return (
+                        <div
+                            key={mod}
+                            className="relative overflow-hidden flex items-center justify-center"
+                            style={{ background: "#050d18" }}
+                        >
+                            <NiiVueMiniViewer
+                                buffer={buf}
+                                scanName={scanNames?.[i]}
+                                slice={slice}
+                                onLoad={i === 0 ? onLoad : undefined}
+                            />
+                            <span
+                                className="absolute top-2 left-2 text-[10px] font-bold px-2 py-0.5 rounded-md backdrop-blur-sm z-10"
+                                style={{
+                                    background: `${meta.color}22`,
+                                    color: meta.color,
+                                    border: `1px solid ${meta.color}44`,
+                                }}
+                            >
+                                {meta.label}
+                            </span>
+                        </div>
+                    );
+                })}
+            </div>
+        );
+    }
+
+    // PNG/BraTS fallback
     const idx = String(Math.max(0, Math.min(slice, BRATS_TOTAL - 1))).padStart(3, "0");
 
     return (
@@ -77,9 +122,9 @@ export function ModalityGridViewer({
     );
 }
 
-// ── Per-modality contact sheet — PNG-based, instant render ────────────────
+// ── Per-modality contact sheet — PNG-based ────────────────────────────────
 
-const CONTACT_COLS = 5; // 5 × 31 = 155
+const CONTACT_COLS = 5;
 const SLICE_INDICES = Array.from({ length: BRATS_TOTAL }, (_, i) => i);
 
 export function ModalityContactSheet({
@@ -87,10 +132,18 @@ export function ModalityContactSheet({
     modality,
     showMask,
 }: {
-    sliceBase: string;
+    sliceBase?: string;
     modality: string;
     showMask: boolean;
 }) {
+    if (!sliceBase) {
+        return (
+            <div className="flex h-full items-center justify-center" style={{ background: "#050d18" }}>
+                <p className="text-xs text-slate-500">Contact sheet not available for uploaded scans</p>
+            </div>
+        );
+    }
+
     return (
         <div className="w-full h-full overflow-y-auto" style={{ background: "#050d18" }}>
             <div
@@ -129,9 +182,9 @@ export function ModalityContactSheet({
 // ── NiiVue single-modality viewer ─────────────────────────────────────────
 
 function NiiVueViewer({
-    url,
-    segUrl,
-    showMask = false,
+    buffer,
+    scanName,
+    showMask: _showMask = false,
     slice,
     onLoad,
     onSliceChange,
@@ -144,7 +197,10 @@ function NiiVueViewer({
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
+        // Buffer not yet available — stay in loading state, wait for re-render
+        if (!buffer) { setLoading(true); setError(null); return; }
         if (!canvasRef.current) return;
+
         aliveRef.current = true;
         setLoading(true);
         setError(null);
@@ -166,21 +222,9 @@ function NiiVueViewer({
                 await nv.attachToCanvas(canvasRef.current);
                 nv.setSliceType(0);
 
-                const fetchBuf = async (u: string) => {
-                    const r = await fetch(u);
-                    if (!r.ok) throw new Error(`HTTP ${r.status}`);
-                    return r.arrayBuffer();
-                };
-
-                const mriBuffer = await fetchBuf(url);
                 const volumes: any[] = [
-                    { url: mriBuffer, name: "scan.nii", colormap: "gray" },
+                    { url: buffer, name: scanName ?? "scan.nii", colormap: "gray" },
                 ];
-                if (segUrl) {
-                    const segBuffer = await fetchBuf(segUrl);
-                    volumes.push({ url: segBuffer, name: "seg.nii", colormap: "actc", opacity: showMask ? 0.5 : 0 });
-                }
-
                 await nv.loadVolumes(volumes);
                 if (!aliveRef.current) return;
 
@@ -203,14 +247,7 @@ function NiiVueViewer({
 
         return () => { aliveRef.current = false; nvRef.current = null; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [url]);
-
-    useEffect(() => {
-        const nv = nvRef.current;
-        if (!nv || loading || error || nv.volumes.length < 2) return;
-        nv.volumes[1]._opacity = showMask ? 0.5 : 0;
-        nv.updateGLVolume();
-    }, [showMask, loading, error]);
+    }, [buffer]);
 
     useEffect(() => {
         const nv = nvRef.current;
@@ -248,6 +285,97 @@ function NiiVueViewer({
                 <div className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-3 px-8 text-center">
                     <p className="text-sm font-semibold text-slate-300">Unable to render scan</p>
                     <p className="text-xs text-slate-500 max-w-[260px]">{error}</p>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// ── NiiVue mini viewer — for the 2×2 grid ────────────────────────────────
+
+function NiiVueMiniViewer({
+    buffer,
+    scanName,
+    slice,
+    onLoad,
+}: {
+    buffer: ArrayBuffer | null;
+    scanName?: string;
+    slice: number;
+    onLoad?: (nz: number, mid: number) => void;
+}) {
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const nvRef = useRef<any>(null);
+    const totalRef = useRef(1);
+    const aliveRef = useRef(true);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        if (!buffer) { setLoading(true); setError(null); return; }
+        if (!canvasRef.current) return;
+
+        aliveRef.current = true;
+        setLoading(true);
+        setError(null);
+
+        (async () => {
+            try {
+                const { Niivue } = await import("@niivue/niivue");
+                if (!aliveRef.current || !canvasRef.current) return;
+
+                const nv = new Niivue({
+                    isResizeCanvas: true,
+                    backColor: [0.02, 0.05, 0.09, 1],
+                    crosshairWidth: 0,
+                    isColorbar: false,
+                    dragMode: 1,
+                    loadingText: "",
+                });
+                nvRef.current = nv;
+                await nv.attachToCanvas(canvasRef.current);
+                nv.setSliceType(0);
+
+                const miniVolumes: any[] = [{ url: buffer, name: scanName ?? "scan.nii", colormap: "gray" }];
+                await nv.loadVolumes(miniVolumes);
+                if (!aliveRef.current) return;
+
+                const dims: number[] = nv.volumes[0].hdr!.dims;
+                const nz = Math.max(dims[3] ?? 1, 1);
+                totalRef.current = nz;
+                _seek(nv, 0, nz);
+                onLoad?.(nz, 0);
+                setLoading(false);
+            } catch (err: any) {
+                if (aliveRef.current) { setError(err?.message ?? "Failed to load"); setLoading(false); }
+            }
+        })();
+
+        return () => { aliveRef.current = false; nvRef.current = null; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [buffer]);
+
+    useEffect(() => {
+        const nv = nvRef.current;
+        if (!nv || loading || error) return;
+        _seek(nv, slice, totalRef.current);
+    }, [slice, loading, error]);
+
+    return (
+        <div className="relative w-full h-full" style={{ background: "#050d18" }}>
+            <canvas
+                ref={canvasRef}
+                className="w-full h-full"
+                style={{ display: loading || error ? "none" : "block" }}
+            />
+            {loading && !error && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                    <Loader2 className="w-5 h-5 animate-spin text-cyan-400/60" />
+                </div>
+            )}
+            {error && (
+                <div className="absolute inset-0 flex items-center justify-center px-2 text-center">
+                    <p className="text-[10px] text-slate-500">{error}</p>
                 </div>
             )}
         </div>
