@@ -5,12 +5,21 @@ import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 import {
-  ArrowLeft, Upload, FileText, X,
+  ArrowLeft, Upload, X,
   CheckCircle2, ChevronDown, Phone, UserCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUpload } from "@/providers/upload-provider";
 import type { Patient } from "@/lib/types/patient.types";
+
+type ModalityKey = "t1" | "t1ce" | "t2" | "flair";
+
+const MODALITY_META: { key: ModalityKey; label: string; full: string; color: string }[] = [
+  { key: "t1",    label: "T1",    full: "T1-weighted",         color: "#60a5fa" },
+  { key: "t1ce",  label: "T1ce",  full: "T1 Contrast Enhanced", color: "#a78bfa" },
+  { key: "t2",    label: "T2",    full: "T2-weighted",         color: "#34d399" },
+  { key: "flair", label: "FLAIR", full: "FLAIR",               color: "#fb923c" },
+];
 
 interface NewCaseShellProps {
   workspaceId: string;
@@ -19,11 +28,17 @@ interface NewCaseShellProps {
 }
 
 export function NewCaseShell({ patients, members }: NewCaseShellProps) {
-  const [files, setFiles] = useState<File[]>([]);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [scans, setScans] = useState<Record<ModalityKey, File | null>>({
+    t1: null, t1ce: null, t2: null, flair: null,
+  });
+  const inputRefs = useRef<Record<ModalityKey, HTMLInputElement | null>>({
+    t1: null, t1ce: null, t2: null, flair: null,
+  });
   const router = useRouter();
   const queryClient = useQueryClient();
   const { startUpload } = useUpload();
+
+  const allScansReady = MODALITY_META.every(({ key }) => scans[key] !== null);
 
   // Patient search state
   const [phoneQuery, setPhoneQuery] = useState("");
@@ -39,18 +54,8 @@ export function NewCaseShell({ patients, members }: NewCaseShellProps) {
     ? patients.filter((p) => p.phone_number.replace(/\s+/g, "").includes(trimmed.replace(/\s+/g, "")))
     : [];
 
-  const handleFiles = (selected: FileList | null) => {
-    if (!selected) return;
-    const arr = Array.from(selected);
-    setFiles((prev) => {
-      const combined = [...prev, ...arr].slice(0, 4);
-      return combined;
-    });
-  };
-
-  const removeFile = (index: number) => {
-    setFiles((prev) => prev.filter((_, i) => i !== index));
-  };
+  const setScan = (key: ModalityKey, file: File | null) =>
+    setScans((prev) => ({ ...prev, [key]: file }));
 
   const inputCls =
     "w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:text-white transition-all";
@@ -59,15 +64,17 @@ export function NewCaseShell({ patients, members }: NewCaseShellProps) {
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (files.length !== 4 || !selectedPatient) return;
+    if (!allScansReady || !selectedPatient) return;
 
     const fd = new FormData(e.currentTarget);
     const priority = fd.get("priority") as string ?? "normal";
     const assignedToMemberId = fd.get("assigned_to_member_id") as string ?? "";
     const notes = fd.get("notes") as string ?? "";
 
-    // Kick off parallel upload via context, then navigate immediately
-    startUpload(files, {
+    // Files are passed in MODALITY_ORDER: [t1, t1ce, t2, flair] → indices 0, 1, 2, 3
+    const orderedFiles = MODALITY_META.map(({ key }) => scans[key]!);
+
+    startUpload(orderedFiles, {
       patientId: selectedPatient.id,
       priority,
       assignedToMemberId,
@@ -253,86 +260,104 @@ export function NewCaseShell({ patients, members }: NewCaseShellProps) {
             />
           </div>
 
-          {/* File upload */}
+          {/* MRI Scans — 4 individual modality slots */}
           <div>
             <label className={labelCls}>
               MRI Scans <span className="text-red-500">*</span>{" "}
               <span className="text-neutral-400 normal-case font-normal">
-                (exactly 4 files)
+                (one file per modality)
               </span>
             </label>
 
-            {/* Drop zone */}
-            <div
-              className={cn(
-                "relative border-2 border-dashed rounded-2xl p-8 text-center transition-all cursor-pointer",
-                files.length === 4
-                  ? "border-emerald-400 dark:border-emerald-600 bg-emerald-50 dark:bg-emerald-900/10"
-                  : "border-slate-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-600 hover:bg-slate-50 dark:hover:bg-slate-900"
-              )}
-              onClick={() => files.length < 4 && inputRef.current?.click()}
-            >
-              <input
-                ref={inputRef}
-                type="file"
-                multiple
-                accept=".nii,.dcm,.nrrd,.mha,.mhd,.gz"
-                className="hidden"
-                onChange={(e) => handleFiles(e.target.files)}
-              />
-              {files.length === 4 ? (
-                <div className="flex flex-col items-center gap-2">
-                  <CheckCircle2 className="w-10 h-10 text-emerald-500" />
-                  <p className="text-sm font-bold text-emerald-700 dark:text-emerald-400">
-                    4 files ready
-                  </p>
-                </div>
-              ) : (
-                <div className="flex flex-col items-center gap-3">
-                  <Upload className="w-10 h-10 text-slate-400" />
-                  <div>
-                    <p className="text-sm font-bold text-slate-700 dark:text-slate-300">
-                      Click to upload MRI scans
-                    </p>
-                    <p className="text-xs text-slate-400 mt-1">
-                      .nii, .nii.gz, .dcm, .nrrd, .mha, .mhd — 500MB max each
-                    </p>
+            <div className="grid grid-cols-2 gap-3">
+              {MODALITY_META.map(({ key, label, full, color }) => {
+                const file = scans[key];
+                return (
+                  <div key={key}>
+                    {/* Hidden file input */}
+                    <input
+                      ref={(el) => { inputRefs.current[key] = el; }}
+                      type="file"
+                      accept=".nii,.nii.gz,.dcm,.nrrd,.mha,.mhd"
+                      className="hidden"
+                      onChange={(e) => setScan(key, e.target.files?.[0] ?? null)}
+                    />
+
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => inputRefs.current[key]?.click()}
+                      onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); inputRefs.current[key]?.click(); } }}
+                      className={cn(
+                        "w-full rounded-xl border-2 p-4 text-left transition-all cursor-pointer",
+                        file
+                          ? "border-emerald-400 dark:border-emerald-600 bg-emerald-50 dark:bg-emerald-900/10"
+                          : "border-dashed border-slate-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-600 hover:bg-slate-50 dark:hover:bg-slate-900/50"
+                      )}
+                    >
+                      {/* Modality badge */}
+                      <div className="flex items-center justify-between mb-2">
+                        <span
+                          className="text-[11px] font-bold px-2 py-0.5 rounded-md"
+                          style={{ background: `${color}22`, color, border: `1px solid ${color}44` }}
+                        >
+                          {label}
+                        </span>
+                        {file ? (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setScan(key, null); }}
+                            className="text-slate-400 hover:text-red-500 transition-colors"
+                          >
+                            <X size={13} />
+                          </button>
+                        ) : (
+                          <Upload size={13} className="text-slate-400" />
+                        )}
+                      </div>
+
+                      {file ? (
+                        <div className="flex items-center gap-2 min-w-0">
+                          <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
+                          <p className="text-xs font-medium text-slate-700 dark:text-slate-300 truncate">
+                            {file.name}
+                          </p>
+                        </div>
+                      ) : (
+                        <div>
+                          <p className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+                            {full}
+                          </p>
+                          <p className="text-[10px] text-slate-400 mt-0.5">
+                            Click to select file
+                          </p>
+                        </div>
+                      )}
+
+                      {file && (
+                        <p className="text-[10px] text-slate-400 mt-1">
+                          {(file.size / 1024 / 1024).toFixed(1)} MB
+                        </p>
+                      )}
+                    </div>
                   </div>
-                  <span className="text-xs font-bold text-slate-500 bg-slate-100 dark:bg-slate-800 px-3 py-1 rounded-full">
-                    {files.length}/4 selected
-                  </span>
-                </div>
-              )}
+                );
+              })}
             </div>
 
-            {/* File list */}
-            {files.length > 0 && (
-              <div className="mt-3 space-y-2">
-                {files.map((f, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-950 rounded-xl border border-slate-200 dark:border-slate-800"
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <FileText size={16} className="text-slate-400 shrink-0" />
-                      <p className="text-sm font-medium text-slate-700 dark:text-slate-300 truncate">
-                        {f.name}
-                      </p>
-                      <span className="text-xs text-slate-400 shrink-0">
-                        {(f.size / 1024 / 1024).toFixed(1)} MB
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => removeFile(i)}
-                      className="p-1.5 text-slate-400 hover:text-red-500 rounded-lg transition-colors shrink-0"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
+            {/* Progress indicator */}
+            <div className="flex items-center gap-2 mt-3">
+              {MODALITY_META.map(({ key, color }) => (
+                <div
+                  key={key}
+                  className="h-1 flex-1 rounded-full transition-all"
+                  style={{ background: scans[key] ? color : "#e2e8f0" }}
+                />
+              ))}
+            </div>
+            <p className="text-xs text-slate-400 mt-1.5">
+              {MODALITY_META.filter(({ key }) => scans[key]).length}/4 modalities selected
+            </p>
           </div>
 
           {/* Actions */}
@@ -345,7 +370,7 @@ export function NewCaseShell({ patients, members }: NewCaseShellProps) {
             </Link>
             <button
               type="submit"
-              disabled={files.length !== 4 || !selectedPatient}
+              disabled={!allScansReady || !selectedPatient}
               className="flex-1 py-3 rounded-xl bg-black dark:bg-white text-white dark:text-black text-sm font-bold disabled:opacity-50 flex items-center justify-center gap-2 hover:opacity-90 transition-all"
             >
               Create Case

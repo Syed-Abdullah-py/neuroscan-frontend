@@ -131,21 +131,32 @@ const ViewerPanel = memo(function ViewerPanel({
     const activeScanName = is2D && tabIndex >= 0 ? scanNames[tabIndex] : "scan.nii";
     const hasScan = is2D && tabIndex >= 0 && !!scanFiles[tabIndex];
 
-    // ── Scan pre-fetch with per-file progress ─────────────────────────────
-    const MODALITY_LABELS = ["T1", "T1ce", "T2", "FLAIR"] as const;
-
+    // ── Unified pre-fetch: 4 scans + mesh.glb + seg.nii + PNG slices ────────
     type FetchStatus = "pending" | "downloading" | "done" | "error";
-    type FileFetchState = { label: string; name: string; sizeMb: number; progress: number; status: FetchStatus };
+    type FileFetchState = { label: string; color: string; sizeMb: number; progress: number; status: FetchStatus };
+    type SliceFetchState = { done: number; status: "idle" | "fetching" | "done" };
+
+    const FETCH_COLORS = ["#60a5fa", "#a78bfa", "#34d399", "#fb923c", "#e879f9", "#38bdf8"];
+    const FETCH_LABELS = ["scan_0_slices", "scan_1_slices", "scan_2_slices", "scan_3_slices", "mesh.glb", "seg.nii"];
+    const SLICE_TOTAL = 155;
+    const SLICE_MODS_ORDER = ["t1", "t1ce", "t2", "flair"] as const;
+    const SLICE_MOD_LABELS = ["T1", "T1ce", "T2", "FLAIR"];
+    const FETCH_URLS = [
+        ...scanUrls,
+        `/api/cases/${caseId}/mesh`,
+        `/api/cases/${caseId}/seg`,
+    ];
 
     const [scanBuffers, setScanBuffers] = useState<(ArrayBuffer | null)[]>([null, null, null, null]);
+    const [segBuffer, setSegBuffer] = useState<ArrayBuffer | null>(null);
     const [fetchStates, setFetchStates] = useState<FileFetchState[]>(() =>
-        MODALITY_LABELS.map((label, i) => ({
-            label,
-            name: scanNames[i] ?? `scan_${i}.nii`,
-            sizeMb: 0,
-            progress: 0,
-            status: scanFiles[i] ? "pending" : "done",
+        FETCH_LABELS.map((label, i) => ({
+            label, color: FETCH_COLORS[i], sizeMb: 0, progress: 0,
+            status: (i < 4 ? (scanFiles[i] ? "pending" : "done") : "pending") as FetchStatus,
         }))
+    );
+    const [sliceStates, setSliceStates] = useState<SliceFetchState[]>(() =>
+        SLICE_MODS_ORDER.map(() => ({ done: 0, status: "idle" as const }))
     );
     const [fetchToastCollapsed, setFetchToastCollapsed] = useState(false);
     const [fetchToastDismissed, setFetchToastDismissed] = useState(false);
@@ -153,26 +164,32 @@ const ViewerPanel = memo(function ViewerPanel({
     const patchFetch = useCallback((i: number, patch: Partial<FileFetchState>) => {
         setFetchStates(prev => prev.map((s, j) => j === i ? { ...s, ...patch } : s));
     }, []);
+    const patchSlice = useCallback((modIdx: number, patch: Partial<SliceFetchState>) => {
+        setSliceStates(prev => prev.map((s, j) => j === modIdx ? { ...s, ...patch } : s));
+    }, []);
 
+    const sliceControllersRef = useRef<AbortController[]>([]);
+
+    // Phase 1 — download main files (scans + mesh + seg)
     useEffect(() => {
         if (!scanFiles.length) return;
-        // Reset state for new case
         setScanBuffers([null, null, null, null]);
-        setFetchStates(MODALITY_LABELS.map((label, i) => ({
-            label,
-            name: scanNames[i] ?? `scan_${i}.nii`,
-            sizeMb: 0,
-            progress: 0,
-            status: scanFiles[i] ? "pending" : "done",
+        setSegBuffer(null);
+        setFetchStates(FETCH_LABELS.map((label, i) => ({
+            label, color: FETCH_COLORS[i], sizeMb: 0, progress: 0,
+            status: (i < 4 ? (scanFiles[i] ? "pending" : "done") : "pending") as FetchStatus,
         })));
+        setSliceStates(SLICE_MODS_ORDER.map(() => ({ done: 0, status: "idle" as const })));
         setFetchToastDismissed(false);
 
-        const controllers = scanUrls.map(() => new AbortController());
+        sliceControllersRef.current.forEach(c => c.abort());
 
-        scanUrls.forEach((url, i) => {
+        const fileControllers = FETCH_URLS.map(() => new AbortController());
+
+        FETCH_URLS.forEach((url, i) => {
             if (!url) return;
             patchFetch(i, { status: "downloading" });
-            fetch(url, { signal: controllers[i].signal })
+            fetch(url, { signal: fileControllers[i].signal })
                 .then(res => {
                     if (!res.ok) throw new Error(`${res.status}`);
                     const total = parseInt(res.headers.get("Content-Length") ?? "0", 10);
@@ -196,27 +213,65 @@ const ViewerPanel = memo(function ViewerPanel({
                     return read();
                 })
                 .then(buf => {
-                    setScanBuffers(prev => { const next = [...prev]; next[i] = buf; return next; });
+                    if (i < 4) setScanBuffers(prev => { const next = [...prev]; next[i] = buf; return next; });
+                    else if (i === 5) setSegBuffer(buf);
                     patchFetch(i, { progress: 100, status: "done" });
                 })
-                .catch(err => {
-                    if (err?.name === "AbortError") return;
-                    patchFetch(i, { status: "error" });
-                });
+                .catch(err => { if (err?.name !== "AbortError") patchFetch(i, { status: "error" }); });
+        });
+
+        return () => {
+            fileControllers.forEach(c => c.abort());
+            sliceControllersRef.current.forEach(c => c.abort());
+        };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [caseId]);
+
+    const allMainDone = fetchStates.every(s => s.status === "done" || s.status === "error");
+    const allSlicesDone = sliceStates.every(s => s.status === "done" || s.status === "idle");
+    const allFetchDone = allMainDone && allSlicesDone;
+
+    // Phase 2 — PNG slice pre-fetch via proxy, starts only after main files are ready.
+    // Uses the same URLs as ModalityContactSheet <img> tags so the browser cache is shared.
+    useEffect(() => {
+        if (!allMainDone || !scanFiles.length) return;
+
+        sliceControllersRef.current.forEach(c => c.abort());
+        const controllers = SLICE_MODS_ORDER.map(() => new AbortController());
+        sliceControllersRef.current = controllers;
+
+        SLICE_MODS_ORDER.forEach((mod, modIdx) => {
+            const sig = controllers[modIdx].signal;
+            patchSlice(modIdx, { status: "fetching", done: 0 });
+            (async () => {
+                let done = 0;
+                const CONCURRENT = 6;
+                for (let start = 0; start < SLICE_TOTAL && !sig.aborted; start += CONCURRENT) {
+                    const end = Math.min(start + CONCURRENT, SLICE_TOTAL);
+                    await Promise.allSettled(
+                        Array.from({ length: end - start }, (_, k) => start + k).map(idx =>
+                            fetch(`/api/cases/${caseId}/slices/${mod}/${idx}`, { signal: sig })
+                                .then(() => { done++; patchSlice(modIdx, { done }); })
+                                .catch(() => {})
+                        )
+                    );
+                }
+                if (!sig.aborted) patchSlice(modIdx, { done: SLICE_TOTAL, status: "done" });
+            })();
         });
 
         return () => controllers.forEach(c => c.abort());
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [caseId]);
+    }, [allMainDone, caseId]);
 
-    // Auto-dismiss fetch toast 3 s after all files finish
+    // Auto-dismiss 3 s after everything (files + slices) is done
     useEffect(() => {
         if (!scanFiles.length) return;
-        if (fetchStates.every(s => s.status === "done" || s.status === "error")) {
+        if (allFetchDone) {
             const t = setTimeout(() => setFetchToastDismissed(true), 3000);
             return () => clearTimeout(t);
         }
-    }, [fetchStates, scanFiles.length]);
+    }, [allFetchDone, scanFiles.length]);
 
     const activeBuffer = tabIndex >= 0 ? scanBuffers[tabIndex] : null;
 
@@ -269,7 +324,13 @@ const ViewerPanel = memo(function ViewerPanel({
     const slicePct = (slice / Math.max(totalSlices - 1, 1)) * 100;
 
     const showFetchToast = !fetchToastDismissed && scanFiles.length > 0;
-    const allFetchDone = fetchStates.every(s => s.status === "done" || s.status === "error");
+
+    // Overall progress across all downloads (files + all slice images)
+    const totalSliceImages = SLICE_MODS_ORDER.length * SLICE_TOTAL;
+    const doneSliceImages = sliceStates.reduce((s, st) => s + st.done, 0);
+    const fileProgress = fetchStates.reduce((s, f) => s + f.progress, 0) / fetchStates.length;
+    const sliceProgress = (doneSliceImages / totalSliceImages) * 100;
+    const overallProgress = Math.round((fileProgress + sliceProgress) / 2);
 
     return (
         <>
@@ -299,11 +360,11 @@ const ViewerPanel = memo(function ViewerPanel({
                                 "text-sm font-semibold",
                                 allFetchDone ? "text-emerald-700 dark:text-emerald-300" : "text-slate-800 dark:text-slate-100"
                             )}>
-                                {allFetchDone ? "Scans ready" : `Loading scans — ${Math.round(fetchStates.reduce((s, f) => s + f.progress, 0) / fetchStates.length)}%`}
+                                {allFetchDone ? "Case ready" : allMainDone ? `Loading images — ${doneSliceImages}/${totalSliceImages}` : `Loading — ${overallProgress}%`}
                             </p>
                             {!allFetchDone && (
                                 <p className="text-xs text-slate-500 mt-0.5">
-                                    {fetchStates.filter(s => s.status === "done").length} of {fetchStates.length} ready
+                                    {allMainDone ? `${sliceStates.filter(s => s.status === "done").length}/4 modalities cached` : `${fetchStates.filter(s => s.status === "done").length} of ${fetchStates.length} files ready`}
                                 </p>
                             )}
                         </div>
@@ -332,22 +393,21 @@ const ViewerPanel = memo(function ViewerPanel({
                     <div className="h-1 bg-slate-100 dark:bg-slate-800">
                         <div
                             className="h-full bg-blue-500 transition-all duration-300"
-                            style={{ width: `${Math.round(fetchStates.reduce((s, f) => s + f.progress, 0) / fetchStates.length)}%` }}
+                            style={{ width: `${overallProgress}%` }}
                         />
                     </div>
                 )}
 
-                {/* Per-file rows */}
+                {/* Per-file rows + slice pre-fetch */}
                 {!fetchToastCollapsed && (
                     <div className="px-4 py-3 space-y-2.5">
                         {fetchStates.map((f, i) => (
                             <div key={i} className="space-y-1">
                                 <div className="flex items-center gap-2 min-w-0">
-                                    <span className="text-[10px] font-bold uppercase tracking-wider shrink-0 w-8 tabular-nums"
-                                        style={{ color: ["#60a5fa","#a78bfa","#34d399","#fb923c"][i] }}>
+                                    <span className="text-[10px] font-bold uppercase tracking-wider shrink-0 tabular-nums"
+                                        style={{ color: f.color }}>
                                         {f.label}
                                     </span>
-                                    <span className="text-xs text-slate-600 dark:text-slate-400 truncate flex-1">{f.name}</span>
                                     {f.sizeMb > 0 && (
                                         <span className="text-xs text-slate-400 shrink-0 tabular-nums">{f.sizeMb} MB</span>
                                     )}
@@ -373,6 +433,36 @@ const ViewerPanel = memo(function ViewerPanel({
                                 </div>
                             </div>
                         ))}
+
+                        {/* Slice image pre-fetch section */}
+                        {sliceStates.some(s => s.status !== "idle") && (
+                            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1.5">
+                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.15em]">PNG Slices</p>
+                                {SLICE_MODS_ORDER.map((mod, modIdx) => {
+                                    const s = sliceStates[modIdx];
+                                    const pct = (s.done / SLICE_TOTAL) * 100;
+                                    return (
+                                        <div key={mod} className="flex items-center gap-2">
+                                            <span className="text-[10px] font-bold w-8 shrink-0"
+                                                style={{ color: FETCH_COLORS[modIdx] }}>
+                                                {SLICE_MOD_LABELS[modIdx]}
+                                            </span>
+                                            <div className="flex-1 h-1 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                                                <div
+                                                    className={cn("h-full rounded-full transition-all duration-150",
+                                                        s.status === "done" ? "bg-emerald-500" : "bg-blue-400")}
+                                                    style={{ width: `${pct}%` }}
+                                                />
+                                            </div>
+                                            <span className="text-[9px] font-mono text-slate-400 shrink-0 tabular-nums w-12 text-right">
+                                                {s.done}/{SLICE_TOTAL}
+                                            </span>
+                                            {s.status === "done" && <CheckCircle2 size={10} className="text-emerald-500 shrink-0" />}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
                     </div>
                 )}
             </div>
@@ -548,7 +638,7 @@ const ViewerPanel = memo(function ViewerPanel({
 
                 {/* Viewer */}
                 {is3D ? (
-                    <ThreeDViewer />
+                    <ThreeDViewer modelUrl={`/api/cases/${caseId}/mesh`} />
                 ) : isGrid ? (
                     <ModalityGridViewer
                         scanBuffers={scanBuffers}
@@ -560,6 +650,7 @@ const ViewerPanel = memo(function ViewerPanel({
                     />
                 ) : isContactSheet ? (
                     <ModalityContactSheet
+                        caseId={scanFiles.length > 0 ? caseId : undefined}
                         sliceBase={scanFiles.length === 0 ? BRATS_BASE : undefined}
                         modality={activeTab}
                         showMask={showMask}
@@ -567,6 +658,7 @@ const ViewerPanel = memo(function ViewerPanel({
                 ) : hasScan ? (
                     <ModalityViewer
                         buffer={activeBuffer}
+                        segBuffer={segBuffer}
                         scanName={activeScanName}
                         showMask={showMask}
                         slice={slice}

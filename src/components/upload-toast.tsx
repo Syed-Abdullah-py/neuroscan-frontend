@@ -63,14 +63,14 @@ function UploadCard({ session, onDismiss }: { session: UploadSession; onDismiss:
                                 : "text-slate-800 dark:text-slate-100"
                         )}>
                             {isUploading && `Uploading scans — ${overallProgress}%`}
-                            {isCreating && "Creating case…"}
+                            {isCreating && "Running AI…"}
                             {isDone && "Case created"}
                             {isError && "Upload failed"}
                         </p>
                         {(isUploading || isCreating) && (
                             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                                 {isCreating
-                                    ? "Finalising…"
+                                    ? "Processing MRI scans with neural network…"
                                     : `${files.filter(f => f.status === "done").length} of ${files.length} files done`}
                             </p>
                         )}
