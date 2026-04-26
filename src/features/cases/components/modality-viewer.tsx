@@ -7,6 +7,7 @@ import { Loader2 } from "lucide-react";
 
 interface ModalityViewerProps {
     buffer: ArrayBuffer | null;  // null = still downloading
+    segBuffer?: ArrayBuffer | null;
     scanName?: string;
     showMask?: boolean;
     slice: number;
@@ -109,6 +110,7 @@ export function ModalityGridViewer({
                             style={{ imageRendering: "pixelated" }}
                             draggable={false}
                         />
+                        <OrientLabels mini />
                         <span
                             className="absolute top-2 left-2 text-[10px] font-bold px-2 py-0.5 rounded-md backdrop-blur-sm"
                             style={{ background: `${meta.color}22`, color: meta.color, border: `1px solid ${meta.color}44` }}
@@ -128,18 +130,31 @@ const CONTACT_COLS = 5;
 const SLICE_INDICES = Array.from({ length: BRATS_TOTAL }, (_, i) => i);
 
 export function ModalityContactSheet({
+    caseId,
     sliceBase,
     modality,
     showMask,
 }: {
+    caseId?: string;
     sliceBase?: string;
     modality: string;
     showMask: boolean;
 }) {
-    if (!sliceBase) {
+    const buildSrc = (sliceIdx: number): string => {
+        const idx = String(sliceIdx).padStart(3, "0");
+        if (caseId) {
+            return `/api/cases/${caseId}/slices/${modality}/${sliceIdx}${showMask ? "?masked=true" : ""}`;
+        }
+        if (sliceBase) {
+            return `${sliceBase}/${modality}/${idx}${showMask ? "_m" : ""}.png`;
+        }
+        return "";
+    };
+
+    if (!caseId && !sliceBase) {
         return (
             <div className="flex h-full items-center justify-center" style={{ background: "#050d18" }}>
-                <p className="text-xs text-slate-500">Contact sheet not available for uploaded scans</p>
+                <p className="text-xs text-slate-500">Contact sheet not available</p>
             </div>
         );
     }
@@ -151,8 +166,7 @@ export function ModalityContactSheet({
                 style={{ gridTemplateColumns: `repeat(${CONTACT_COLS}, 1fr)` }}
             >
                 {SLICE_INDICES.map((sliceIdx) => {
-                    const idx = String(sliceIdx).padStart(3, "0");
-                    const src = `${sliceBase}/${modality}/${idx}${showMask ? "_m" : ""}.png`;
+                    const src = buildSrc(sliceIdx);
                     return (
                         <div
                             key={sliceIdx}
@@ -179,12 +193,29 @@ export function ModalityContactSheet({
     );
 }
 
+// ── Orientation labels — shared across all 2-D slice views ───────────────
+// T = top of image, L = patient's left side (viewer's right in radiology convention,
+// but placed left here to match the PNG slices as generated — verify and flip if needed)
+
+function OrientLabels({ mini = false }: { mini?: boolean }) {
+    const cls = mini
+        ? "text-[7px] font-bold font-mono text-white/45 select-none pointer-events-none"
+        : "text-[9px] font-bold font-mono text-white/50 select-none pointer-events-none";
+    return (
+        <>
+            <span className={`absolute top-1.5 left-1/2 -translate-x-1/2 z-30 ${cls}`}>T</span>
+            <span className={`absolute left-1.5 top-1/2 -translate-y-1/2 z-30 ${cls}`}>L</span>
+        </>
+    );
+}
+
 // ── NiiVue single-modality viewer ─────────────────────────────────────────
 
 function NiiVueViewer({
     buffer,
+    segBuffer,
     scanName,
-    showMask: _showMask = false,
+    showMask = false,
     slice,
     onLoad,
     onSliceChange,
@@ -193,11 +224,21 @@ function NiiVueViewer({
     const nvRef = useRef<any>(null);
     const totalRef = useRef(1);
     const aliveRef = useRef(true);
+    // keep latest values accessible inside async callbacks without causing re-runs
+    const bufferRef = useRef(buffer);
+    const segBufferRef = useRef(segBuffer);
+    const scanNameRef = useRef(scanName);
+    const showMaskRef = useRef(showMask);
+    bufferRef.current = buffer;
+    segBufferRef.current = segBuffer;
+    scanNameRef.current = scanName;
+    showMaskRef.current = showMask;
+
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    // Effect 1: initialise NiiVue and load the scan volume
     useEffect(() => {
-        // Buffer not yet available — stay in loading state, wait for re-render
         if (!buffer) { setLoading(true); setError(null); return; }
         if (!canvasRef.current) return;
 
@@ -222,10 +263,7 @@ function NiiVueViewer({
                 await nv.attachToCanvas(canvasRef.current);
                 nv.setSliceType(0);
 
-                const volumes: any[] = [
-                    { url: buffer, name: scanName ?? "scan.nii", colormap: "gray" },
-                ];
-                await nv.loadVolumes(volumes);
+                await nv.loadVolumes([{ url: buffer as any, name: scanName ?? "scan.nii", colormap: "gray" }]);
                 if (!aliveRef.current) return;
 
                 const dims: number[] = nv.volumes[0].hdr!.dims;
@@ -249,6 +287,24 @@ function NiiVueViewer({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [buffer]);
 
+    // Effect 2: toggle seg overlay — uses loadVolumes (addVolume has ArrayBuffer issues in NiiVue)
+    // Uses refs for buffer/scanName so scan is not re-initialised, only the volume list changes.
+    useEffect(() => {
+        const nv = nvRef.current;
+        if (!nv || loading || error || !bufferRef.current) return;
+
+        const savedSlice = _currentSliceIdx(nv, totalRef.current);
+        const vols: any[] = [{ url: bufferRef.current as any, name: scanNameRef.current ?? "scan.nii", colormap: "gray" }];
+        if (showMask && segBufferRef.current) {
+            vols.push({ url: segBufferRef.current as any, name: "seg.nii", opacity: 0.55, colormap: "warm", cal_min: 0.5, cal_max: 4 });
+        }
+        nv.loadVolumes(vols).then(() => {
+            if (aliveRef.current) _seek(nv, savedSlice, totalRef.current);
+        }).catch(() => { /* ignore */ });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [showMask, segBuffer]);
+
+    // Effect 3: seek to requested slice
     useEffect(() => {
         const nv = nvRef.current;
         if (!nv || loading || error) return;
@@ -265,6 +321,7 @@ function NiiVueViewer({
                     backgroundSize: "32px 32px",
                 }}
             />
+            {/* NiiVue renders its own A/P/L/R orientation markers; no overlay needed */}
             <canvas
                 ref={canvasRef}
                 className="relative z-10 w-full h-full"
@@ -368,6 +425,7 @@ function NiiVueMiniViewer({
                 className="w-full h-full"
                 style={{ display: loading || error ? "none" : "block" }}
             />
+            {!loading && !error && <OrientLabels mini />}
             {loading && !error && (
                 <div className="absolute inset-0 flex items-center justify-center">
                     <Loader2 className="w-5 h-5 animate-spin text-cyan-400/60" />
@@ -390,4 +448,9 @@ function _seek(nv: any, sliceIdx: number, nz: number) {
     pos[2] = target;
     nv.scene.crosshairPos = pos;
     nv.drawScene();
+}
+
+function _currentSliceIdx(nv: any, nz: number): number {
+    if (!nv?.scene) return 0;
+    return Math.round((nv.scene.crosshairPos?.[2] ?? 0) * Math.max(nz - 1, 1));
 }

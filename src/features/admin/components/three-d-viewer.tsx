@@ -19,6 +19,7 @@ import * as THREE from "three";
 export type LayerKey = "brain_surface" | "ncr" | "edema" | "enhancing";
 
 export interface ThreeDViewerProps {
+    modelUrl?: string;
     visible?: Record<LayerKey, boolean>;
     autoRotate?: boolean;
 }
@@ -46,13 +47,15 @@ const ALL_VISIBLE: Record<LayerKey, boolean> = {
 // ── BrainModel ─────────────────────────────────────────────────────────────
 
 function BrainModel({
+    modelUrl,
     visible,
     rotating,
 }: {
+    modelUrl: string;
     visible: Record<LayerKey, boolean>;
     rotating: boolean;
 }) {
-    const { scene } = useGLTF("/models/brain.glb");
+    const { scene } = useGLTF(modelUrl);
     const modelRef = useRef<THREE.Group>(null);
     const angleRef = useRef(0);
 
@@ -111,7 +114,7 @@ function BrainModel({
 
 // ── ThreeDViewer ───────────────────────────────────────────────────────────
 
-export function ThreeDViewer({ visible: visibleProp, autoRotate: autoRotateProp }: ThreeDViewerProps = {}) {
+export function ThreeDViewer({ modelUrl = "/models/brain.glb", visible: visibleProp, autoRotate: autoRotateProp }: ThreeDViewerProps = {}) {
     const controlled = visibleProp !== undefined;
 
     // Internal state — only used when no external props are provided
@@ -182,7 +185,7 @@ export function ThreeDViewer({ visible: visibleProp, autoRotate: autoRotateProp 
                     <pointLight position={[0, -50, 50]} intensity={1500} color="#ffffff" />
                     <Environment preset="city" blur={1} />
                     <Float speed={2} rotationIntensity={0.2} floatIntensity={0.2}>
-                        <BrainModel visible={visible} rotating={autoRotate} />
+                        <BrainModel modelUrl={modelUrl} visible={visible} rotating={autoRotate} />
                     </Float>
                     <EffectComposer enableNormalPass={false} multisampling={0}>
                         <SMAA />
@@ -324,4 +327,3 @@ export function ThreeDViewer({ visible: visibleProp, autoRotate: autoRotateProp 
     );
 }
 
-useGLTF.preload("/models/brain.glb");
