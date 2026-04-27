@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useTheme } from "next-themes";
 import { motion, type Variants } from "framer-motion";
 import {
@@ -103,6 +103,9 @@ function AppearanceSection({
     setTheme: (t: string) => void;
     resolvedTheme: string | undefined;
 }) {
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => setMounted(true), []);
+
     const options: { value: ThemeOption; label: string; icon: React.FC<{ size?: number; className?: string }>; desc: string }[] = [
         {
             value: "light",
@@ -137,7 +140,7 @@ function AppearanceSection({
 
             <div className="grid grid-cols-3 gap-3">
                 {options.map((opt) => {
-                    const isActive = theme === opt.value;
+                    const isActive = mounted && theme === opt.value;
                     return (
                         <button
                             key={opt.value}
@@ -205,9 +208,9 @@ function AppearanceSection({
                 <p className="text-xs text-neutral-400">
                     Currently using{" "}
                     <span className="font-bold text-neutral-600 dark:text-neutral-300">
-                        {resolvedTheme === "dark" ? "dark" : "light"} mode
+                        {mounted ? (resolvedTheme === "dark" ? "dark" : "light") : "..."} mode
                     </span>
-                    {theme === "system" && " (system preference)"}
+                    {mounted && theme === "system" && " (system preference)"}
                 </p>
             </div>
         </div>

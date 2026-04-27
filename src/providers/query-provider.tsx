@@ -7,9 +7,9 @@ function makeQueryClient() {
     return new QueryClient({
         defaultOptions: {
             queries: {
-                // Data stays fresh for 5 minutes — prevents redundant refetches
-                // on tab switch, component remount, or navigation
-                staleTime: 5 * 60 * 1000,
+                // Always stale — ensures invalidateQueries and polling always
+                // trigger real fetches without a freshness window blocking them.
+                staleTime: 0,
                 // Keep unused cache entries for 10 minutes
                 gcTime: 10 * 60 * 1000,
                 // Don't retry 4xx — they won't self-heal

@@ -41,6 +41,19 @@ export function useUpload() {
     return ctx;
 }
 
+/** Polyfill for crypto.randomUUID — required when running over plain HTTP (non-secure context). */
+function generateUUID(): string {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+        return crypto.randomUUID();
+    }
+    // Fallback: RFC 4122 v4 UUID using Math.random
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+        const r = (Math.random() * 16) | 0;
+        const v = c === "x" ? r : (r & 0x3) | 0x8;
+        return v.toString(16);
+    });
+}
+
 function UploadProviderInner({ children }: { children: React.ReactNode }) {
     const { token, activeWorkspaceId } = useWorkspace();
     const [sessions, setSessions] = useState<UploadSession[]>([]);
@@ -69,8 +82,8 @@ function UploadProviderInner({ children }: { children: React.ReactNode }) {
             if (!token || !activeWorkspaceId) return;
 
             const backendUrl = `${window.location.protocol}//${window.location.hostname}:8000`;
-            const uploadId = crypto.randomUUID();
-            const sessionId = crypto.randomUUID();
+            const uploadId = generateUUID();
+            const sessionId = generateUUID();
 
             // Register this session immediately so the toast appears
             setSessions(prev => [...prev, {

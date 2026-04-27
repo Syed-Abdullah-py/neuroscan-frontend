@@ -25,6 +25,7 @@ export function useWorkspaces() {
         queryKey: workspaceKeys.lists(),
         queryFn: () => makeWorkspacesClient(token).list(),
         enabled: !!token,
+        refetchInterval: 2000,
     });
 }
 
@@ -34,6 +35,7 @@ export function useWorkspaceMembers(workspaceId: string | undefined) {
         queryKey: workspaceKeys.members(workspaceId ?? ""),
         queryFn: () => makeWorkspacesClient(token).listMembers(workspaceId!),
         enabled: !!workspaceId && !!token,
+        refetchInterval: 2000,
     });
 }
 
@@ -90,6 +92,7 @@ export function useWorkspaceInvitations(workspaceId: string | undefined) {
         queryKey: workspaceKeys.invitations(workspaceId ?? ""),
         queryFn: () => makeWorkspacesClient(token).listInvitations(workspaceId!),
         enabled: !!workspaceId && !!token,
+        refetchInterval: 2000,
     });
 }
 
@@ -99,7 +102,7 @@ export function useMyInvitations() {
         queryKey: workspaceKeys.myInvitations(),
         queryFn: () => makeWorkspacesClient(token).myInvitations(),
         enabled: !!token,
-        refetchInterval: 3_000,
+        refetchInterval: 2000,
     });
 }
 
@@ -148,7 +151,7 @@ export function useJoinRequests(workspaceId: string | undefined, initialData?: a
         enabled: !!workspaceId && !!token,
         initialData: initialData,
         initialDataUpdatedAt: initialData ? Date.now() : undefined,
-        refetchInterval: 5000,
+        refetchInterval: 2000,
     });
 }
 
