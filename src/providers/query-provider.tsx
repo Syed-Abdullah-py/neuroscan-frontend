@@ -10,8 +10,8 @@ function makeQueryClient() {
                 // Always stale — ensures invalidateQueries and polling always
                 // trigger real fetches without a freshness window blocking them.
                 staleTime: 0,
-                // Keep unused cache entries for 10 minutes
-                gcTime: 10 * 60 * 1000,
+                // Disable caching completely
+                gcTime: 0,
                 // Don't retry 4xx — they won't self-heal
                 retry: (failureCount, error: any) => {
                     if (error?.status >= 400 && error?.status < 500) return false;
