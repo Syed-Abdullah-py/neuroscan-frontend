@@ -35,6 +35,7 @@ const BRATS_TOTAL = 155;
 export function ModalityGridViewer({
     scanBuffers,
     scanNames,
+    segBuffer,
     sliceBase,
     showMask,
     slice,
@@ -43,6 +44,7 @@ export function ModalityGridViewer({
 }: {
     scanBuffers?: (ArrayBuffer | null)[];
     scanNames?: string[];
+    segBuffer?: ArrayBuffer | null;
     sliceBase?: string;
     showMask: boolean;
     slice: number;
@@ -72,6 +74,8 @@ export function ModalityGridViewer({
                             <NiiVueMiniViewer
                                 buffer={buf}
                                 scanName={scanNames?.[i]}
+                                segBuffer={segBuffer}
+                                showMask={showMask}
                                 slice={slice}
                                 onLoad={i === 0 ? onLoad : undefined}
                             />
@@ -209,6 +213,19 @@ function OrientLabels({ mini = false }: { mini?: boolean }) {
     );
 }
 
+// ── BraTS segmentation colormap (label 1→red, 2→yellow, 4→blue) ──────────
+// With cal_min=0.5, cal_max=4: label 1→idx≈36, label 2→idx≈109, label 4→idx=255
+function _makeBratsCmap() {
+    const R = new Array(256).fill(0);
+    const G = new Array(256).fill(0);
+    const B = new Array(256).fill(0);
+    const A = new Array(256).fill(0);
+    for (let i = 21; i <= 72; i++) { R[i] = 220; G[i] = 40;  B[i] = 40;  A[i] = 255; } // NCR — red
+    for (let i = 73; i <= 145; i++) { R[i] = 250; G[i] = 200; B[i] = 20;  A[i] = 255; } // edema — yellow
+    for (let i = 240; i <= 255; i++) { R[i] = 59;  G[i] = 130; B[i] = 246; A[i] = 255; } // active tumor — blue
+    return { R, G, B, A };
+}
+
 // ── NiiVue single-modality viewer ─────────────────────────────────────────
 
 function NiiVueViewer({
@@ -296,7 +313,8 @@ function NiiVueViewer({
         const savedSlice = _currentSliceIdx(nv, totalRef.current);
         const vols: any[] = [{ url: bufferRef.current as any, name: scanNameRef.current ?? "scan.nii", colormap: "gray" }];
         if (showMask && segBufferRef.current) {
-            vols.push({ url: segBufferRef.current as any, name: "seg.nii", opacity: 0.55, colormap: "warm", cal_min: 0.5, cal_max: 4 });
+            nv.addColormap("brats_seg", _makeBratsCmap());
+            vols.push({ url: segBufferRef.current as any, name: "seg.nii", opacity: 0.7, colormap: "brats_seg", cal_min: 0.5, cal_max: 4 });
         }
         nv.loadVolumes(vols).then(() => {
             if (aliveRef.current) _seek(nv, savedSlice, totalRef.current);
@@ -353,11 +371,15 @@ function NiiVueViewer({
 function NiiVueMiniViewer({
     buffer,
     scanName,
+    segBuffer,
+    showMask,
     slice,
     onLoad,
 }: {
     buffer: ArrayBuffer | null;
     scanName?: string;
+    segBuffer?: ArrayBuffer | null;
+    showMask?: boolean;
     slice: number;
     onLoad?: (nz: number, mid: number) => void;
 }) {
@@ -365,6 +387,14 @@ function NiiVueMiniViewer({
     const nvRef = useRef<any>(null);
     const totalRef = useRef(1);
     const aliveRef = useRef(true);
+    const bufferRef = useRef(buffer);
+    const segBufferRef = useRef(segBuffer);
+    const scanNameRef = useRef(scanName);
+    const showMaskRef = useRef(showMask);
+    bufferRef.current = buffer;
+    segBufferRef.current = segBuffer;
+    scanNameRef.current = scanName;
+    showMaskRef.current = showMask;
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -411,6 +441,23 @@ function NiiVueMiniViewer({
         return () => { aliveRef.current = false; nvRef.current = null; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [buffer]);
+
+    // Toggle segmentation overlay
+    useEffect(() => {
+        const nv = nvRef.current;
+        if (!nv || loading || error || !bufferRef.current) return;
+
+        const savedSlice = _currentSliceIdx(nv, totalRef.current);
+        const vols: any[] = [{ url: bufferRef.current as any, name: scanNameRef.current ?? "scan.nii", colormap: "gray" }];
+        if (showMask && segBufferRef.current) {
+            nv.addColormap("brats_seg", _makeBratsCmap());
+            vols.push({ url: segBufferRef.current as any, name: "seg.nii", opacity: 0.7, colormap: "brats_seg", cal_min: 0.5, cal_max: 4 });
+        }
+        nv.loadVolumes(vols).then(() => {
+            if (aliveRef.current) _seek(nv, savedSlice, totalRef.current);
+        }).catch(() => { /* ignore */ });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [showMask, segBuffer]);
 
     useEffect(() => {
         const nv = nvRef.current;

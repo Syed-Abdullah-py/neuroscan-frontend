@@ -1,5 +1,11 @@
-const AUTH_SERVICE_URL =
-    (process.env.NEXT_PUBLIC_AUTH_SERVICE_URL || "http://localhost:8000").replace(/\/$/, "");
+// Derive the backend origin from the browser's current hostname so this works
+// on any network without changing .env (localhost, LAN IP, ngrok, etc.).
+function getBackendUrl(): string {
+    if (typeof window !== "undefined") {
+        return `${window.location.protocol}//${window.location.hostname}:8000`;
+    }
+    return "http://localhost:8000";
+}
 
 export class ApiError extends Error {
     constructor(
@@ -44,7 +50,7 @@ export async function clientFetch<T>(
         headers["Content-Type"] = "application/json";
     }
 
-    const response = await fetch(`${AUTH_SERVICE_URL}${path}`, {
+    const response = await fetch(`${getBackendUrl()}${path}`, {
         ...rest,
         headers,
         body: body !== undefined ? JSON.stringify(body) : undefined,

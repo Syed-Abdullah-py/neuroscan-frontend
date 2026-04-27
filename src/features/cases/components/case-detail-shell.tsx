@@ -66,8 +66,8 @@ const MODALITY_TABS: { key: Exclude<TabKey, "3d">; label: string; fullLabel: str
 
 const MASK_LEGEND = [
     { label: "Necrotic Core", color: "#dc2828" },
-    { label: "Edema", color: "#32c850" },
-    { label: "Active Tumor", color: "#ff8c00" },
+    { label: "Edema", color: "#fac814" },
+    { label: "Active Tumor", color: "#3b82f6" },
 ];
 
 const PRIORITY_STYLES: Record<string, string> = {
@@ -643,6 +643,7 @@ const ViewerPanel = memo(function ViewerPanel({
                     <ModalityGridViewer
                         scanBuffers={scanBuffers}
                         scanNames={scanNames}
+                        segBuffer={segBuffer}
                         slice={slice}
                         showMask={showMask}
                         onLoad={handleVolumeLoad}

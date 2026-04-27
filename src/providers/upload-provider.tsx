@@ -68,7 +68,7 @@ function UploadProviderInner({ children }: { children: React.ReactNode }) {
         ) => {
             if (!token || !activeWorkspaceId) return;
 
-            const backendUrl = (process.env.NEXT_PUBLIC_AUTH_SERVICE_URL ?? "http://localhost:8000").replace(/\/$/, "");
+            const backendUrl = `${window.location.protocol}//${window.location.hostname}:8000`;
             const uploadId = crypto.randomUUID();
             const sessionId = crypto.randomUUID();
 
