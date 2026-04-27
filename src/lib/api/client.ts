@@ -65,8 +65,7 @@ export async function apiFetch<T>(
         ...rest,
         headers: { ...headers, ...(extraHeaders as Record<string, string>) },
         body: body !== undefined ? JSON.stringify(body) : undefined,
-        cache: isGet ? undefined : "no-store",
-        next: isGet ? { revalidate: 30 } : undefined,
+        cache: "no-store",
     });
 
     if (response.status === 204) return undefined as T;

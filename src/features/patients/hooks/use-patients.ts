@@ -20,7 +20,7 @@ export function usePatients(initialData?: Patient[]) {
         enabled: !!activeWorkspaceId && !!token,
         initialData: initialData,
         initialDataUpdatedAt: initialData ? Date.now() : undefined,
-        refetchInterval: 5000,
+        refetchInterval: 2000,
     });
 }
 
@@ -53,11 +53,11 @@ export function useUpdatePatient() {
         mutationFn: ({ patientId, data }: { patientId: string; data: PatientUpdate }) =>
             makePatientsClient(token, activeWorkspaceId!).update(patientId, data),
         onSuccess: (updated) => {
-            qc.invalidateQueries({ queryKey: patientKeys.list(activeWorkspaceId!) });
-            qc.setQueryData(
-                patientKeys.detail(activeWorkspaceId!, updated.id),
-                updated
+            qc.setQueryData<Patient[]>(
+                patientKeys.list(activeWorkspaceId!),
+                (old = []) => old.map((p) => (p.id === updated.id ? updated : p))
             );
+            qc.setQueryData(patientKeys.detail(activeWorkspaceId!, updated.id), updated);
         },
     });
 }
@@ -68,11 +68,25 @@ export function useDeletePatient() {
     return useMutation({
         mutationFn: (patientId: string) =>
             makePatientsClient(token, activeWorkspaceId!).delete(patientId),
+        onMutate: async (patientId) => {
+            await qc.cancelQueries({ queryKey: patientKeys.list(activeWorkspaceId!) });
+            const previous = qc.getQueryData<Patient[]>(patientKeys.list(activeWorkspaceId!));
+            qc.setQueryData<Patient[]>(
+                patientKeys.list(activeWorkspaceId!),
+                (old = []) => old.filter((p) => p.id !== patientId)
+            );
+            return { previous };
+        },
+        onError: (_err, _patientId, context) => {
+            if (context?.previous) {
+                qc.setQueryData(patientKeys.list(activeWorkspaceId!), context.previous);
+            }
+        },
         onSuccess: (_, patientId) => {
+            qc.removeQueries({ queryKey: patientKeys.detail(activeWorkspaceId!, patientId) });
+        },
+        onSettled: () => {
             qc.invalidateQueries({ queryKey: patientKeys.list(activeWorkspaceId!) });
-            qc.removeQueries({
-                queryKey: patientKeys.detail(activeWorkspaceId!, patientId),
-            });
         },
     });
 }

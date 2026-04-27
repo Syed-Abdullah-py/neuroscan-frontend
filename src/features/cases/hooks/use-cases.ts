@@ -23,6 +23,7 @@ export function useCases(initialData?: Case[]) {
         // Seed the cache with server-fetched data so isLoading is false on first render
         initialData: initialData,
         initialDataUpdatedAt: initialData ? Date.now() : undefined,
+        refetchInterval: 2000,
     });
 }
 
@@ -34,7 +35,7 @@ export function useCaseStats(initialData?: CaseStats | null) {
         enabled: !!activeWorkspaceId && !!token,
         initialData: initialData ?? undefined,
         initialDataUpdatedAt: initialData ? Date.now() : undefined,
-        refetchInterval: 5000,
+        refetchInterval: 2000,
     });
 }
 
@@ -46,7 +47,7 @@ export function useRecentCases(initialData?: any[]) {
         enabled: !!activeWorkspaceId && !!token,
         initialData: initialData,
         initialDataUpdatedAt: initialData ? Date.now() : undefined,
-        refetchInterval: 5000,
+        refetchInterval: 2000,
     });
 }
 
@@ -98,13 +99,30 @@ export function useDeleteCase() {
     return useMutation({
         mutationFn: (caseId: string) =>
             makeCasesClient(token, activeWorkspaceId!).delete(caseId),
+        onMutate: async (caseId) => {
+            // Cancel any in-flight list GET so it can't land and restore the deleted row.
+            await qc.cancelQueries({ queryKey: caseKeys.list(activeWorkspaceId!) });
+            const previous = qc.getQueryData<Case[]>(caseKeys.list(activeWorkspaceId!));
+            qc.setQueryData<Case[]>(
+                caseKeys.list(activeWorkspaceId!),
+                (old = []) => old.filter((c) => c.id !== caseId)
+            );
+            return { previous };
+        },
+        onError: (_err, _caseId, context) => {
+            // Roll back if the DELETE itself failed.
+            if (context?.previous) {
+                qc.setQueryData(caseKeys.list(activeWorkspaceId!), context.previous);
+            }
+        },
         onSuccess: (_, caseId) => {
-            qc.invalidateQueries({ queryKey: caseKeys.list(activeWorkspaceId!) });
+            qc.removeQueries({ queryKey: caseKeys.detail(activeWorkspaceId!, caseId) });
             qc.invalidateQueries({ queryKey: caseKeys.stats(activeWorkspaceId!) });
             qc.invalidateQueries({ queryKey: caseKeys.recent(activeWorkspaceId!) });
-            qc.removeQueries({
-                queryKey: caseKeys.detail(activeWorkspaceId!, caseId),
-            });
+        },
+        onSettled: () => {
+            // Re-sync the list with the server after the mutation completes.
+            qc.invalidateQueries({ queryKey: caseKeys.list(activeWorkspaceId!) });
         },
     });
 }

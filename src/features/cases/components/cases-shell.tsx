@@ -5,13 +5,14 @@ import { useState } from "react";
 import { motion, type Variants } from "framer-motion";
 import {
     FileText, Plus, User, Calendar,
-    AlertCircle, CheckCircle2, Clock,
     Search, ArrowUpRight, Trash2, Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCases, useDeleteCase } from "@/features/cases/hooks/use-cases";
+import { useWorkspaceMembers } from "@/features/workspaces/hooks/use-workspaces";
+import { useWorkspace } from "@/providers/workspace-provider";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { WorkspaceRole } from "@/lib/types/workspace.types";
+import type { WorkspaceRole, WorkspaceMember } from "@/lib/types/workspace.types";
 import type { Case, CaseStats } from "@/lib/types/case.types";
 
 const container: Variants = {
@@ -49,13 +50,13 @@ export function CasesShell({
     initialCases,
     initialStats,
 }: CasesShellProps) {
+    const { activeWorkspaceId } = useWorkspace();
     const [search, setSearch] = useState("");
     const [statusFilter, setStatusFilter] = useState("ALL");
     const [priorityFilter, setPriorityFilter] = useState("ALL");
 
-    // Pass initialCases so React Query seeds the cache immediately —
-    // isLoading is false from the first render, no skeleton flash on navigation.
     const { data: cases = [], isLoading } = useCases(initialCases);
+    const { data: members = [] } = useWorkspaceMembers(activeWorkspaceId ?? undefined);
     const deleteCase = useDeleteCase();
 
     const isAdmin = workspaceRole === "OWNER" || workspaceRole === "ADMIN";
@@ -157,7 +158,7 @@ export function CasesShell({
                 <table className="w-full">
                     <thead>
                         <tr className="border-b border-neutral-200 dark:border-slate-700/50 bg-neutral-50/50 dark:bg-gray-900/50">
-                            {["Case", "Priority", "Status", "Assigned", "Created", ""].map((h) => (
+                            {["Patient", "Assigned", "Priority", "Status", "Created", ""].map((h) => (
                                 <th key={h} className="py-3 px-4 text-left text-[11px] font-bold text-neutral-500 uppercase tracking-widest">
                                     {h}
                                 </th>
@@ -193,6 +194,7 @@ export function CasesShell({
                                     caseItem={c}
                                     isAdmin={isAdmin}
                                     workspaceId={workspaceId}
+                                    members={members}
                                     onDelete={() => deleteCase.mutate(c.id)}
                                     isDeleting={deleteCase.isPending && deleteCase.variables === c.id}
                                 />
@@ -208,32 +210,66 @@ export function CasesShell({
 function CaseRow({
     caseItem: c,
     isAdmin,
+    members,
     onDelete,
     isDeleting,
 }: {
     caseItem: Case;
     isAdmin: boolean;
     workspaceId: string;
+    members: WorkspaceMember[];
     onDelete: () => void;
     isDeleting: boolean;
 }) {
     const priority = (c.priority || "normal").toLowerCase();
 
+    const assignedMember = c.assigned_to_member_id
+        ? members.find((m) => m.id === c.assigned_to_member_id)
+        : null;
+    const assignedName = assignedMember
+        ? (assignedMember.user_name || assignedMember.user_email || "Unknown")
+        : null;
+
+    const patientName = (c.patient_first_name || c.patient_last_name)
+        ? `${c.patient_first_name ?? ""} ${c.patient_last_name ?? ""}`.trim()
+        : null;
+
+    const createdAt = new Date(c.created_at).toLocaleString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+    });
+
     return (
         <tr className="group hover:bg-neutral-50 dark:hover:bg-slate-800/30 transition-colors">
+            {/* Patient */}
             <td className="py-3.5 px-4">
-                <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-neutral-100 dark:bg-slate-800 flex items-center justify-center">
-                        <User size={14} className="text-neutral-500" />
+                {patientName ? (
+                    <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-md bg-neutral-100 dark:bg-slate-800 flex items-center justify-center text-[10px] font-bold text-neutral-500 shrink-0">
+                            {(c.patient_first_name?.[0] ?? "")}{(c.patient_last_name?.[0] ?? "")}
+                        </div>
+                        <span className="text-sm font-medium text-black dark:text-white">{patientName}</span>
                     </div>
-                    <div>
-                        <p className="text-sm font-bold text-black dark:text-white font-mono">
-                            #{c.id.slice(-6)}
-                        </p>
-                        <p className="text-[10px] text-neutral-400">{c.patient_id.slice(-8)}</p>
-                    </div>
-                </div>
+                ) : (
+                    <span className="text-xs text-neutral-400 italic">Unknown</span>
+                )}
             </td>
+            {/* Assigned */}
+            <td className="py-3.5 px-4 text-xs">
+                {assignedName ? (
+                    <div className="flex items-center gap-1.5">
+                        <User size={12} className="text-blue-500 shrink-0" />
+                        <span className="text-blue-600 dark:text-blue-400 font-medium">{assignedName}</span>
+                    </div>
+                ) : (
+                    <span className="text-neutral-400 italic">Unassigned</span>
+                )}
+            </td>
+            {/* Priority */}
             <td className="py-3.5 px-4">
                 <span className={cn(
                     "inline-flex items-center px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border",
@@ -242,6 +278,7 @@ function CaseRow({
                     {priority}
                 </span>
             </td>
+            {/* Status */}
             <td className="py-3.5 px-4">
                 <div className="flex items-center gap-2">
                     {c.status === "PENDING" && (
@@ -257,19 +294,14 @@ function CaseRow({
                     </span>
                 </div>
             </td>
-            <td className="py-3.5 px-4 text-xs text-neutral-500">
-                {c.assigned_to_member_id ? (
-                    <span className="text-blue-600 dark:text-blue-400 font-medium">Assigned</span>
-                ) : (
-                    <span className="italic">Unassigned</span>
-                )}
-            </td>
+            {/* Created */}
             <td className="py-3.5 px-4">
-                <div className="flex items-center gap-1.5 text-xs text-neutral-500">
-                    <Calendar size={12} />
-                    {new Date(c.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                <div className="flex items-center gap-1.5 text-xs text-neutral-500 whitespace-nowrap">
+                    <Calendar size={12} className="shrink-0" />
+                    {createdAt}
                 </div>
             </td>
+            {/* Actions */}
             <td className="py-3.5 px-4">
                 <div className="flex items-center gap-2 justify-end">
                     <Link
