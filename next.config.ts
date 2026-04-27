@@ -6,13 +6,7 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "500mb",
     },
   },
-  // Allow Route Handlers to receive large MRI scan bodies (individual files up to 500MB)
-  api: {
-    bodyParser: {
-      sizeLimit: "500mb",
-    },
-    responseLimit: "500mb",
-  },
+  allowedDevOrigins: ["10.30.140.10:3000", "localhost:3000", "10.30.140.10.nip.io:3000"],
   transpilePackages: ["@niivue/niivue"],
 };
 

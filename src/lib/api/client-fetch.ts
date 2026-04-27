@@ -4,7 +4,7 @@ function getBackendUrl(): string {
     if (typeof window !== "undefined") {
         return `${window.location.protocol}//${window.location.hostname}:8000`;
     }
-    return "http://localhost:8000";
+    return "https://localhost:8000";
 }
 
 export class ApiError extends Error {
@@ -54,6 +54,7 @@ export async function clientFetch<T>(
         ...rest,
         headers,
         body: body !== undefined ? JSON.stringify(body) : undefined,
+        cache: "no-store",
     });
 
     if (response.status === 204) return undefined as T;
