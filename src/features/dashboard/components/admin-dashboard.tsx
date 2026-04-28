@@ -158,21 +158,21 @@ export function AdminDashboard({
                 />
                 <StatCard
                     title="Total Cases"
-                    value={displayStats?.total ?? "—"}
+                    value={displayStats?.total ?? "-"}
                     icon={FileText}
                     color="green"
                     trend="All time"
                 />
                 <StatCard
                     title="Pending Review"
-                    value={displayStats?.pending ?? "—"}
+                    value={displayStats?.pending ?? "-"}
                     icon={Clock}
                     color="amber"
                     trend="Action needed"
                 />
                 <StatCard
                     title="Reviewed"
-                    value={displayStats?.reviewed ?? "—"}
+                    value={displayStats?.reviewed ?? "-"}
                     icon={CheckCircle2}
                     color="green"
                     trend="Complete"
@@ -289,7 +289,7 @@ export function AdminDashboard({
                                             {p.gender}
                                         </td>
                                         <td className="py-3.5 px-5 text-sm text-neutral-600 dark:text-neutral-400">
-                                            {p.city || "—"}
+                                            {p.city || "-"}
                                         </td>
                                         <td className="py-3.5 px-5 text-right">
                                             <Link
@@ -393,7 +393,7 @@ function CaseRow({ caseItem: c }: { caseItem: any }) {
         <tr className="group hover:bg-neutral-50 dark:hover:bg-slate-800/30 transition-colors">
             <td className="py-3.5 px-5">
                 <p className="text-sm font-bold text-black dark:text-white">
-                    {c.patient_first_name ?? "—"} {c.patient_last_name ?? ""}
+                    {c.patient_first_name ?? "-"} {c.patient_last_name ?? ""}
                 </p>
             </td>
             <td className="py-3.5 px-5">

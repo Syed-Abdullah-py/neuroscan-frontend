@@ -21,12 +21,14 @@ export default async function CaseDetailPage({
     const caseItem = await casesApi.get(id, workspaceId).catch(() => null);
     if (!caseItem) notFound();
 
-    // membershipId is the workspace_members.id — used to check if doctor is assigned
     const membershipId = activeWorkspace?.id ?? null;
 
     const isDoctor = workspaceRole === "DOCTOR";
+    // Allow access if assigned via current membership OR via stable user reference (covers rejoined doctors)
     const isAssigned =
-        isDoctor && caseItem.assigned_to_member_id === membershipId;
+        isDoctor &&
+        (caseItem.assigned_to_member_id === membershipId ||
+            caseItem.assigned_to_user_id === user.id);
 
     // Doctor can only see their assigned cases
     if (isDoctor && !isAssigned) redirect("/cases");

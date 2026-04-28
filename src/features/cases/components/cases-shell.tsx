@@ -228,7 +228,7 @@ function CaseRow({
         : null;
     const assignedName = assignedMember
         ? (assignedMember.user_name || assignedMember.user_email || "Unknown")
-        : null;
+        : (c.assigned_to_name ?? null);
 
     const patientName = (c.patient_first_name || c.patient_last_name)
         ? `${c.patient_first_name ?? ""} ${c.patient_last_name ?? ""}`.trim()

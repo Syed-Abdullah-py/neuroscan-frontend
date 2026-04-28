@@ -41,7 +41,7 @@ export function useUpload() {
     return ctx;
 }
 
-/** Polyfill for crypto.randomUUID — required when running over plain HTTP (non-secure context). */
+/** Polyfill for crypto.randomUUID - required when running over plain HTTP (non-secure context). */
 function generateUUID(): string {
     if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
         return crypto.randomUUID();

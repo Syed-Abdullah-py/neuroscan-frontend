@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
       Accept: "text/event-stream",
       "Cache-Control": "no-cache",
     },
-    // @ts-expect-error — duplex needed for streaming
+    // @ts-expect-error - duplex needed for streaming
     duplex: "half",
   });
 

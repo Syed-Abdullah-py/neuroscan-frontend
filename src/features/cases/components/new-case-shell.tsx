@@ -15,10 +15,10 @@ import type { Patient } from "@/lib/types/patient.types";
 type ModalityKey = "t1" | "t1ce" | "t2" | "flair";
 
 const MODALITY_META: { key: ModalityKey; label: string; full: string; color: string }[] = [
-  { key: "t1",    label: "T1",    full: "T1-weighted",         color: "#60a5fa" },
-  { key: "t1ce",  label: "T1ce",  full: "T1 Contrast Enhanced", color: "#a78bfa" },
-  { key: "t2",    label: "T2",    full: "T2-weighted",         color: "#34d399" },
-  { key: "flair", label: "FLAIR", full: "FLAIR",               color: "#fb923c" },
+  { key: "t1", label: "T1", full: "T1-weighted", color: "#60a5fa" },
+  { key: "t1ce", label: "T1ce", full: "T1 Contrast Enhanced", color: "#a78bfa" },
+  { key: "t2", label: "T2", full: "T2-weighted", color: "#34d399" },
+  { key: "flair", label: "FLAIR", full: "FLAIR", color: "#fb923c" },
 ];
 
 interface NewCaseShellProps {
@@ -44,9 +44,7 @@ export function NewCaseShell({ patients, members }: NewCaseShellProps) {
   const [phoneQuery, setPhoneQuery] = useState("");
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
 
-  const doctors = members.filter(
-    (m) => m.role === "DOCTOR" || m.role === "ADMIN" || m.role === "OWNER"
-  );
+  const doctors = members.filter((m) => m.role === "DOCTOR");
 
   // Filter patients by phone number as the user types
   const trimmed = phoneQuery.trim();
@@ -103,7 +101,7 @@ export function NewCaseShell({ patients, members }: NewCaseShellProps) {
       <div className="bg-white dark:bg-slate-900 rounded-2xl border border-neutral-200 dark:border-slate-800 p-8">
         <form onSubmit={handleSubmit} className="space-y-6">
 
-          {/* Patient — phone search then select */}
+          {/* Patient - phone search then select */}
           <div>
             <label className={labelCls}>
               Patient <span className="text-red-500">*</span>
@@ -126,7 +124,7 @@ export function NewCaseShell({ patients, members }: NewCaseShellProps) {
               </div>
             ) : (
               <div className="space-y-3">
-                {/* Step 1 — search by phone */}
+                {/* Step 1 - search by phone */}
                 <div className="relative">
                   <Phone size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                   <input
@@ -141,14 +139,14 @@ export function NewCaseShell({ patients, members }: NewCaseShellProps) {
                   />
                 </div>
 
-                {/* Step 2 — results */}
+                {/* Step 2 - results */}
                 {trimmed.length > 0 && (
                   filteredPatients.length === 0 ? (
                     <p className="text-xs text-slate-400 px-1">
                       No patients match that phone number.
                     </p>
                   ) : filteredPatients.length === 1 ? (
-                    // Single match — clickable card to confirm
+                    // Single match - clickable card to confirm
                     <button
                       type="button"
                       onClick={() => setSelectedPatient(filteredPatients[0])}
@@ -174,7 +172,7 @@ export function NewCaseShell({ patients, members }: NewCaseShellProps) {
                       )}
                     </button>
                   ) : (
-                    // Multiple matches — dropdown
+                    // Multiple matches - dropdown
                     <div className="relative">
                       <select
                         className={inputCls}
@@ -185,12 +183,12 @@ export function NewCaseShell({ patients, members }: NewCaseShellProps) {
                         }}
                       >
                         <option value="">
-                          {filteredPatients.length} patients found — select one
+                          {filteredPatients.length} patients found - select one
                         </option>
                         {filteredPatients.map((p) => (
                           <option key={p.id} value={p.id}>
                             {p.first_name} {p.last_name}
-                            {p.mrn ? ` — MRN ${p.mrn}` : ""} · {p.phone_number}
+                            {p.mrn ? ` - MRN ${p.mrn}` : ""} · {p.phone_number}
                           </option>
                         ))}
                       </select>
@@ -224,11 +222,11 @@ export function NewCaseShell({ patients, members }: NewCaseShellProps) {
             <div>
               <label className={labelCls}>Priority</label>
               <div className="relative">
-                <select name="priority" defaultValue="normal" className={inputCls}>
-                  <option value="low">Low — Routine</option>
-                  <option value="normal">Normal — Standard</option>
-                  <option value="high">High — Urgent</option>
-                  <option value="urgent">Urgent — Emergency</option>
+                <select name="priority" defaultValue="normal" className={cn(inputCls, "appearance-none")}>
+                  <option value="low">Low - Routine</option>
+                  <option value="normal">Normal - Standard</option>
+                  <option value="high">High - Urgent</option>
+                  <option value="urgent">Urgent - Emergency</option>
                 </select>
                 <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 pointer-events-none" />
               </div>
@@ -236,11 +234,11 @@ export function NewCaseShell({ patients, members }: NewCaseShellProps) {
             <div>
               <label className={labelCls}>Assign To</label>
               <div className="relative">
-                <select name="assigned_to_member_id" className={inputCls}>
+                <select name="assigned_to_member_id" className={cn(inputCls, "appearance-none")}>
                   <option value="">Unassigned</option>
                   {doctors.map((m) => (
                     <option key={m.id} value={m.id}>
-                      {m.user_name || m.user_email || "Unknown"} ({m.role})
+                      {m.user_name || m.user_email || "Unknown"}
                     </option>
                   ))}
                 </select>
@@ -260,7 +258,7 @@ export function NewCaseShell({ patients, members }: NewCaseShellProps) {
             />
           </div>
 
-          {/* MRI Scans — 4 individual modality slots */}
+          {/* MRI Scans - 4 individual modality slots */}
           <div>
             <label className={labelCls}>
               MRI Scans <span className="text-red-500">*</span>{" "}

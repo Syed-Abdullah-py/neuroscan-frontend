@@ -7,17 +7,17 @@ function makeQueryClient() {
     return new QueryClient({
         defaultOptions: {
             queries: {
-                // Always stale — ensures invalidateQueries and polling always
+                // Always stale - ensures invalidateQueries and polling always
                 // trigger real fetches without a freshness window blocking them.
                 staleTime: 0,
                 // Disable caching completely
                 gcTime: 0,
-                // Don't retry 4xx — they won't self-heal
+                // Don't retry 4xx - they won't self-heal
                 retry: (failureCount, error: any) => {
                     if (error?.status >= 400 && error?.status < 500) return false;
                     return failureCount < 2;
                 },
-                // Medical app — don't refetch mid-read when user switches tabs
+                // Medical app - don't refetch mid-read when user switches tabs
                 refetchOnWindowFocus: false,
                 // But do refetch when network comes back after being offline
                 refetchOnReconnect: true,

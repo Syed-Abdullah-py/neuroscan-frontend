@@ -27,7 +27,7 @@ export function NoWorkspaceState({
                     : "Join or request access to a workspace to start reviewing cases."}
             </p>
             <Link
-                href="/dashboard/workspaces"
+                href="/workspaces"
                 className="px-6 py-2.5 bg-black dark:bg-white text-white dark:text-black rounded-xl text-sm font-bold hover:opacity-90 transition-opacity"
             >
                 {globalRole === "ADMIN" ? "Create Workspace" : "Browse Workspaces"}

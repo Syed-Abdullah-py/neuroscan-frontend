@@ -259,7 +259,7 @@ export function SignupForm({
             {/* ── Step 2: Details form ───────────────────────────────────────── */}
             {currentStep === 2 && (
                 <div className="space-y-5">
-                    {/* Google signup — role already selected in Step 1 */}
+                    {/* Google signup - role already selected in Step 1 */}
                     <GoogleSignInButton
                         global_role={selectedRole === "admin" ? "ADMIN" : "RADIOLOGIST"}
                     />
@@ -276,177 +276,177 @@ export function SignupForm({
                         </div>
                     </div>
 
-                <form action={formAction} className="space-y-5">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className={labelClasses}>First Name</label>
-                            <input
-                                name="firstName"
-                                value={formData.firstName}
-                                onChange={handleInputChange}
-                                className={cn(
-                                    inputClasses,
-                                    errors.firstName && errorInputClasses
+                    <form action={formAction} className="space-y-5">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className={labelClasses}>First Name</label>
+                                <input
+                                    name="firstName"
+                                    value={formData.firstName}
+                                    onChange={handleInputChange}
+                                    className={cn(
+                                        inputClasses,
+                                        errors.firstName && errorInputClasses
+                                    )}
+                                    placeholder="Jane"
+                                    required
+                                />
+                                {errors.firstName && (
+                                    <p className="text-xs font-medium mt-1 text-red-500">
+                                        {errors.firstName}
+                                    </p>
                                 )}
-                                placeholder="Jane"
+                            </div>
+                            <div>
+                                <label className={labelClasses}>Last Name</label>
+                                <input
+                                    name="lastName"
+                                    value={formData.lastName}
+                                    onChange={handleInputChange}
+                                    className={cn(
+                                        inputClasses,
+                                        errors.lastName && errorInputClasses
+                                    )}
+                                    placeholder="Doe"
+                                    required
+                                />
+                                {errors.lastName && (
+                                    <p className="text-xs font-medium mt-1 text-red-500">
+                                        {errors.lastName}
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+
+                        <div>
+                            <label className={labelClasses}>Work Email</label>
+                            <input
+                                name="email"
+                                type="email"
+                                value={formData.email}
+                                onChange={handleInputChange}
+                                className={cn(inputClasses, errors.email && errorInputClasses)}
+                                placeholder="doctor@hospital.org"
                                 required
                             />
-                            {errors.firstName && (
+                            {errors.email && (
                                 <p className="text-xs font-medium mt-1 text-red-500">
-                                    {errors.firstName}
+                                    {errors.email}
                                 </p>
                             )}
                         </div>
+
                         <div>
-                            <label className={labelClasses}>Last Name</label>
-                            <input
-                                name="lastName"
-                                value={formData.lastName}
-                                onChange={handleInputChange}
-                                className={cn(
-                                    inputClasses,
-                                    errors.lastName && errorInputClasses
-                                )}
-                                placeholder="Doe"
-                                required
-                            />
-                            {errors.lastName && (
+                            <label className={labelClasses}>Password</label>
+                            <div className="relative">
+                                <input
+                                    name="password"
+                                    type={showPass ? "text" : "password"}
+                                    value={formData.password}
+                                    onChange={handleInputChange}
+                                    className={cn(
+                                        inputClasses,
+                                        "pr-11",
+                                        errors.password && errorInputClasses
+                                    )}
+                                    placeholder="••••••••"
+                                    required
+                                    minLength={8}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPass(!showPass)}
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-black dark:hover:text-white transition-colors"
+                                >
+                                    {showPass ? (
+                                        <EyeOff size={18} strokeWidth={2} />
+                                    ) : (
+                                        <Eye size={18} strokeWidth={2} />
+                                    )}
+                                </button>
+                            </div>
+                            {errors.password && (
                                 <p className="text-xs font-medium mt-1 text-red-500">
-                                    {errors.lastName}
+                                    {errors.password}
                                 </p>
                             )}
                         </div>
-                    </div>
 
-                    <div>
-                        <label className={labelClasses}>Work Email</label>
-                        <input
-                            name="email"
-                            type="email"
-                            value={formData.email}
-                            onChange={handleInputChange}
-                            className={cn(inputClasses, errors.email && errorInputClasses)}
-                            placeholder="doctor@hospital.org"
-                            required
-                        />
-                        {errors.email && (
-                            <p className="text-xs font-medium mt-1 text-red-500">
-                                {errors.email}
-                            </p>
-                        )}
-                    </div>
-
-                    <div>
-                        <label className={labelClasses}>Password</label>
-                        <div className="relative">
+                        <div>
+                            <label className={labelClasses}>Confirm Password</label>
                             <input
-                                name="password"
-                                type={showPass ? "text" : "password"}
-                                value={formData.password}
+                                name="confirmPassword"
+                                type="password"
+                                value={formData.confirmPassword}
                                 onChange={handleInputChange}
                                 className={cn(
                                     inputClasses,
-                                    "pr-11",
-                                    errors.password && errorInputClasses
+                                    errors.confirmPassword && errorInputClasses
                                 )}
                                 placeholder="••••••••"
                                 required
-                                minLength={8}
                             />
+                            {errors.confirmPassword && (
+                                <p className="text-xs font-medium mt-1 text-red-500">
+                                    {errors.confirmPassword}
+                                </p>
+                            )}
+                        </div>
+
+                        <div className="py-2">
+                            <label className="flex items-start gap-3 cursor-pointer group">
+                                <input
+                                    type="checkbox"
+                                    name="termsAccepted"
+                                    checked={formData.termsAccepted}
+                                    onChange={handleInputChange}
+                                    className="mt-0.5 w-4 h-4 rounded border-neutral-300 dark:border-neutral-700 cursor-pointer"
+                                    required
+                                />
+                                <span className="text-sm text-neutral-600 dark:text-neutral-400 group-hover:text-black dark:group-hover:text-white transition-colors">
+                                    I agree to the{" "}
+                                    <Link href="/terms" className="underline hover:text-black dark:hover:text-white">
+                                        Terms of Service
+                                    </Link>{" "}
+                                    and{" "}
+                                    <Link href="/privacy" className="underline hover:text-black dark:hover:text-white">
+                                        Privacy Policy
+                                    </Link>
+                                </span>
+                            </label>
+                        </div>
+
+                        <div className="pt-4 flex items-center justify-between border-t border-neutral-200 dark:border-neutral-800">
                             <button
                                 type="button"
-                                onClick={() => setShowPass(!showPass)}
-                                className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-black dark:hover:text-white transition-colors"
+                                onClick={onBack}
+                                className="text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white text-sm font-medium transition-colors"
                             >
-                                {showPass ? (
-                                    <EyeOff size={18} strokeWidth={2} />
-                                ) : (
-                                    <Eye size={18} strokeWidth={2} />
+                                Back
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={isPending || !isFormValid()}
+                                className="bg-black dark:bg-white hover:bg-neutral-800 dark:hover:bg-neutral-200 disabled:opacity-50 disabled:cursor-not-allowed text-white dark:text-black px-8 py-3 rounded-xl text-sm font-semibold transition-all active:scale-95 flex items-center gap-2"
+                            >
+                                {isPending && (
+                                    <Loader2 className="w-4 h-4 animate-spin" strokeWidth={2} />
                                 )}
+                                {isPending ? "Creating..." : "Create Account"}
                             </button>
                         </div>
-                        {errors.password && (
-                            <p className="text-xs font-medium mt-1 text-red-500">
-                                {errors.password}
-                            </p>
+
+                        {/* Server error */}
+                        {state?.message && !state.success && (
+                            <div className="p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 rounded-xl text-sm flex items-center gap-3 text-red-600 dark:text-red-400">
+                                <AlertCircle className="w-5 h-5 shrink-0" strokeWidth={2} />
+                                <span className="font-medium">{state.message}</span>
+                            </div>
                         )}
-                    </div>
 
-                    <div>
-                        <label className={labelClasses}>Confirm Password</label>
-                        <input
-                            name="confirmPassword"
-                            type="password"
-                            value={formData.confirmPassword}
-                            onChange={handleInputChange}
-                            className={cn(
-                                inputClasses,
-                                errors.confirmPassword && errorInputClasses
-                            )}
-                            placeholder="••••••••"
-                            required
-                        />
-                        {errors.confirmPassword && (
-                            <p className="text-xs font-medium mt-1 text-red-500">
-                                {errors.confirmPassword}
-                            </p>
-                        )}
-                    </div>
-
-                    <div className="py-2">
-                        <label className="flex items-start gap-3 cursor-pointer group">
-                            <input
-                                type="checkbox"
-                                name="termsAccepted"
-                                checked={formData.termsAccepted}
-                                onChange={handleInputChange}
-                                className="mt-0.5 w-4 h-4 rounded border-neutral-300 dark:border-neutral-700 cursor-pointer"
-                                required
-                            />
-                            <span className="text-sm text-neutral-600 dark:text-neutral-400 group-hover:text-black dark:group-hover:text-white transition-colors">
-                                I agree to the{" "}
-                                <Link href="/terms" className="underline hover:text-black dark:hover:text-white">
-                                    Terms of Service
-                                </Link>{" "}
-                                and{" "}
-                                <Link href="/privacy" className="underline hover:text-black dark:hover:text-white">
-                                    Privacy Policy
-                                </Link>
-                            </span>
-                        </label>
-                    </div>
-
-                    <div className="pt-4 flex items-center justify-between border-t border-neutral-200 dark:border-neutral-800">
-                        <button
-                            type="button"
-                            onClick={onBack}
-                            className="text-neutral-600 dark:text-neutral-400 hover:text-black dark:hover:text-white text-sm font-medium transition-colors"
-                        >
-                            Back
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={isPending || !isFormValid()}
-                            className="bg-black dark:bg-white hover:bg-neutral-800 dark:hover:bg-neutral-200 disabled:opacity-50 disabled:cursor-not-allowed text-white dark:text-black px-8 py-3 rounded-xl text-sm font-semibold transition-all active:scale-95 flex items-center gap-2"
-                        >
-                            {isPending && (
-                                <Loader2 className="w-4 h-4 animate-spin" strokeWidth={2} />
-                            )}
-                            {isPending ? "Creating..." : "Create Account"}
-                        </button>
-                    </div>
-
-                    {/* Server error */}
-                    {state?.message && !state.success && (
-                        <div className="p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900 rounded-xl text-sm flex items-center gap-3 text-red-600 dark:text-red-400">
-                            <AlertCircle className="w-5 h-5 shrink-0" strokeWidth={2} />
-                            <span className="font-medium">{state.message}</span>
-                        </div>
-                    )}
-
-                    {/* Hidden role field */}
-                    <input type="hidden" name="role" value={selectedRole || ""} />
-                </form>
+                        {/* Hidden role field */}
+                        <input type="hidden" name="role" value={selectedRole || ""} />
+                    </form>
                 </div>
             )}
 

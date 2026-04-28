@@ -96,7 +96,7 @@ export function useWorkspaceEvents(workspaceId: string | undefined) {
                 const parsed = JSON.parse(event.data) as WorkspaceSSEEvent;
                 handleEvent(parsed);
             } catch {
-                // Not JSON — ignore (heartbeat comments come through here too)
+                // Not JSON - ignore (heartbeat comments come through here too)
             }
         };
 

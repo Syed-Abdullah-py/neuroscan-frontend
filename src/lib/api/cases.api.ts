@@ -6,7 +6,7 @@ import type {
 } from "@/lib/types/case.types";
 
 export const casesApi = {
-    /** GET /cases/ — OWNER/ADMIN sees all; DOCTOR sees assigned only */
+    /** GET /cases/ - OWNER/ADMIN sees all; DOCTOR sees assigned only */
     list(workspaceId: string): Promise<Case[]> {
         return apiFetch<Case[]>("/cases/", { workspaceId });
     },
@@ -16,7 +16,7 @@ export const casesApi = {
         return apiFetch<CaseStats>("/cases/stats", { workspaceId });
     },
 
-    /** GET /cases/recent — last 5 cases */
+    /** GET /cases/recent - last 5 cases */
     recent(workspaceId: string): Promise<Case[]> {
         return apiFetch<Case[]>("/cases/recent", { workspaceId });
     },
@@ -27,7 +27,7 @@ export const casesApi = {
     },
 
     /**
-     * POST /cases/ — multipart/form-data
+     * POST /cases/ - multipart/form-data
      * Sends exactly 4 MRI scan files plus case metadata.
      * Allowed file types: .nii, .nii.gz, .dcm, .nrrd, .mha, .mhd
      * Max size per file: 500MB
@@ -69,7 +69,7 @@ export const casesApi = {
         });
     },
 
-    /** DELETE /cases/{id} — OWNER/ADMIN only */
+    /** DELETE /cases/{id} - OWNER/ADMIN only */
     delete(caseId: string, workspaceId: string): Promise<void> {
         return apiFetch<void>(`/cases/${caseId}`, {
             method: "DELETE",

@@ -51,19 +51,25 @@ export function useRecentCases(initialData?: any[]) {
     });
 }
 
-export function useCase(caseId: string | undefined) {
+const THIRTY_MINUTES = 30 * 60 * 1000;
+
+export function useCase(caseId: string | undefined, initialData?: Case) {
     const { token, activeWorkspaceId } = useWorkspace();
     return useQuery({
         queryKey: caseKeys.detail(activeWorkspaceId ?? "", caseId ?? ""),
         queryFn: () => makeCasesClient(token, activeWorkspaceId!).get(caseId!),
         enabled: !!activeWorkspaceId && !!caseId && !!token,
+        initialData,
+        initialDataUpdatedAt: initialData ? Date.now() : undefined,
+        staleTime: THIRTY_MINUTES,
+        gcTime: THIRTY_MINUTES,
     });
 }
 
 export function useCreateCase() {
     const qc = useQueryClient();
     const { activeWorkspaceId } = useWorkspace();
-    // Case creation uses multipart — handled by server action, not clientFetch
+    // Case creation uses multipart - handled by server action, not clientFetch
     // This mutation just triggers cache invalidation after the action completes
     return useMutation({
         mutationFn: async (_: void) => { },

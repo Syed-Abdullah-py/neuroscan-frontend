@@ -139,7 +139,7 @@ export function CaseDetailsView({ caseItem, user, aiData, isDoctor, isAssignedDo
                                         <div className="flex items-center justify-between">
                                             <span className="text-sm text-slate-500">Assigned To</span>
                                             <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
-                                                {caseItem.assigned_to_member_id ? "Assigned" : "Unassigned"}
+                                                {caseItem.assigned_to_name ?? "Unassigned"}
                                             </span>
                                         </div>
                                     </div>

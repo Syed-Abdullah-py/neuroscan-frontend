@@ -53,7 +53,7 @@ export function ModalityGridViewer({
 }) {
     const isRealData = !!scanBuffers;
 
-    // Must be before any early return — rules of hooks
+    // Must be before any early return - rules of hooks
     useEffect(() => {
         if (!isRealData) onLoad?.(BRATS_TOTAL, 0);
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -128,7 +128,7 @@ export function ModalityGridViewer({
     );
 }
 
-// ── Per-modality contact sheet — PNG-based ────────────────────────────────
+// ── Per-modality contact sheet - PNG-based ────────────────────────────────
 
 const CONTACT_COLS = 5;
 const SLICE_INDICES = Array.from({ length: BRATS_TOTAL }, (_, i) => i);
@@ -197,9 +197,9 @@ export function ModalityContactSheet({
     );
 }
 
-// ── Orientation labels — shared across all 2-D slice views ───────────────
+// ── Orientation labels - shared across all 2-D slice views ───────────────
 // T = top of image, L = patient's left side (viewer's right in radiology convention,
-// but placed left here to match the PNG slices as generated — verify and flip if needed)
+// but placed left here to match the PNG slices as generated - verify and flip if needed)
 
 function OrientLabels({ mini = false }: { mini?: boolean }) {
     const cls = mini
@@ -220,9 +220,9 @@ function _makeBratsCmap() {
     const G = new Array(256).fill(0);
     const B = new Array(256).fill(0);
     const A = new Array(256).fill(0);
-    for (let i = 21; i <= 72; i++) { R[i] = 220; G[i] = 40;  B[i] = 40;  A[i] = 255; } // NCR — red
-    for (let i = 73; i <= 145; i++) { R[i] = 250; G[i] = 200; B[i] = 20;  A[i] = 255; } // edema — yellow
-    for (let i = 240; i <= 255; i++) { R[i] = 59;  G[i] = 130; B[i] = 246; A[i] = 255; } // active tumor — blue
+    for (let i = 21; i <= 72; i++) { R[i] = 220; G[i] = 40; B[i] = 40; A[i] = 255; } // NCR - red
+    for (let i = 73; i <= 145; i++) { R[i] = 250; G[i] = 200; B[i] = 20; A[i] = 255; } // edema - yellow
+    for (let i = 240; i <= 255; i++) { R[i] = 59; G[i] = 130; B[i] = 246; A[i] = 255; } // active tumor - blue
     return { R, G, B, A };
 }
 
@@ -304,7 +304,7 @@ function NiiVueViewer({
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [buffer]);
 
-    // Effect 2: toggle seg overlay — uses loadVolumes (addVolume has ArrayBuffer issues in NiiVue)
+    // Effect 2: toggle seg overlay - uses loadVolumes (addVolume has ArrayBuffer issues in NiiVue)
     // Uses refs for buffer/scanName so scan is not re-initialised, only the volume list changes.
     useEffect(() => {
         const nv = nvRef.current;
@@ -319,7 +319,7 @@ function NiiVueViewer({
         nv.loadVolumes(vols).then(() => {
             if (aliveRef.current) _seek(nv, savedSlice, totalRef.current);
         }).catch(() => { /* ignore */ });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [showMask, segBuffer]);
 
     // Effect 3: seek to requested slice
@@ -366,7 +366,7 @@ function NiiVueViewer({
     );
 }
 
-// ── NiiVue mini viewer — for the 2×2 grid ────────────────────────────────
+// ── NiiVue mini viewer - for the 2×2 grid ────────────────────────────────
 
 function NiiVueMiniViewer({
     buffer,
@@ -456,7 +456,7 @@ function NiiVueMiniViewer({
         nv.loadVolumes(vols).then(() => {
             if (aliveRef.current) _seek(nv, savedSlice, totalRef.current);
         }).catch(() => { /* ignore */ });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [showMask, segBuffer]);
 
     useEffect(() => {

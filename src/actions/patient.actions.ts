@@ -1,4 +1,4 @@
-// Stub — real implementation comes in Phase 7 (patients domain).
+// Stub - real implementation comes in Phase 7 (patients domain).
 export async function createPatient(_data: any) {
     throw new Error("Not implemented yet");
 }

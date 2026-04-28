@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Shield, Stethoscope, Trash2, UserPlus, Loader2, CheckCircle2, AlertCircle } from "lucide-react";
+import { Shield, Stethoscope, Trash2, UserPlus, Loader2, CheckCircle2, AlertCircle, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
     inviteMemberAction,
     removeMemberAction,
+    leaveWorkspaceAction,
 } from "@/features/workspaces/actions/workspace.actions";
 import { useWorkspaceMembers } from "@/features/workspaces/hooks/use-workspaces";
 import type { WorkspaceRole } from "@/lib/types/workspace.types";
@@ -48,9 +49,17 @@ export function MembersPanel({
         });
     };
 
+    const handleLeave = () => {
+        if (!confirm("Are you sure you want to leave this workspace?")) return;
+        startTransition(async () => {
+            const res = await leaveWorkspaceAction(workspaceId);
+            setMsg({ text: res.message, ok: res.success });
+        });
+    };
+
     return (
         <div className="space-y-6">
-            {/* Invite form — admin/owner only */}
+            {/* Invite form - admin/owner only */}
             {canManage && (
                 <div className="p-5 rounded-2xl border border-neutral-200 dark:border-slate-700/50 bg-neutral-50 dark:bg-slate-900/30">
                     <h4 className="text-sm font-bold text-black dark:text-white mb-3 flex items-center gap-2">
@@ -109,8 +118,9 @@ export function MembersPanel({
                         members.map((m: any) => {
                             const isMe = m.user_email === currentUserEmail;
                             const isOwner = m.role === "OWNER";
+                            const canLeave = isMe && !isOwner;
                             const canRemove =
-                                canManage && !isOwner && (isMe || currentUserRole === "OWNER" ||
+                                !isMe && canManage && !isOwner && (currentUserRole === "OWNER" ||
                                     (currentUserRole === "ADMIN" && m.role === "DOCTOR"));
 
                             return (
@@ -149,12 +159,23 @@ export function MembersPanel({
                                                 {m.role}
                                             </span>
                                         </div>
+                                        {canLeave && (
+                                            <button
+                                                onClick={handleLeave}
+                                                disabled={isPending}
+                                                title="Leave workspace"
+                                                className="p-1.5 text-neutral-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+                                            >
+                                                <LogOut className="w-3.5 h-3.5" />
+                                            </button>
+                                        )}
                                         {canRemove && (
                                             <button
                                                 onClick={() =>
                                                     handleRemove(m.user_id, m.user_email)
                                                 }
                                                 disabled={isPending}
+                                                title="Remove member"
                                                 className="p-1.5 text-neutral-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
                                             >
                                                 <Trash2 className="w-3.5 h-3.5" />

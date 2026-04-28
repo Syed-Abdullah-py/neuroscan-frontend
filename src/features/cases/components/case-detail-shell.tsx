@@ -12,7 +12,7 @@ import {
     SlidersHorizontal, CheckCircle2, X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useUpdateCase } from "@/features/cases/hooks/use-cases";
+import { useCase, useUpdateCase } from "@/features/cases/hooks/use-cases";
 import { useWorkspace } from "@/providers/workspace-provider";
 import type { Case, CaseStatus } from "@/lib/types/case.types";
 import type { WorkspaceRole } from "@/lib/types/workspace.types";
@@ -107,7 +107,30 @@ interface CaseDetailShellProps {
     user: { name: string; email: string; globalRole: string };
 }
 
-// ── ViewerPanel — isolated so slice ticks don't re-render sidebar ──────────
+// ── Module-level 30-minute buffer cache (survives unmount/remount) ─────────
+
+const BUFFER_CACHE_TTL = 30 * 60 * 1000;
+
+type CachedScanData = {
+    scans: (ArrayBuffer | null)[];
+    seg: ArrayBuffer | null;
+    slicesPrefetched: boolean;
+    cachedAt: number;
+};
+
+const _scanBufferCache = new Map<string, CachedScanData>();
+
+function getCachedBuffers(caseId: string): CachedScanData | null {
+    const entry = _scanBufferCache.get(caseId);
+    if (!entry) return null;
+    if (Date.now() - entry.cachedAt > BUFFER_CACHE_TTL) {
+        _scanBufferCache.delete(caseId);
+        return null;
+    }
+    return entry;
+}
+
+// ── ViewerPanel - isolated so slice ticks don't re-render sidebar ──────────
 
 const ViewerPanel = memo(function ViewerPanel({
     activeTab,
@@ -147,19 +170,31 @@ const ViewerPanel = memo(function ViewerPanel({
         `/api/cases/${caseId}/seg`,
     ];
 
-    const [scanBuffers, setScanBuffers] = useState<(ArrayBuffer | null)[]>([null, null, null, null]);
-    const [segBuffer, setSegBuffer] = useState<ArrayBuffer | null>(null);
+    // Initialise from cache immediately so we never re-download within the TTL
+    const cached = getCachedBuffers(caseId);
+    const [scanBuffers, setScanBuffers] = useState<(ArrayBuffer | null)[]>(
+        () => cached?.scans ?? [null, null, null, null]
+    );
+    const [segBuffer, setSegBuffer] = useState<ArrayBuffer | null>(
+        () => cached?.seg ?? null
+    );
     const [fetchStates, setFetchStates] = useState<FileFetchState[]>(() =>
-        FETCH_LABELS.map((label, i) => ({
-            label, color: FETCH_COLORS[i], sizeMb: 0, progress: 0,
-            status: (i < 4 ? (scanFiles[i] ? "pending" : "done") : "pending") as FetchStatus,
-        }))
+        cached
+            ? FETCH_LABELS.map((label, i) => ({
+                label, color: FETCH_COLORS[i], sizeMb: 0, progress: 100, status: "done" as FetchStatus,
+            }))
+            : FETCH_LABELS.map((label, i) => ({
+                label, color: FETCH_COLORS[i], sizeMb: 0, progress: 0,
+                status: (i < 4 ? (scanFiles[i] ? "pending" : "done") : "pending") as FetchStatus,
+            }))
     );
     const [sliceStates, setSliceStates] = useState<SliceFetchState[]>(() =>
-        SLICE_MODS_ORDER.map(() => ({ done: 0, status: "idle" as const }))
+        cached?.slicesPrefetched
+            ? SLICE_MODS_ORDER.map(() => ({ done: SLICE_TOTAL, status: "done" as const }))
+            : SLICE_MODS_ORDER.map(() => ({ done: 0, status: "idle" as const }))
     );
     const [fetchToastCollapsed, setFetchToastCollapsed] = useState(false);
-    const [fetchToastDismissed, setFetchToastDismissed] = useState(false);
+    const [fetchToastDismissed, setFetchToastDismissed] = useState(() => !!cached);
 
     const patchFetch = useCallback((i: number, patch: Partial<FileFetchState>) => {
         setFetchStates(prev => prev.map((s, j) => j === i ? { ...s, ...patch } : s));
@@ -169,12 +204,22 @@ const ViewerPanel = memo(function ViewerPanel({
     }, []);
 
     const sliceControllersRef = useRef<AbortController[]>([]);
+    // Accumulate buffers during download so we can write them to cache atomically
+    const pendingBuffersRef = useRef<{ scans: (ArrayBuffer | null)[]; seg: ArrayBuffer | null }>({
+        scans: cached?.scans ?? [null, null, null, null],
+        seg: cached?.seg ?? null,
+    });
 
-    // Phase 1 — download main files (scans + mesh + seg)
+    // Phase 1 - download main files (scans + mesh + seg); skipped when cache is fresh
     useEffect(() => {
         if (!scanFiles.length) return;
+
+        // If cache is still valid for this caseId, nothing to fetch
+        if (getCachedBuffers(caseId)) return;
+
         setScanBuffers([null, null, null, null]);
         setSegBuffer(null);
+        pendingBuffersRef.current = { scans: [null, null, null, null], seg: null };
         setFetchStates(FETCH_LABELS.map((label, i) => ({
             label, color: FETCH_COLORS[i], sizeMb: 0, progress: 0,
             status: (i < 4 ? (scanFiles[i] ? "pending" : "done") : "pending") as FetchStatus,
@@ -213,8 +258,13 @@ const ViewerPanel = memo(function ViewerPanel({
                     return read();
                 })
                 .then(buf => {
-                    if (i < 4) setScanBuffers(prev => { const next = [...prev]; next[i] = buf; return next; });
-                    else if (i === 5) setSegBuffer(buf);
+                    if (i < 4) {
+                        pendingBuffersRef.current.scans[i] = buf;
+                        setScanBuffers(prev => { const next = [...prev]; next[i] = buf; return next; });
+                    } else if (i === 5) {
+                        pendingBuffersRef.current.seg = buf;
+                        setSegBuffer(buf);
+                    }
                     patchFetch(i, { progress: 100, status: "done" });
                 })
                 .catch(err => { if (err?.name !== "AbortError") patchFetch(i, { status: "error" }); });
@@ -231,10 +281,26 @@ const ViewerPanel = memo(function ViewerPanel({
     const allSlicesDone = sliceStates.every(s => s.status === "done" || s.status === "idle");
     const allFetchDone = allMainDone && allSlicesDone;
 
-    // Phase 2 — PNG slice pre-fetch via proxy, starts only after main files are ready.
+    // Write main buffers to cache once all files are downloaded
+    useEffect(() => {
+        if (!allMainDone || getCachedBuffers(caseId)) return;
+        _scanBufferCache.set(caseId, {
+            scans: pendingBuffersRef.current.scans,
+            seg: pendingBuffersRef.current.seg,
+            slicesPrefetched: false,
+            cachedAt: Date.now(),
+        });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [allMainDone, caseId]);
+
+    // Phase 2 - PNG slice pre-fetch via proxy, starts only after main files are ready.
     // Uses the same URLs as ModalityContactSheet <img> tags so the browser cache is shared.
     useEffect(() => {
         if (!allMainDone || !scanFiles.length) return;
+
+        // Slices already pre-fetched and cached — nothing to do
+        const entry = _scanBufferCache.get(caseId);
+        if (entry?.slicesPrefetched) return;
 
         sliceControllersRef.current.forEach(c => c.abort());
         const controllers = SLICE_MODS_ORDER.map(() => new AbortController());
@@ -252,7 +318,7 @@ const ViewerPanel = memo(function ViewerPanel({
                         Array.from({ length: end - start }, (_, k) => start + k).map(idx =>
                             fetch(`/api/cases/${caseId}/slices/${mod}/${idx}`, { signal: sig })
                                 .then(() => { done++; patchSlice(modIdx, { done }); })
-                                .catch(() => {})
+                                .catch(() => { })
                         )
                     );
                 }
@@ -263,6 +329,16 @@ const ViewerPanel = memo(function ViewerPanel({
         return () => controllers.forEach(c => c.abort());
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [allMainDone, caseId]);
+
+    // Mark slices as prefetched in cache once phase 2 completes
+    useEffect(() => {
+        if (!allSlicesDone) return;
+        const entry = _scanBufferCache.get(caseId);
+        if (entry && !entry.slicesPrefetched) {
+            _scanBufferCache.set(caseId, { ...entry, slicesPrefetched: true });
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [allSlicesDone, caseId]);
 
     // Auto-dismiss 3 s after everything (files + slices) is done
     useEffect(() => {
@@ -303,7 +379,7 @@ const ViewerPanel = memo(function ViewerPanel({
         return () => document.removeEventListener("fullscreenchange", handler);
     }, []);
 
-    // Playback loop — interval only, no extra deps
+    // Playback loop - interval only, no extra deps
     useEffect(() => {
         if (!isPlaying || is3D) return;
         const id = setInterval(() => setSlice(s => (s + 1) % totalSlices), 1000 / playFps);
@@ -334,425 +410,425 @@ const ViewerPanel = memo(function ViewerPanel({
 
     return (
         <>
-        {showFetchToast && (
-            <div className={cn(
-                "fixed bottom-6 right-6 z-50 w-[320px] rounded-2xl shadow-2xl overflow-hidden border bg-white dark:bg-slate-900",
-                allFetchDone
-                    ? "border-emerald-200 dark:border-emerald-800/60"
-                    : "border-slate-200 dark:border-slate-700"
-            )}>
-                {/* Toast header */}
+            {showFetchToast && (
                 <div className={cn(
-                    "flex items-center justify-between px-4 py-3",
-                    allFetchDone ? "bg-emerald-50 dark:bg-emerald-950/40" : "bg-slate-50 dark:bg-slate-800/60"
+                    "fixed bottom-6 right-6 z-50 w-[320px] rounded-2xl shadow-2xl overflow-hidden border bg-white dark:bg-slate-900",
+                    allFetchDone
+                        ? "border-emerald-200 dark:border-emerald-800/60"
+                        : "border-slate-200 dark:border-slate-700"
                 )}>
-                    <div className="flex items-center gap-2.5 min-w-0">
-                        <div className={cn(
-                            "flex items-center justify-center w-7 h-7 rounded-full shrink-0",
-                            allFetchDone ? "bg-emerald-100 dark:bg-emerald-900/50" : "bg-blue-100 dark:bg-blue-900/50"
-                        )}>
-                            {allFetchDone
-                                ? <CheckCircle2 size={14} className="text-emerald-600 dark:text-emerald-400" />
-                                : <Loader2 size={14} className="animate-spin text-blue-600 dark:text-blue-400" />}
-                        </div>
-                        <div className="min-w-0">
-                            <p className={cn(
-                                "text-sm font-semibold",
-                                allFetchDone ? "text-emerald-700 dark:text-emerald-300" : "text-slate-800 dark:text-slate-100"
+                    {/* Toast header */}
+                    <div className={cn(
+                        "flex items-center justify-between px-4 py-3",
+                        allFetchDone ? "bg-emerald-50 dark:bg-emerald-950/40" : "bg-slate-50 dark:bg-slate-800/60"
+                    )}>
+                        <div className="flex items-center gap-2.5 min-w-0">
+                            <div className={cn(
+                                "flex items-center justify-center w-7 h-7 rounded-full shrink-0",
+                                allFetchDone ? "bg-emerald-100 dark:bg-emerald-900/50" : "bg-blue-100 dark:bg-blue-900/50"
                             )}>
-                                {allFetchDone ? "Case ready" : allMainDone ? `Loading images — ${doneSliceImages}/${totalSliceImages}` : `Loading — ${overallProgress}%`}
-                            </p>
-                            {!allFetchDone && (
-                                <p className="text-xs text-slate-500 mt-0.5">
-                                    {allMainDone ? `${sliceStates.filter(s => s.status === "done").length}/4 modalities cached` : `${fetchStates.filter(s => s.status === "done").length} of ${fetchStates.length} files ready`}
+                                {allFetchDone
+                                    ? <CheckCircle2 size={14} className="text-emerald-600 dark:text-emerald-400" />
+                                    : <Loader2 size={14} className="animate-spin text-blue-600 dark:text-blue-400" />}
+                            </div>
+                            <div className="min-w-0">
+                                <p className={cn(
+                                    "text-sm font-semibold",
+                                    allFetchDone ? "text-emerald-700 dark:text-emerald-300" : "text-slate-800 dark:text-slate-100"
+                                )}>
+                                    {allFetchDone ? "Case ready" : allMainDone ? `Loading images - ${doneSliceImages}/${totalSliceImages}` : `Loading - ${overallProgress}%`}
                                 </p>
+                                {!allFetchDone && (
+                                    <p className="text-xs text-slate-500 mt-0.5">
+                                        {allMainDone ? `${sliceStates.filter(s => s.status === "done").length}/4 modalities loaded` : `${fetchStates.filter(s => s.status === "done").length} of ${fetchStates.length} files ready`}
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0 ml-2">
+                            <button
+                                onClick={() => setFetchToastCollapsed(v => !v)}
+                                title={fetchToastCollapsed ? "Expand" : "Collapse"}
+                                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                            >
+                                {fetchToastCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                            </button>
+                            {allFetchDone && (
+                                <button
+                                    onClick={() => setFetchToastDismissed(true)}
+                                    className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
+                                >
+                                    <X size={14} />
+                                </button>
                             )}
                         </div>
                     </div>
-                    <div className="flex items-center gap-1 shrink-0 ml-2">
-                        <button
-                            onClick={() => setFetchToastCollapsed(v => !v)}
-                            title={fetchToastCollapsed ? "Expand" : "Collapse"}
-                            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
-                        >
-                            {fetchToastCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-                        </button>
-                        {allFetchDone && (
-                            <button
-                                onClick={() => setFetchToastDismissed(true)}
-                                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-black/5 dark:hover:bg-white/10 transition-colors"
-                            >
-                                <X size={14} />
-                            </button>
-                        )}
-                    </div>
-                </div>
 
-                {/* Overall progress strip */}
-                {!allFetchDone && (
-                    <div className="h-1 bg-slate-100 dark:bg-slate-800">
-                        <div
-                            className="h-full bg-blue-500 transition-all duration-300"
-                            style={{ width: `${overallProgress}%` }}
-                        />
-                    </div>
-                )}
-
-                {/* Per-file rows + slice pre-fetch */}
-                {!fetchToastCollapsed && (
-                    <div className="px-4 py-3 space-y-2.5">
-                        {fetchStates.map((f, i) => (
-                            <div key={i} className="space-y-1">
-                                <div className="flex items-center gap-2 min-w-0">
-                                    <span className="text-[10px] font-bold uppercase tracking-wider shrink-0 tabular-nums"
-                                        style={{ color: f.color }}>
-                                        {f.label}
-                                    </span>
-                                    {f.sizeMb > 0 && (
-                                        <span className="text-xs text-slate-400 shrink-0 tabular-nums">{f.sizeMb} MB</span>
-                                    )}
-                                    {f.status === "done" && <CheckCircle2 size={12} className="text-emerald-500 shrink-0" />}
-                                    {f.status === "error" && <AlertCircle size={12} className="text-red-500 shrink-0" />}
-                                    {(f.status === "downloading" || f.status === "pending") && (
-                                        <span className="text-xs tabular-nums text-blue-600 dark:text-blue-400 shrink-0 w-7 text-right">
-                                            {f.progress > 0 ? `${f.progress}%` : "…"}
-                                        </span>
-                                    )}
-                                </div>
-                                <div className="h-1 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                                    <div
-                                        className={cn(
-                                            "h-full rounded-full transition-all duration-200",
-                                            f.status === "error" ? "bg-red-500"
-                                                : f.status === "done" ? "bg-emerald-500"
-                                                : f.status === "pending" ? "bg-slate-300 dark:bg-slate-600"
-                                                : "bg-blue-500"
-                                        )}
-                                        style={{ width: `${f.status === "pending" ? 0 : f.progress}%` }}
-                                    />
-                                </div>
-                            </div>
-                        ))}
-
-                        {/* Slice image pre-fetch section */}
-                        {sliceStates.some(s => s.status !== "idle") && (
-                            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1.5">
-                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.15em]">PNG Slices</p>
-                                {SLICE_MODS_ORDER.map((mod, modIdx) => {
-                                    const s = sliceStates[modIdx];
-                                    const pct = (s.done / SLICE_TOTAL) * 100;
-                                    return (
-                                        <div key={mod} className="flex items-center gap-2">
-                                            <span className="text-[10px] font-bold w-8 shrink-0"
-                                                style={{ color: FETCH_COLORS[modIdx] }}>
-                                                {SLICE_MOD_LABELS[modIdx]}
-                                            </span>
-                                            <div className="flex-1 h-1 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                                                <div
-                                                    className={cn("h-full rounded-full transition-all duration-150",
-                                                        s.status === "done" ? "bg-emerald-500" : "bg-blue-400")}
-                                                    style={{ width: `${pct}%` }}
-                                                />
-                                            </div>
-                                            <span className="text-[9px] font-mono text-slate-400 shrink-0 tabular-nums w-12 text-right">
-                                                {s.done}/{SLICE_TOTAL}
-                                            </span>
-                                            {s.status === "done" && <CheckCircle2 size={10} className="text-emerald-500 shrink-0" />}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </div>
-                )}
-            </div>
-        )}
-
-        <div
-            ref={viewerCardRef}
-            className={cn(
-                "rounded-2xl border overflow-hidden shadow-sm flex flex-col",
-                isFullscreen
-                    ? "h-screen border-transparent"
-                    : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
-            )}
-            style={isFullscreen ? { background: "#050d18" } : undefined}
-        >
-            {/* Header — hidden in fullscreen */}
-            {!isFullscreen && (
-                <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 bg-slate-50/60 dark:bg-slate-900/80">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                        {is3D
-                            ? <Brain className="w-4 h-4 text-purple-500 shrink-0" />
-                            : isGrid
-                                ? <LayoutGrid className="w-4 h-4 text-teal-500 shrink-0" />
-                                : isContactSheet
-                                    ? <LayoutGrid className="w-4 h-4 text-blue-500 shrink-0" />
-                                    : <ScanLine className="w-4 h-4 text-blue-500 shrink-0" />}
-                        <span className="text-sm font-bold text-slate-900 dark:text-white truncate">
-                            {is3D
-                                ? "3D Brain Model"
-                                : isGrid
-                                    ? "All Modalities — Grid View"
-                                    : isContactSheet
-                                        ? `${activeMeta?.fullLabel} — Contact Sheet`
-                                        : `${activeMeta?.fullLabel} — 2D Slices`}
-                        </span>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                        {!is3D && !isContactSheet && (
-                            <span className="text-xs text-slate-500 font-mono">{slice + 1} / {totalSlices}</span>
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {/* Canvas */}
-            <div className={cn("w-full relative", isFullscreen ? "flex-1 min-h-0" : "h-[480px]")}>
-                {/* Canvas overlay — top right (hidden for 3D which has its own controls) */}
-                {!is3D && <div className="absolute top-3 right-3 z-20 flex flex-col items-end gap-1.5">
-                    {/* Top row: Collapse toggle + Fullscreen always visible */}
-                    <div className="flex items-center gap-1.5">
-                        <button
-                            onClick={toggleFullscreen}
-                            className="flex items-center justify-center gap-1.5 py-1 px-2 w-[88px] rounded-lg border border-white/10 backdrop-blur-md text-slate-300 hover:text-white hover:border-white/25 transition-all text-[10px] font-semibold"
-                            style={{ background: "rgba(8,15,28,0.65)" }}
-                        >
-                            {isFullscreen ? <Minimize2 className="w-3 h-3 shrink-0" /> : <Maximize2 className="w-3 h-3 shrink-0" />}
-                            <span>{isFullscreen ? "Exit Full" : "Fullscreen"}</span>
-                        </button>
-                        <button
-                            onClick={() => setControlsVisible(v => !v)}
-                            title={controlsVisible ? "Collapse" : "Expand"}
-                            className="flex items-center justify-center gap-1 py-1 px-2 rounded-lg border border-white/10 backdrop-blur-md text-slate-400 hover:text-white hover:border-white/25 transition-all text-[10px] font-semibold"
-                            style={{ background: "rgba(8,15,28,0.65)" }}
-                        >
-                            {controlsVisible
-                                ? <><ChevronRight className="w-3 h-3" /><span>Collapse</span></>
-                                : <SlidersHorizontal className="w-3 h-3" />}
-                        </button>
-                    </div>
-
-                    {controlsVisible && (<>
-                        {/* 1. Mask */}
-                        {!is3D && (
-                            <button
-                                onClick={() => setShowMask(v => !v)}
-                                className={cn(
-                                    "flex items-center justify-center gap-1.5 py-1 px-2 w-full rounded-lg border backdrop-blur-md transition-all text-[10px] font-semibold",
-                                    showMask
-                                        ? "border-violet-500/60 text-violet-200"
-                                        : "border-white/10 text-slate-300 hover:text-violet-300 hover:border-violet-500/40"
-                                )}
-                                style={{ background: showMask ? "rgba(124,58,237,0.25)" : "rgba(8,15,28,0.65)" }}
-                            >
-                                <span className={cn("w-2 h-2 rounded-full shrink-0 transition-all", showMask ? "bg-violet-400 shadow-[0_0_6px_2px_rgba(167,139,250,0.6)]" : "bg-slate-600")} />
-                                <span>Mask</span>
-                            </button>
-                        )}
-
-                        {/* 2. Grid (contact sheet) — 2D only */}
-                        {is2D && (
-                            <button
-                                onClick={() => setViewMode(v => v === "slider" ? "contact" : "slider")}
-                                className={cn(
-                                    "flex items-center justify-center gap-1.5 py-1 px-2 w-full rounded-lg border backdrop-blur-md transition-all text-[10px] font-semibold",
-                                    isContactSheet
-                                        ? "border-blue-500/60 text-blue-300"
-                                        : "border-white/10 text-slate-300 hover:text-blue-300 hover:border-blue-500/40"
-                                )}
-                                style={{ background: isContactSheet ? "rgba(37,99,235,0.20)" : "rgba(8,15,28,0.65)" }}
-                            >
-                                <LayoutGrid className="w-3 h-3 shrink-0" />
-                                <span>Grid</span>
-                            </button>
-                        )}
-
-                        {/* 3. Settings */}
-                        {!is3D && (
-                            <button
-                                onClick={() => setSettingsOpen(v => !v)}
-                                className={cn(
-                                    "flex items-center justify-center gap-1.5 py-1 px-2 w-full rounded-lg border backdrop-blur-md transition-all text-[10px] font-semibold",
-                                    settingsOpen
-                                        ? "border-cyan-500/40 text-cyan-300"
-                                        : "border-white/10 text-slate-300 hover:text-white hover:border-white/25"
-                                )}
-                                style={{ background: settingsOpen ? "rgba(0,180,255,0.12)" : "rgba(8,15,28,0.65)" }}
-                            >
-                                <Settings2 className="w-3 h-3 shrink-0" />
-                                <span>Settings</span>
-                            </button>
-                        )}
-
-                        {/* Settings panel — speed only */}
-                        {settingsOpen && !is3D && !isContactSheet && (
+                    {/* Overall progress strip */}
+                    {!allFetchDone && (
+                        <div className="h-1 bg-slate-100 dark:bg-slate-800">
                             <div
-                                className="w-52 rounded-2xl border border-white/[0.07] backdrop-blur-xl shadow-2xl overflow-hidden"
-                                style={{ background: "rgba(6,12,24,0.94)" }}
-                            >
-                                <div className="px-3 pt-3 pb-3 space-y-2.5">
-                                    <div className="flex items-center justify-between px-1">
-                                        <p className="text-[9px] font-semibold text-slate-500 uppercase tracking-[0.18em]">Playback Speed</p>
-                                        <span className="text-[10px] font-bold text-cyan-400 font-mono">{playFps} fps</span>
-                                    </div>
-                                    <input
-                                        type="range" min={1} max={24} value={playFps}
-                                        onChange={e => setPlayFps(Number(e.target.value))}
-                                        className="w-full h-1 rounded-full cursor-pointer accent-cyan-400"
-                                    />
-                                    <div className="flex justify-between px-0.5">
-                                        <span className="text-[8px] text-slate-600">1 fps</span>
-                                        <span className="text-[8px] text-slate-600">24 fps</span>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </>)}
-                </div>}
-
-                {/* Fullscreen bottom: play + slider only */}
-                {isFullscreen && !is3D && !isContactSheet && (
-                    <div
-                        className="absolute bottom-5 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 px-5 py-3 rounded-2xl border border-white/10 backdrop-blur-xl shadow-2xl"
-                        style={{ background: "rgba(8,15,28,0.75)", minWidth: "360px" }}
-                    >
-                        <button onClick={() => setIsPlaying(v => !v)} className="p-1.5 text-slate-400 hover:text-cyan-400 transition-colors shrink-0">
-                            {isPlaying ? <Pause size={16} /> : <Play size={16} />}
-                        </button>
-                        <button onClick={() => setSlice(s => Math.max(0, s - 1))} className="p-1 text-slate-400 hover:text-white transition-colors shrink-0">
-                            <ChevronLeft size={16} />
-                        </button>
-                        <input
-                            type="range" min={0} max={Math.max(totalSlices - 1, 0)} value={slice}
-                            onChange={e => setSlice(Number(e.target.value))}
-                            className="flex-1 h-1 rounded-full cursor-pointer accent-cyan-400"
-                        />
-                        <button onClick={() => setSlice(s => Math.min(totalSlices - 1, s + 1))} className="p-1 text-slate-400 hover:text-white transition-colors shrink-0">
-                            <ChevronRight size={16} />
-                        </button>
-                        <span className="text-xs font-mono text-slate-400 shrink-0 w-14 text-right">{slice + 1}/{totalSlices}</span>
-                    </div>
-                )}
-
-                {/* Viewer */}
-                {is3D ? (
-                    <ThreeDViewer modelUrl={`/api/cases/${caseId}/mesh`} />
-                ) : isGrid ? (
-                    <ModalityGridViewer
-                        scanBuffers={scanBuffers}
-                        scanNames={scanNames}
-                        segBuffer={segBuffer}
-                        slice={slice}
-                        showMask={showMask}
-                        onLoad={handleVolumeLoad}
-                        onSliceChange={setSlice}
-                    />
-                ) : isContactSheet ? (
-                    <ModalityContactSheet
-                        caseId={scanFiles.length > 0 ? caseId : undefined}
-                        sliceBase={scanFiles.length === 0 ? BRATS_BASE : undefined}
-                        modality={activeTab}
-                        showMask={showMask}
-                    />
-                ) : hasScan ? (
-                    <ModalityViewer
-                        buffer={activeBuffer}
-                        segBuffer={segBuffer}
-                        scanName={activeScanName}
-                        showMask={showMask}
-                        slice={slice}
-                        onLoad={handleVolumeLoad}
-                        onSliceChange={setSlice}
-                    />
-                ) : (
-                    <div className="flex flex-col items-center justify-center h-full gap-3" style={{ background: "#050d18" }}>
-                        <div className="p-3 rounded-2xl bg-slate-800/60 border border-slate-700/50">
-                            <ScanLine className="w-6 h-6 text-slate-500" />
-                        </div>
-                        <p className="text-sm text-slate-500">No scan file uploaded for this modality</p>
-                    </div>
-                )}
-            </div>
-
-            {/* Controls panel */}
-            {!is3D && !isFullscreen && (isGrid || isContactSheet || hasScan) && (
-                <div className="px-5 py-4 border-t border-slate-200 dark:border-slate-800 space-y-3 bg-white dark:bg-slate-900">
-                    {!isContactSheet && (
-                        <div className="flex items-center gap-3">
-                            <button
-                                onClick={() => setIsPlaying(v => !v)}
-                                title={isPlaying ? "Pause" : "Play"}
-                                className={cn(
-                                    "w-7 h-7 rounded-lg border flex items-center justify-center transition-all shrink-0",
-                                    isPlaying
-                                        ? "bg-blue-600 border-blue-600 text-white shadow-sm shadow-blue-500/30"
-                                        : "border-slate-200 dark:border-slate-700 text-slate-500 hover:border-blue-400 hover:text-blue-600"
-                                )}
-                            >
-                                {isPlaying ? <Pause size={12} /> : <Play size={12} />}
-                            </button>
-                            <input
-                                type="range"
-                                min={0}
-                                max={Math.max(totalSlices - 1, 0)}
-                                value={slice}
-                                onChange={e => { setIsPlaying(false); setSlice(Number(e.target.value)); }}
-                                className="flex-1 h-1 rounded-full cursor-pointer accent-blue-600"
-                                style={{ background: `linear-gradient(to right,#2563eb ${slicePct}%,#e2e8f0 ${slicePct}%)` }}
+                                className="h-full bg-blue-500 transition-all duration-300"
+                                style={{ width: `${overallProgress}%` }}
                             />
-                            <span className="text-xs font-mono text-slate-600 dark:text-slate-400 w-14 text-right shrink-0">
-                                {slice + 1}/{totalSlices}
-                            </span>
-                            <div className="flex items-center gap-1 shrink-0">
-                                <button
-                                    onClick={() => setSlice(s => Math.max(0, s - 1))}
-                                    className="w-6 h-6 rounded border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 hover:text-slate-900 dark:hover:text-white hover:border-slate-400 dark:hover:border-slate-500 transition-all"
-                                >
-                                    <ChevronLeft size={12} />
-                                </button>
-                                <button
-                                    onClick={() => setSlice(s => Math.min(totalSlices - 1, s + 1))}
-                                    className="w-6 h-6 rounded border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 hover:text-slate-900 dark:hover:text-white hover:border-slate-400 dark:hover:border-slate-500 transition-all"
-                                >
-                                    <ChevronRight size={12} />
-                                </button>
-                            </div>
                         </div>
                     )}
 
-                    <div className="flex items-center gap-4 flex-wrap">
-                        <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400 shrink-0">Mask Legend</span>
-                        {MASK_LEGEND.map(({ label, color }) => (
-                            <div key={label} className="flex items-center gap-1.5">
-                                <span
-                                    className="w-2 h-2 rounded-full shrink-0 transition-all"
-                                    style={showMask
-                                        ? { background: color, boxShadow: `0 0 6px ${color}99` }
-                                        : { background: "transparent", border: `1.5px solid ${color}77` }
-                                    }
-                                />
-                                <span className={cn("text-xs", showMask ? "text-slate-500" : "text-slate-400 dark:text-slate-600")}>{label}</span>
-                            </div>
-                        ))}
-                    </div>
+                    {/* Per-file rows + slice pre-fetch */}
+                    {!fetchToastCollapsed && (
+                        <div className="px-4 py-3 space-y-2.5">
+                            {fetchStates.map((f, i) => (
+                                <div key={i} className="space-y-1">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        <span className="text-[10px] font-bold uppercase tracking-wider shrink-0 tabular-nums"
+                                            style={{ color: f.color }}>
+                                            {f.label}
+                                        </span>
+                                        {f.sizeMb > 0 && (
+                                            <span className="text-xs text-slate-400 shrink-0 tabular-nums">{f.sizeMb} MB</span>
+                                        )}
+                                        {f.status === "done" && <CheckCircle2 size={12} className="text-emerald-500 shrink-0" />}
+                                        {f.status === "error" && <AlertCircle size={12} className="text-red-500 shrink-0" />}
+                                        {(f.status === "downloading" || f.status === "pending") && (
+                                            <span className="text-xs tabular-nums text-blue-600 dark:text-blue-400 shrink-0 w-7 text-right">
+                                                {f.progress > 0 ? `${f.progress}%` : "…"}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="h-1 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                                        <div
+                                            className={cn(
+                                                "h-full rounded-full transition-all duration-200",
+                                                f.status === "error" ? "bg-red-500"
+                                                    : f.status === "done" ? "bg-emerald-500"
+                                                        : f.status === "pending" ? "bg-slate-300 dark:bg-slate-600"
+                                                            : "bg-blue-500"
+                                            )}
+                                            style={{ width: `${f.status === "pending" ? 0 : f.progress}%` }}
+                                        />
+                                    </div>
+                                </div>
+                            ))}
+
+                            {/* Slice image pre-fetch section */}
+                            {sliceStates.some(s => s.status !== "idle") && (
+                                <div className="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-1.5">
+                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.15em]">PNG Slices</p>
+                                    {SLICE_MODS_ORDER.map((mod, modIdx) => {
+                                        const s = sliceStates[modIdx];
+                                        const pct = (s.done / SLICE_TOTAL) * 100;
+                                        return (
+                                            <div key={mod} className="flex items-center gap-2">
+                                                <span className="text-[10px] font-bold w-8 shrink-0"
+                                                    style={{ color: FETCH_COLORS[modIdx] }}>
+                                                    {SLICE_MOD_LABELS[modIdx]}
+                                                </span>
+                                                <div className="flex-1 h-1 rounded-full bg-slate-100 dark:bg-slate-800 overflow-hidden">
+                                                    <div
+                                                        className={cn("h-full rounded-full transition-all duration-150",
+                                                            s.status === "done" ? "bg-emerald-500" : "bg-blue-400")}
+                                                        style={{ width: `${pct}%` }}
+                                                    />
+                                                </div>
+                                                <span className="text-[9px] font-mono text-slate-400 shrink-0 tabular-nums w-12 text-right">
+                                                    {s.done}/{SLICE_TOTAL}
+                                                </span>
+                                                {s.status === "done" && <CheckCircle2 size={10} className="text-emerald-500 shrink-0" />}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </div>
             )}
 
-            {is3D && !isFullscreen && (
-                <div className="px-5 py-3 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
-                    <p className="text-[11px] text-slate-400 text-center">
-                        Drag to rotate · Scroll to zoom · Use layer controls inside the viewer
-                    </p>
+            <div
+                ref={viewerCardRef}
+                className={cn(
+                    "rounded-2xl border overflow-hidden shadow-sm flex flex-col",
+                    isFullscreen
+                        ? "h-screen border-transparent"
+                        : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
+                )}
+                style={isFullscreen ? { background: "#050d18" } : undefined}
+            >
+                {/* Header - hidden in fullscreen */}
+                {!isFullscreen && (
+                    <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3 bg-slate-50/60 dark:bg-slate-900/80">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                            {is3D
+                                ? <Brain className="w-4 h-4 text-purple-500 shrink-0" />
+                                : isGrid
+                                    ? <LayoutGrid className="w-4 h-4 text-teal-500 shrink-0" />
+                                    : isContactSheet
+                                        ? <LayoutGrid className="w-4 h-4 text-blue-500 shrink-0" />
+                                        : <ScanLine className="w-4 h-4 text-blue-500 shrink-0" />}
+                            <span className="text-sm font-bold text-slate-900 dark:text-white truncate">
+                                {is3D
+                                    ? "3D Brain Model"
+                                    : isGrid
+                                        ? "All Modalities - Grid View"
+                                        : isContactSheet
+                                            ? `${activeMeta?.fullLabel} - Contact Sheet`
+                                            : `${activeMeta?.fullLabel} - 2D Slices`}
+                            </span>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                            {!is3D && !isContactSheet && (
+                                <span className="text-xs text-slate-500 font-mono">{slice + 1} / {totalSlices}</span>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* Canvas */}
+                <div className={cn("w-full relative", isFullscreen ? "flex-1 min-h-0" : "h-[480px]")}>
+                    {/* Canvas overlay - top right (hidden for 3D which has its own controls) */}
+                    {!is3D && <div className="absolute top-3 right-3 z-20 flex flex-col items-end gap-1.5">
+                        {/* Top row: Collapse toggle + Fullscreen always visible */}
+                        <div className="flex items-center gap-1.5">
+                            <button
+                                onClick={toggleFullscreen}
+                                className="flex items-center justify-center gap-1.5 py-1 px-2 w-[88px] rounded-lg border border-white/10 backdrop-blur-md text-slate-300 hover:text-white hover:border-white/25 transition-all text-[10px] font-semibold"
+                                style={{ background: "rgba(8,15,28,0.65)" }}
+                            >
+                                {isFullscreen ? <Minimize2 className="w-3 h-3 shrink-0" /> : <Maximize2 className="w-3 h-3 shrink-0" />}
+                                <span>{isFullscreen ? "Exit Full" : "Fullscreen"}</span>
+                            </button>
+                            <button
+                                onClick={() => setControlsVisible(v => !v)}
+                                title={controlsVisible ? "Collapse" : "Expand"}
+                                className="flex items-center justify-center gap-1 py-1 px-2 rounded-lg border border-white/10 backdrop-blur-md text-slate-400 hover:text-white hover:border-white/25 transition-all text-[10px] font-semibold"
+                                style={{ background: "rgba(8,15,28,0.65)" }}
+                            >
+                                {controlsVisible
+                                    ? <><ChevronRight className="w-3 h-3" /><span>Collapse</span></>
+                                    : <SlidersHorizontal className="w-3 h-3" />}
+                            </button>
+                        </div>
+
+                        {controlsVisible && (<>
+                            {/* 1. Mask */}
+                            {!is3D && (
+                                <button
+                                    onClick={() => setShowMask(v => !v)}
+                                    className={cn(
+                                        "flex items-center justify-center gap-1.5 py-1 px-2 w-full rounded-lg border backdrop-blur-md transition-all text-[10px] font-semibold",
+                                        showMask
+                                            ? "border-violet-500/60 text-violet-200"
+                                            : "border-white/10 text-slate-300 hover:text-violet-300 hover:border-violet-500/40"
+                                    )}
+                                    style={{ background: showMask ? "rgba(124,58,237,0.25)" : "rgba(8,15,28,0.65)" }}
+                                >
+                                    <span className={cn("w-2 h-2 rounded-full shrink-0 transition-all", showMask ? "bg-violet-400 shadow-[0_0_6px_2px_rgba(167,139,250,0.6)]" : "bg-slate-600")} />
+                                    <span>Mask</span>
+                                </button>
+                            )}
+
+                            {/* 2. Grid (contact sheet) - 2D only */}
+                            {is2D && (
+                                <button
+                                    onClick={() => setViewMode(v => v === "slider" ? "contact" : "slider")}
+                                    className={cn(
+                                        "flex items-center justify-center gap-1.5 py-1 px-2 w-full rounded-lg border backdrop-blur-md transition-all text-[10px] font-semibold",
+                                        isContactSheet
+                                            ? "border-blue-500/60 text-blue-300"
+                                            : "border-white/10 text-slate-300 hover:text-blue-300 hover:border-blue-500/40"
+                                    )}
+                                    style={{ background: isContactSheet ? "rgba(37,99,235,0.20)" : "rgba(8,15,28,0.65)" }}
+                                >
+                                    <LayoutGrid className="w-3 h-3 shrink-0" />
+                                    <span>Grid</span>
+                                </button>
+                            )}
+
+                            {/* 3. Settings */}
+                            {!is3D && (
+                                <button
+                                    onClick={() => setSettingsOpen(v => !v)}
+                                    className={cn(
+                                        "flex items-center justify-center gap-1.5 py-1 px-2 w-full rounded-lg border backdrop-blur-md transition-all text-[10px] font-semibold",
+                                        settingsOpen
+                                            ? "border-cyan-500/40 text-cyan-300"
+                                            : "border-white/10 text-slate-300 hover:text-white hover:border-white/25"
+                                    )}
+                                    style={{ background: settingsOpen ? "rgba(0,180,255,0.12)" : "rgba(8,15,28,0.65)" }}
+                                >
+                                    <Settings2 className="w-3 h-3 shrink-0" />
+                                    <span>Settings</span>
+                                </button>
+                            )}
+
+                            {/* Settings panel - speed only */}
+                            {settingsOpen && !is3D && !isContactSheet && (
+                                <div
+                                    className="w-52 rounded-2xl border border-white/[0.07] backdrop-blur-xl shadow-2xl overflow-hidden"
+                                    style={{ background: "rgba(6,12,24,0.94)" }}
+                                >
+                                    <div className="px-3 pt-3 pb-3 space-y-2.5">
+                                        <div className="flex items-center justify-between px-1">
+                                            <p className="text-[9px] font-semibold text-slate-500 uppercase tracking-[0.18em]">Playback Speed</p>
+                                            <span className="text-[10px] font-bold text-cyan-400 font-mono">{playFps} fps</span>
+                                        </div>
+                                        <input
+                                            type="range" min={1} max={24} value={playFps}
+                                            onChange={e => setPlayFps(Number(e.target.value))}
+                                            className="w-full h-1 rounded-full cursor-pointer accent-cyan-400"
+                                        />
+                                        <div className="flex justify-between px-0.5">
+                                            <span className="text-[8px] text-slate-600">1 fps</span>
+                                            <span className="text-[8px] text-slate-600">24 fps</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </>)}
+                    </div>}
+
+                    {/* Fullscreen bottom: play + slider only */}
+                    {isFullscreen && !is3D && !isContactSheet && (
+                        <div
+                            className="absolute bottom-5 left-1/2 -translate-x-1/2 z-20 flex items-center gap-3 px-5 py-3 rounded-2xl border border-white/10 backdrop-blur-xl shadow-2xl"
+                            style={{ background: "rgba(8,15,28,0.75)", minWidth: "360px" }}
+                        >
+                            <button onClick={() => setIsPlaying(v => !v)} className="p-1.5 text-slate-400 hover:text-cyan-400 transition-colors shrink-0">
+                                {isPlaying ? <Pause size={16} /> : <Play size={16} />}
+                            </button>
+                            <button onClick={() => setSlice(s => Math.max(0, s - 1))} className="p-1 text-slate-400 hover:text-white transition-colors shrink-0">
+                                <ChevronLeft size={16} />
+                            </button>
+                            <input
+                                type="range" min={0} max={Math.max(totalSlices - 1, 0)} value={slice}
+                                onChange={e => setSlice(Number(e.target.value))}
+                                className="flex-1 h-1 rounded-full cursor-pointer accent-cyan-400"
+                            />
+                            <button onClick={() => setSlice(s => Math.min(totalSlices - 1, s + 1))} className="p-1 text-slate-400 hover:text-white transition-colors shrink-0">
+                                <ChevronRight size={16} />
+                            </button>
+                            <span className="text-xs font-mono text-slate-400 shrink-0 w-14 text-right">{slice + 1}/{totalSlices}</span>
+                        </div>
+                    )}
+
+                    {/* Viewer */}
+                    {is3D ? (
+                        <ThreeDViewer modelUrl={`/api/cases/${caseId}/mesh`} />
+                    ) : isGrid ? (
+                        <ModalityGridViewer
+                            scanBuffers={scanBuffers}
+                            scanNames={scanNames}
+                            segBuffer={segBuffer}
+                            slice={slice}
+                            showMask={showMask}
+                            onLoad={handleVolumeLoad}
+                            onSliceChange={setSlice}
+                        />
+                    ) : isContactSheet ? (
+                        <ModalityContactSheet
+                            caseId={scanFiles.length > 0 ? caseId : undefined}
+                            sliceBase={scanFiles.length === 0 ? BRATS_BASE : undefined}
+                            modality={activeTab}
+                            showMask={showMask}
+                        />
+                    ) : hasScan ? (
+                        <ModalityViewer
+                            buffer={activeBuffer}
+                            segBuffer={segBuffer}
+                            scanName={activeScanName}
+                            showMask={showMask}
+                            slice={slice}
+                            onLoad={handleVolumeLoad}
+                            onSliceChange={setSlice}
+                        />
+                    ) : (
+                        <div className="flex flex-col items-center justify-center h-full gap-3" style={{ background: "#050d18" }}>
+                            <div className="p-3 rounded-2xl bg-slate-800/60 border border-slate-700/50">
+                                <ScanLine className="w-6 h-6 text-slate-500" />
+                            </div>
+                            <p className="text-sm text-slate-500">No scan file uploaded for this modality</p>
+                        </div>
+                    )}
                 </div>
-            )}
-        </div>
+
+                {/* Controls panel */}
+                {!is3D && !isFullscreen && (isGrid || isContactSheet || hasScan) && (
+                    <div className="px-5 py-4 border-t border-slate-200 dark:border-slate-800 space-y-3 bg-white dark:bg-slate-900">
+                        {!isContactSheet && (
+                            <div className="flex items-center gap-3">
+                                <button
+                                    onClick={() => setIsPlaying(v => !v)}
+                                    title={isPlaying ? "Pause" : "Play"}
+                                    className={cn(
+                                        "w-7 h-7 rounded-lg border flex items-center justify-center transition-all shrink-0",
+                                        isPlaying
+                                            ? "bg-blue-600 border-blue-600 text-white shadow-sm shadow-blue-500/30"
+                                            : "border-slate-200 dark:border-slate-700 text-slate-500 hover:border-blue-400 hover:text-blue-600"
+                                    )}
+                                >
+                                    {isPlaying ? <Pause size={12} /> : <Play size={12} />}
+                                </button>
+                                <input
+                                    type="range"
+                                    min={0}
+                                    max={Math.max(totalSlices - 1, 0)}
+                                    value={slice}
+                                    onChange={e => { setIsPlaying(false); setSlice(Number(e.target.value)); }}
+                                    className="flex-1 h-1 rounded-full cursor-pointer accent-blue-600"
+                                    style={{ background: `linear-gradient(to right,#2563eb ${slicePct}%,#e2e8f0 ${slicePct}%)` }}
+                                />
+                                <span className="text-xs font-mono text-slate-600 dark:text-slate-400 w-14 text-right shrink-0">
+                                    {slice + 1}/{totalSlices}
+                                </span>
+                                <div className="flex items-center gap-1 shrink-0">
+                                    <button
+                                        onClick={() => setSlice(s => Math.max(0, s - 1))}
+                                        className="w-6 h-6 rounded border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 hover:text-slate-900 dark:hover:text-white hover:border-slate-400 dark:hover:border-slate-500 transition-all"
+                                    >
+                                        <ChevronLeft size={12} />
+                                    </button>
+                                    <button
+                                        onClick={() => setSlice(s => Math.min(totalSlices - 1, s + 1))}
+                                        className="w-6 h-6 rounded border border-slate-200 dark:border-slate-700 flex items-center justify-center text-slate-500 hover:text-slate-900 dark:hover:text-white hover:border-slate-400 dark:hover:border-slate-500 transition-all"
+                                    >
+                                        <ChevronRight size={12} />
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="flex items-center gap-4 flex-wrap">
+                            <span className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400 shrink-0">Mask Legend</span>
+                            {MASK_LEGEND.map(({ label, color }) => (
+                                <div key={label} className="flex items-center gap-1.5">
+                                    <span
+                                        className="w-2 h-2 rounded-full shrink-0 transition-all"
+                                        style={showMask
+                                            ? { background: color, boxShadow: `0 0 6px ${color}99` }
+                                            : { background: "transparent", border: `1.5px solid ${color}77` }
+                                        }
+                                    />
+                                    <span className={cn("text-xs", showMask ? "text-slate-500" : "text-slate-400 dark:text-slate-600")}>{label}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {is3D && !isFullscreen && (
+                    <div className="px-5 py-3 border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
+                        <p className="text-[11px] text-slate-400 text-center">
+                            Drag to rotate · Scroll to zoom · Use layer controls inside the viewer
+                        </p>
+                    </div>
+                )}
+            </div>
         </>
     );
 });
 
-// ── Sidebar — memoized, never re-renders on slice changes ──────────────────
+// ── Sidebar - memoized, never re-renders on slice changes ──────────────────
 
 interface SidebarProps {
     caseItem: Case;
@@ -811,8 +887,8 @@ const CaseSidebar = memo(function CaseSidebar({ caseItem, isAdmin, isAssignedDoc
                     </div>
                     <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2.5">
                         <Row label="Assigned To" value={
-                            <span className={cn("text-xs font-semibold", caseItem.assigned_to_member_id ? "text-blue-600 dark:text-blue-400" : "text-slate-400 italic")}>
-                                {caseItem.assigned_to_member_id ? "Assigned" : "Unassigned"}
+                            <span className={cn("text-xs font-semibold", caseItem.assigned_to_name ? "text-blue-600 dark:text-blue-400" : "text-slate-400 italic")}>
+                                {caseItem.assigned_to_name ?? "Unassigned"}
                             </span>
                         } />
                         <Row label="Last Updated" value={
@@ -835,7 +911,7 @@ const CaseSidebar = memo(function CaseSidebar({ caseItem, isAdmin, isAssignedDoc
             {/* Diagnostic Verdict */}
             <motion.div variants={fadeUp} className={cn(
                 "p-5 rounded-2xl border shadow-sm",
-                isAssignedDoctor || isAdmin
+                isAssignedDoctor
                     ? "bg-blue-50/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800"
                     : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
             )}>
@@ -845,7 +921,7 @@ const CaseSidebar = memo(function CaseSidebar({ caseItem, isAdmin, isAssignedDoc
                     </div>
                     <h3 className="text-sm font-bold text-slate-900 dark:text-white">Diagnostic Verdict</h3>
                 </div>
-                {isAssignedDoctor || isAdmin ? (
+                {isAssignedDoctor ? (
                     <VerdictForm caseId={caseItem.id} initialVerdict={caseItem.verdict} />
                 ) : (
                     <div className={cn(
@@ -864,9 +940,11 @@ const CaseSidebar = memo(function CaseSidebar({ caseItem, isAdmin, isAssignedDoc
 
 // ── Shell ──────────────────────────────────────────────────────────────────
 
-export function CaseDetailShell({ caseItem, workspaceRole, membershipId }: CaseDetailShellProps) {
+export function CaseDetailShell({ caseItem: initialCaseItem, workspaceRole, membershipId }: CaseDetailShellProps) {
+    const { data: caseItem = initialCaseItem } = useCase(initialCaseItem.id, initialCaseItem);
     const isAdmin = workspaceRole === "OWNER" || workspaceRole === "ADMIN";
-    const isAssignedDoctor = workspaceRole === "DOCTOR" && caseItem.assigned_to_member_id === membershipId;
+    // Any doctor who reaches this page has passed the server-side guard (they ARE the assigned doctor)
+    const isAssignedDoctor = workspaceRole === "DOCTOR";
     const priority = (caseItem.priority || "normal").toLowerCase();
     const fileUrls: string[] = (() => { try { return JSON.parse(caseItem.file_references); } catch { return []; } })();
 
@@ -963,7 +1041,7 @@ export function CaseDetailShell({ caseItem, workspaceRole, membershipId }: CaseD
                         </button>
                     </motion.div>
 
-                    {/* Viewer — isolated, memoized */}
+                    {/* Viewer - isolated, memoized */}
                     <motion.div variants={fadeUp}>
                         <ViewerPanel
                             activeTab={activeTab}
@@ -983,7 +1061,7 @@ export function CaseDetailShell({ caseItem, workspaceRole, membershipId }: CaseD
                     </motion.div>
                 </div>
 
-                {/* Right sidebar — memoized */}
+                {/* Right sidebar - memoized */}
                 <CaseSidebar
                     caseItem={caseItem}
                     isAdmin={isAdmin}

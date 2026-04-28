@@ -39,7 +39,7 @@ export function PatientsShell({
     const [search, setSearch] = useState("");
     const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
 
-    // Pass initialPatients so React Query seeds the cache immediately —
+    // Pass initialPatients so React Query seeds the cache immediately -
     // isLoading is false from the first render, no skeleton flash on navigation.
     const { data: patients = [], isLoading } = usePatients(initialPatients);
 
@@ -246,10 +246,10 @@ function PatientRow({
                 {p.gender}
             </td>
             <td className="py-3.5 px-4 text-sm text-neutral-600 dark:text-neutral-400">
-                {p.city || "—"}
+                {p.city || "-"}
             </td>
             <td className="py-3.5 px-4 text-sm text-neutral-600 dark:text-neutral-400 font-mono">
-                {p.mrn || "—"}
+                {p.mrn || "-"}
             </td>
             <td className="py-3.5 px-4">
                 {isAdmin && (

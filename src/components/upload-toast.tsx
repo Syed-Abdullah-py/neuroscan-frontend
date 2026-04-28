@@ -26,8 +26,8 @@ function UploadCard({ session, onDismiss }: { session: UploadSession; onDismiss:
                 isDone
                     ? "border-emerald-200 dark:border-emerald-800/60"
                     : isError
-                    ? "border-red-200 dark:border-red-800/60"
-                    : "border-slate-200 dark:border-slate-700"
+                        ? "border-red-200 dark:border-red-800/60"
+                        : "border-slate-200 dark:border-slate-700"
             )}
         >
             {/* Header */}
@@ -37,8 +37,8 @@ function UploadCard({ session, onDismiss }: { session: UploadSession; onDismiss:
                     isDone
                         ? "bg-emerald-50 dark:bg-emerald-950/40"
                         : isError
-                        ? "bg-red-50 dark:bg-red-950/40"
-                        : "bg-slate-50 dark:bg-slate-800/60"
+                            ? "bg-red-50 dark:bg-red-950/40"
+                            : "bg-slate-50 dark:bg-slate-800/60"
                 )}
             >
                 <div className="flex items-center gap-2.5 min-w-0">
@@ -60,9 +60,9 @@ function UploadCard({ session, onDismiss }: { session: UploadSession; onDismiss:
                             "text-sm font-semibold truncate",
                             isDone ? "text-emerald-700 dark:text-emerald-300"
                                 : isError ? "text-red-700 dark:text-red-300"
-                                : "text-slate-800 dark:text-slate-100"
+                                    : "text-slate-800 dark:text-slate-100"
                         )}>
-                            {isUploading && `Uploading scans — ${overallProgress}%`}
+                            {isUploading && `Uploading scans - ${overallProgress}%`}
                             {isCreating && "Running AI…"}
                             {isDone && "Case created"}
                             {isError && "Upload failed"}
@@ -106,7 +106,7 @@ function UploadCard({ session, onDismiss }: { session: UploadSession; onDismiss:
                 </div>
             )}
 
-            {/* Per-file list — hidden when collapsed */}
+            {/* Per-file list - hidden when collapsed */}
             {!collapsed && (
                 <div className="px-4 py-3 space-y-2.5">
                     {files.map((f, i) => (
@@ -116,7 +116,7 @@ function UploadCard({ session, onDismiss }: { session: UploadSession; onDismiss:
                                     "shrink-0",
                                     f.status === "done" ? "text-emerald-500"
                                         : f.status === "error" ? "text-red-500"
-                                        : "text-slate-400 dark:text-slate-500"
+                                            : "text-slate-400 dark:text-slate-500"
                                 )} />
                                 <span className="text-xs font-medium text-slate-700 dark:text-slate-300 truncate flex-1">
                                     {f.name}
@@ -138,7 +138,7 @@ function UploadCard({ session, onDismiss }: { session: UploadSession; onDismiss:
                                         "h-full rounded-full transition-all duration-200",
                                         f.status === "error" ? "bg-red-500"
                                             : f.status === "done" ? "bg-emerald-500"
-                                            : "bg-blue-500"
+                                                : "bg-blue-500"
                                     )}
                                     style={{ width: `${f.progress}%` }}
                                 />

@@ -26,7 +26,7 @@ interface ClientFetchOptions extends Omit<RequestInit, "body"> {
 
 /**
  * Client-side authenticated fetch.
- * Token and workspaceId must be passed explicitly —
+ * Token and workspaceId must be passed explicitly -
  * this file never touches next/headers.
  * Used by React Query query functions in hooks.
  */
