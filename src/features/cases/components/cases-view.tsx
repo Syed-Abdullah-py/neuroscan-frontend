@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { FileText, Plus, User, Stethoscope, Calendar, AlertCircle, CheckCircle2, Clock } from "lucide-react";
+import { FileText, Plus, User, Stethoscope, Calendar, AlertCircle, CheckCircle2, Clock, Loader2 } from "lucide-react";
 import { getAllCasesForWorkspace } from "@/features/cases/actions/case-actions";
 import { cn } from "@/lib/utils";
 import { motion, Variants } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 type Case = {
     id: string;
@@ -23,6 +25,7 @@ type Case = {
         phone_number: string;
     } | null;
     assigned_to_member_id: string | null;
+    assigned_to_name: string | null;
 };
 
 // --- Animation Variants ---
@@ -51,6 +54,8 @@ const itemVariants: Variants = {
 };
 
 export function CasesView({ workspaceId }: { workspaceId: string }) {
+    const router = useRouter();
+    const [openingId, setOpeningId] = useState<string | null>(null);
     const { data: cases = [], isLoading } = useQuery({
         queryKey: ['cases', workspaceId],
         queryFn: async () => {
@@ -190,11 +195,11 @@ export function CasesView({ workspaceId }: { workspaceId: string }) {
                                             {getStatusBadge(caseItem.status)}
                                         </td>
                                         <td className="px-6 py-4">
-                                            {caseItem.assigned_to_member_id ? (
+                                            {caseItem.assigned_to_name ? (
                                                 <div className="flex items-center gap-2">
                                                     <Stethoscope size={14} className="text-slate-400" />
                                                     <span className="text-sm text-slate-700 dark:text-slate-300">
-                                                        Assigned
+                                                        {caseItem.assigned_to_name}
                                                     </span>
                                                 </div>
                                             ) : (
@@ -208,12 +213,19 @@ export function CasesView({ workspaceId }: { workspaceId: string }) {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 text-right">
-                                            <Link
-                                                href={`/cases/${caseItem.id}`}
-                                                className="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm transition-colors inline-block"
+                                            <button
+                                                onClick={() => {
+                                                    setOpeningId(caseItem.id);
+                                                    router.push(`/cases/${caseItem.id}`);
+                                                }}
+                                                disabled={!!openingId}
+                                                className="bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm transition-colors inline-flex items-center gap-1.5"
                                             >
+                                                {openingId === caseItem.id ? (
+                                                    <Loader2 size={12} className="animate-spin" />
+                                                ) : null}
                                                 View
-                                            </Link>
+                                            </button>
                                         </td>
                                     </tr>
                                 ))}

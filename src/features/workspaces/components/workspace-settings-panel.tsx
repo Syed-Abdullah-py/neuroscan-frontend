@@ -92,7 +92,7 @@ export function WorkspaceSettingsPanel({
                 </div>
             </div>
 
-            {/* Danger zone — owner only */}
+            {/* Danger zone - owner only */}
             {isOwner && (
                 <div className="p-6 rounded-2xl border border-red-200 dark:border-red-900/30 bg-red-50 dark:bg-red-950/10 space-y-4">
                     <div className="flex items-center gap-2 text-red-700 dark:text-red-400">

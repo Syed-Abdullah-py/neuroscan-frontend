@@ -30,7 +30,7 @@ export interface RegisterResponse {
 }
 
 /**
- * Frontend-only session user — decoded from the JWT cookie.
+ * Frontend-only session user - decoded from the JWT cookie.
  * Never returned by the API directly.
  */
 export interface SessionUser {

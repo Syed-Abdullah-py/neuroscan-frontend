@@ -10,14 +10,14 @@ import type {
 export const workspacesApi = {
     // ── Workspace CRUD ───────────────────────────────────────────────────────
 
-    /** GET /workspaces/ — list caller's memberships */
+    /** GET /workspaces/ - list caller's memberships */
     list(): Promise<WorkspaceMembership[]> {
         return apiFetch<WorkspaceMembership[]>("/workspaces/", {
             noWorkspace: true,
         });
     },
 
-    /** POST /workspaces/ — Global ADMIN only */
+    /** POST /workspaces/ - Global ADMIN only */
     create(name: string): Promise<Workspace> {
         return apiFetch<Workspace>("/workspaces/", {
             method: "POST",
@@ -26,7 +26,7 @@ export const workspacesApi = {
         });
     },
 
-    /** PUT /workspaces/{id} — OWNER only */
+    /** PUT /workspaces/{id} - OWNER only */
     update(workspaceId: string, name: string): Promise<Workspace> {
         return apiFetch<Workspace>(`/workspaces/${workspaceId}`, {
             method: "PUT",
@@ -35,7 +35,7 @@ export const workspacesApi = {
         });
     },
 
-    /** DELETE /workspaces/{id} — OWNER only */
+    /** DELETE /workspaces/{id} - OWNER only */
     delete(workspaceId: string): Promise<void> {
         return apiFetch<void>(`/workspaces/${workspaceId}`, {
             method: "DELETE",
@@ -43,7 +43,7 @@ export const workspacesApi = {
         });
     },
 
-    /** GET /workspaces/discover — workspaces the caller hasn't joined */
+    /** GET /workspaces/discover - workspaces the caller hasn't joined */
     discover(): Promise<Workspace[]> {
         return apiFetch<Workspace[]>("/workspaces/discover", {
             noWorkspace: true,
@@ -78,7 +78,7 @@ export const workspacesApi = {
         });
     },
 
-    /** GET /workspaces/{id}/invitations — OWNER/ADMIN only */
+    /** GET /workspaces/{id}/invitations - OWNER/ADMIN only */
     listInvitations(workspaceId: string): Promise<Invitation[]> {
         return apiFetch<Invitation[]>(`/workspaces/${workspaceId}/invitations`, {
             workspaceId,
@@ -124,7 +124,7 @@ export const workspacesApi = {
         });
     },
 
-    /** GET /workspaces/{id}/join-requests — OWNER/ADMIN only */
+    /** GET /workspaces/{id}/join-requests - OWNER/ADMIN only */
     listJoinRequests(workspaceId: string): Promise<JoinRequest[]> {
         return apiFetch<JoinRequest[]>(
             `/workspaces/${workspaceId}/join-requests`,

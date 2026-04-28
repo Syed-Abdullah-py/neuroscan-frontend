@@ -117,7 +117,7 @@ function BrainModel({
 export function ThreeDViewer({ modelUrl = "/models/brain.glb", visible: visibleProp, autoRotate: autoRotateProp }: ThreeDViewerProps = {}) {
     const controlled = visibleProp !== undefined;
 
-    // Internal state — only used when no external props are provided
+    // Internal state - only used when no external props are provided
     const [internalVisible, setInternalVisible] = useState<Record<LayerKey, boolean>>(ALL_VISIBLE);
     const [internalRotate, setInternalRotate] = useState(true);
     const [panelOpen, setPanelOpen] = useState(false);

@@ -56,7 +56,7 @@ export const authApi = {
         });
     },
 
-    /** POST /auth/google — verify Google id_token and sign in or create account */
+    /** POST /auth/google - verify Google id_token and sign in or create account */
     googleAuth(
         id_token: string,
         global_role?: "ADMIN" | "RADIOLOGIST"

@@ -7,7 +7,7 @@ import { Loader2, AlertCircle } from "lucide-react";
 
 
 interface GoogleSignInButtonProps {
-    /** Provided on signup pages — signals role selection and triggers account creation.
+    /** Provided on signup pages - signals role selection and triggers account creation.
      *  Omit on login pages (login-only, errors if no account exists). */
     global_role?: "ADMIN" | "RADIOLOGIST";
 }

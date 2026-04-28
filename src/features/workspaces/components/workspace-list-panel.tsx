@@ -11,10 +11,9 @@ import { useWorkspace } from "@/providers/workspace-provider";
 import {
     createWorkspaceAction,
     requestJoinAction,
+    leaveWorkspaceAction,
 } from "@/features/workspaces/actions/workspace.actions";
 import type { WorkspaceMembership } from "@/lib/types/workspace.types";
-import { removeMemberAction } from "@/features/workspaces/actions/workspace.actions";
-import { getCurrentUser } from "@/features/auth/actions/auth.actions";
 import { useRouter } from "next/navigation";
 
 interface WorkspaceListPanelProps {
@@ -61,14 +60,14 @@ export function WorkspaceListPanel({
     };
 
     const handleLeave = (wsId: string) => {
-        if (!confirm("Leave this workspace?")) return;
+        if (!confirm("Are you sure you want to leave this workspace?")) return;
         startTransition(async () => {
-            // Leave = remove yourself — user_id from session
-            const res = await fetch("/api/me").then((r) => r.json()).catch(() => null);
-            // We use the removeMember server action with the user's own ID
-            // The user id is available from the JWT — we fetch /auth/me via the API
-            // For simplicity, redirect to trigger a full re-auth check
-            router.refresh();
+            const res = await leaveWorkspaceAction(wsId);
+            if (res.success) {
+                router.refresh();
+            } else {
+                setMsg({ text: res.message, ok: false });
+            }
         });
     };
 
@@ -217,58 +216,65 @@ export function WorkspaceListPanel({
                 ) : (
                     memberships.map((m) => {
                         const isActive = m.workspace_id === activeWorkspaceId;
-                        const isSwitchingThis = isSwitching;
+                        const canLeave = m.role !== "OWNER";
                         return (
-                            <button
+                            <div
                                 key={m.workspace_id}
-                                onClick={() =>
-                                    !isActive && switchWorkspace(m.workspace_id)
-                                }
                                 className={cn(
-                                    "w-full text-left p-3.5 rounded-2xl border transition-all relative group",
+                                    "w-full text-left p-3.5 rounded-2xl border transition-all relative group flex items-center gap-3",
                                     isActive
                                         ? "bg-blue-50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800"
-                                        : "bg-white dark:bg-gray-900/20 border-neutral-200 dark:border-slate-700/50 hover:border-neutral-300 dark:hover:border-slate-600 hover:shadow-sm cursor-pointer"
+                                        : "bg-white dark:bg-gray-900/20 border-neutral-200 dark:border-slate-700/50 hover:border-neutral-300 dark:hover:border-slate-600 hover:shadow-sm"
                                 )}
                             >
-                                {isSwitchingThis && !isActive && (
-                                    <div className="absolute inset-0 bg-white/60 dark:bg-slate-950/60 rounded-2xl flex items-center justify-center z-10">
-                                        <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-                                    </div>
-                                )}
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <div
-                                            className={cn(
-                                                "w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold",
-                                                isActive
-                                                    ? "bg-blue-500 text-white"
-                                                    : "bg-neutral-100 dark:bg-slate-800 text-neutral-600 dark:text-neutral-400"
-                                            )}
-                                        >
-                                            {m.workspace_name.charAt(0).toUpperCase()}
+                                {/* Clickable area to switch workspace */}
+                                <button
+                                    onClick={() => !isActive && switchWorkspace(m.workspace_id)}
+                                    disabled={isActive || isSwitching}
+                                    className="flex items-center gap-3 flex-1 min-w-0 text-left"
+                                >
+                                    {isSwitching && !isActive && (
+                                        <div className="absolute inset-0 bg-white/60 dark:bg-slate-950/60 rounded-2xl flex items-center justify-center z-10">
+                                            <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
                                         </div>
-                                        <div>
-                                            <p
-                                                className={cn(
-                                                    "text-sm font-bold",
-                                                    isActive
-                                                        ? "text-blue-700 dark:text-blue-300"
-                                                        : "text-black dark:text-white"
-                                                )}
-                                            >
-                                                {m.workspace_name}
-                                            </p>
-                                            <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
-                                                {m.role}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    {isActive && (
-                                        <div className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_6px_rgba(59,130,246,0.5)]" />
                                     )}
-                                </div>
-                            </button>
+                                    <div
+                                        className={cn(
+                                            "w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold shrink-0",
+                                            isActive
+                                                ? "bg-blue-500 text-white"
+                                                : "bg-neutral-100 dark:bg-slate-800 text-neutral-600 dark:text-neutral-400"
+                                        )}
+                                    >
+                                        {m.workspace_name.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className={cn(
+                                            "text-sm font-bold truncate",
+                                            isActive ? "text-blue-700 dark:text-blue-300" : "text-black dark:text-white"
+                                        )}>
+                                            {m.workspace_name}
+                                        </p>
+                                        <p className="text-[10px] font-bold uppercase tracking-wider text-neutral-400">
+                                            {m.role}
+                                        </p>
+                                    </div>
+                                </button>
+
+                                {/* Right side: active dot or leave button */}
+                                {isActive ? (
+                                    <div className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_6px_rgba(59,130,246,0.5)] shrink-0" />
+                                ) : canLeave ? (
+                                    <button
+                                        onClick={() => handleLeave(m.workspace_id)}
+                                        disabled={isPending}
+                                        title="Leave workspace"
+                                        className="shrink-0 p-1.5 rounded-lg text-neutral-300 dark:text-slate-600 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors opacity-0 group-hover:opacity-100"
+                                    >
+                                        <LogOut className="w-3.5 h-3.5" />
+                                    </button>
+                                ) : null}
+                            </div>
                         );
                     })
                 )}

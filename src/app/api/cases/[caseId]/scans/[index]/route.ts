@@ -35,7 +35,7 @@ export async function GET(
         return NextResponse.json({ error: "Not found" }, { status: res.status });
     }
 
-    // Pipe the ReadableStream directly — no buffering in Node memory
+    // Pipe the ReadableStream directly - no buffering in Node memory
     const forwardHeaders: Record<string, string> = {
         "Content-Type": "application/octet-stream",
         "Cache-Control": "private, max-age=1800",

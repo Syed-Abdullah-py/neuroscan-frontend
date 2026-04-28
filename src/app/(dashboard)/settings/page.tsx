@@ -4,12 +4,12 @@ import { SettingsShell } from "@/features/settings/components/settings-shell";
 import type { WorkspaceRole } from "@/lib/types/workspace.types";
 
 export default async function SettingsPage() {
-    // getCurrentUser() only decodes the JWT cookie — zero network calls
+    // getCurrentUser() only decodes the JWT cookie - zero network calls
     const user = await getCurrentUser();
     if (!user) redirect("/login");
 
     // workspaceRole comes from the layout's sidebar context on the client
-    // Settings doesn't need it server-side — nothing is gated on role here
+    // Settings doesn't need it server-side - nothing is gated on role here
     return (
         <SettingsShell
             user={{

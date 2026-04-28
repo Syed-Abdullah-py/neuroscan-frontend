@@ -166,7 +166,7 @@ export function NewPatientShell({ workspaceRole: _ }: NewPatientShellProps) {
                         <input
                             name="phone_number"
                             type="tel"
-                            placeholder="+923001234567"
+                            placeholder="03001234567"
                             className={cn(
                                 inputCls,
                                 state.errors?.phone_number &&

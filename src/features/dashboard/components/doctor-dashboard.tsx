@@ -80,21 +80,21 @@ export function DoctorDashboard({
                 {[
                     {
                         title: "Assigned Cases",
-                        value: displayStats?.total ?? "—",
+                        value: displayStats?.total ?? "-",
                         icon: Brain,
                         color: "text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20",
                         trend: "Active",
                     },
                     {
                         title: "Pending Review",
-                        value: displayStats?.pending ?? "—",
+                        value: displayStats?.pending ?? "-",
                         icon: Clock,
                         color: "text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20",
                         trend: "Action needed",
                     },
                     {
                         title: "Reviewed",
-                        value: displayStats?.reviewed ?? "—",
+                        value: displayStats?.reviewed ?? "-",
                         icon: CheckCircle2,
                         color: "text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20",
                         trend: "Complete",
@@ -183,7 +183,7 @@ export function DoctorDashboard({
                                                         {c.patient_last_name?.[0]}
                                                     </div>
                                                     <p className="text-sm font-bold text-black dark:text-white">
-                                                        {c.patient_first_name ?? "—"}{" "}
+                                                        {c.patient_first_name ?? "-"}{" "}
                                                         {c.patient_last_name ?? ""}
                                                     </p>
                                                 </div>

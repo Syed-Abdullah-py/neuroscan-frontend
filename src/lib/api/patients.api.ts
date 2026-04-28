@@ -11,7 +11,7 @@ export const patientsApi = {
         return apiFetch<Patient[]>("/patients/", { workspaceId });
     },
 
-    /** POST /patients/ — OWNER/ADMIN only */
+    /** POST /patients/ - OWNER/ADMIN only */
     create(data: PatientCreate, workspaceId: string): Promise<Patient> {
         return apiFetch<Patient>("/patients/", {
             method: "POST",
@@ -25,7 +25,7 @@ export const patientsApi = {
         return apiFetch<Patient>(`/patients/${patientId}`, { workspaceId });
     },
 
-    /** PUT /patients/{id} — OWNER/ADMIN only */
+    /** PUT /patients/{id} - OWNER/ADMIN only */
     update(
         patientId: string,
         data: PatientUpdate,
@@ -38,7 +38,7 @@ export const patientsApi = {
         });
     },
 
-    /** DELETE /patients/{id} — OWNER/ADMIN only */
+    /** DELETE /patients/{id} - OWNER/ADMIN only */
     delete(patientId: string, workspaceId: string): Promise<void> {
         return apiFetch<void>(`/patients/${patientId}`, {
             method: "DELETE",

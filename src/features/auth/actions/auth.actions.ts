@@ -61,7 +61,7 @@ export async function getAuthToken(): Promise<string | null> {
  * Decodes the JWT from the session cookie WITHOUT a network call.
  * Used in layouts and server components where we only need basic
  * user info (id, email, name, globalRole).
- * JWT signature is verified by middleware — we trust it here.
+ * JWT signature is verified by middleware - we trust it here.
  */
 export async function getCurrentUser() {
     const token = await getAuthToken();

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Building2, Users, Settings, LayoutDashboard,
@@ -28,6 +28,7 @@ import {
     useDiscoverWorkspaces,
     useRequestJoin,
 } from "@/features/workspaces/hooks/use-workspaces";
+import { leaveWorkspaceAction } from "@/features/workspaces/actions/workspace.actions";
 import type { WorkspaceRole } from "@/lib/types/workspace.types";
 
 type Tab = "overview" | "members" | "settings";
@@ -261,6 +262,15 @@ function WorkspaceListPanel({
     const [newName, setNewName] = useState("");
     const [joinSlug, setJoinSlug] = useState("");
     const [msg, setMsg] = useState("");
+    const [isLeavePending, startLeave] = useTransition();
+
+    const handleLeave = (wsId: string) => {
+        if (!confirm("Are you sure you want to leave this workspace?")) return;
+        startLeave(async () => {
+            const res = await leaveWorkspaceAction(wsId);
+            if (!res.success) setMsg(res.message || "Failed to leave workspace.");
+        });
+    };
 
     const canCreate = globalRole === "ADMIN";
 
@@ -417,22 +427,25 @@ function WorkspaceListPanel({
                         const wsName = ws.workspace_name || ws.name;
                         const isActive = wsId === activeWorkspaceId;
 
+                        const canLeave = ws.role !== "OWNER";
                         return (
-                            <button
+                            <div
                                 key={wsId}
-                                onClick={() => !isActive && onSwitch(wsId)}
-                                disabled={isSwitching}
                                 className={cn(
-                                    "w-full text-left p-4 rounded-2xl border transition-all relative group",
+                                    "w-full text-left p-4 rounded-2xl border transition-all relative group flex items-center gap-3",
                                     isActive
-                                        ? "bg-blue-50 border-blue-200 dark:bg-blue-900/10 dark:border-blue-800 cursor-default"
-                                        : "bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 cursor-pointer"
+                                        ? "bg-blue-50 border-blue-200 dark:bg-blue-900/10 dark:border-blue-800"
+                                        : "bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700"
                                 )}
                             >
-                                <div className="flex items-center gap-3">
+                                <button
+                                    onClick={() => !isActive && onSwitch(wsId)}
+                                    disabled={isSwitching || isActive}
+                                    className="flex items-center gap-3 flex-1 min-w-0 text-left"
+                                >
                                     <div
                                         className={cn(
-                                            "w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold",
+                                            "w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold shrink-0",
                                             isActive
                                                 ? "bg-blue-500 text-white"
                                                 : "bg-slate-100 dark:bg-slate-800 text-slate-500"
@@ -440,10 +453,10 @@ function WorkspaceListPanel({
                                     >
                                         {wsName.charAt(0).toUpperCase()}
                                     </div>
-                                    <div>
+                                    <div className="min-w-0">
                                         <p
                                             className={cn(
-                                                "text-sm font-bold",
+                                                "text-sm font-bold truncate",
                                                 isActive
                                                     ? "text-blue-700 dark:text-blue-300"
                                                     : "text-slate-900 dark:text-white"
@@ -455,11 +468,23 @@ function WorkspaceListPanel({
                                             {ws.role}
                                         </p>
                                     </div>
+                                </button>
+                                <div className="flex items-center gap-1.5 shrink-0">
                                     {isActive && (
-                                        <div className="ml-auto w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
+                                        <div className="w-2 h-2 rounded-full bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
+                                    )}
+                                    {canLeave && (
+                                        <button
+                                            onClick={() => handleLeave(wsId)}
+                                            disabled={isLeavePending}
+                                            title="Leave workspace"
+                                            className="p-1.5 rounded-lg text-slate-300 dark:text-slate-600 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                                        >
+                                            <LogOut size={14} />
+                                        </button>
                                     )}
                                 </div>
-                            </button>
+                            </div>
                         );
                     })
                 )}
@@ -772,6 +797,31 @@ function SettingsTab({
     );
 }
 
+const AVATAR_COLORS = [
+    { bg: "bg-violet-100 dark:bg-violet-900/40", text: "text-violet-700 dark:text-violet-300" },
+    { bg: "bg-blue-100 dark:bg-blue-900/40", text: "text-blue-700 dark:text-blue-300" },
+    { bg: "bg-emerald-100 dark:bg-emerald-900/40", text: "text-emerald-700 dark:text-emerald-300" },
+    { bg: "bg-orange-100 dark:bg-orange-900/40", text: "text-orange-700 dark:text-orange-300" },
+    { bg: "bg-rose-100 dark:bg-rose-900/40", text: "text-rose-700 dark:text-rose-300" },
+];
+
+function getAvatarColor(str: string) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) hash = str.charCodeAt(i) + ((hash << 5) - hash);
+    return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
+function timeAgo(dateStr: string): string {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return "just now";
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+}
+
 function RequestsCard({
     joinRequests,
     workspaceId,
@@ -793,64 +843,88 @@ function RequestsCard({
     };
 
     return (
-        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm p-6">
-            <div className="flex items-center justify-between mb-4">
-                <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
-                    <Users size={13} />
-                    Join Requests
-                </h4>
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800">
+                <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center">
+                        <UserPlus size={14} className="text-amber-600 dark:text-amber-400" />
+                    </div>
+                    <h4 className="text-sm font-bold text-slate-900 dark:text-white">Join Requests</h4>
+                </div>
                 {joinRequests.length > 0 && (
-                    <span className="min-w-[20px] h-5 px-1.5 bg-amber-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                    <span className="min-w-[22px] h-[22px] px-1.5 bg-amber-500 text-white text-[11px] font-bold rounded-full flex items-center justify-center">
                         {joinRequests.length}
                     </span>
                 )}
             </div>
-            <div className="space-y-2">
+
+            {/* Body */}
+            <div className="divide-y divide-slate-100 dark:divide-slate-800">
                 {joinRequests.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-8 gap-2 opacity-40">
-                        <CheckCircle2 className="w-6 h-6 text-slate-400" />
-                        <p className="text-xs text-slate-500 font-medium">All clear</p>
+                    <div className="flex flex-col items-center justify-center py-10 gap-2">
+                        <CheckCircle2 className="w-6 h-6 text-slate-300 dark:text-slate-600" />
+                        <p className="text-xs text-slate-400 font-medium">No pending requests</p>
                     </div>
                 ) : (
                     joinRequests.map((req: any) => {
                         const isProcessing = processingId === req.id;
+                        const name = req.user_name || req.user_email?.split("@")[0] || "Unknown";
+                        const initials = name.slice(0, 2).toUpperCase();
+                        const color = getAvatarColor(req.user_id || req.user_email || req.id);
+
                         return (
                             <div
                                 key={req.id}
                                 className={cn(
-                                    "flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl transition-opacity",
+                                    "flex items-center gap-4 px-5 py-4 transition-opacity",
                                     isProcessing && "opacity-50 pointer-events-none"
                                 )}
                             >
-                                <div className="flex items-center gap-3 min-w-0 mr-2">
-                                    <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xs font-bold text-slate-600 dark:text-slate-300 shrink-0">
-                                        {(req.user_name || "?").charAt(0).toUpperCase()}
-                                    </div>
-                                    <div className="min-w-0">
-                                        <p className="text-sm font-bold text-slate-900 dark:text-white truncate leading-tight">
-                                            {req.user_name || "Unknown"}
-                                        </p>
-                                        <p className="text-xs text-slate-500 truncate">{req.user_email}</p>
-                                    </div>
+                                {/* Avatar */}
+                                <div className={cn(
+                                    "w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold shrink-0",
+                                    color.bg, color.text
+                                )}>
+                                    {initials}
                                 </div>
-                                <div className="flex gap-1.5 shrink-0">
-                                    <button
-                                        onClick={() => handleReject(req.id)}
-                                        disabled={!!processingId}
-                                        title="Decline"
-                                        className="h-7 px-2 flex items-center gap-1 text-xs font-semibold text-slate-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-red-200 dark:hover:border-red-800 transition-all"
-                                    >
-                                        {isProcessing && reject.isPending ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}
-                                        <span>Decline</span>
-                                    </button>
+
+                                {/* Info */}
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-semibold text-slate-900 dark:text-white truncate leading-tight">
+                                        {name}
+                                    </p>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                                        {req.user_email}
+                                    </p>
+                                    {req.created_at && (
+                                        <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 font-medium">
+                                            Requested {timeAgo(req.created_at)}
+                                        </p>
+                                    )}
+                                </div>
+
+                                {/* Actions */}
+                                <div className="flex flex-col gap-1.5 shrink-0">
                                     <button
                                         onClick={() => handleApprove(req.id)}
                                         disabled={!!processingId}
-                                        title="Approve"
-                                        className="h-7 px-2 flex items-center gap-1 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition-all shadow-sm shadow-blue-500/20"
+                                        className="h-8 px-3 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition-all shadow-sm shadow-blue-500/20 disabled:opacity-50"
                                     >
-                                        {isProcessing && approve.isPending ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
-                                        <span>Approve</span>
+                                        {isProcessing && approve.isPending
+                                            ? <Loader2 size={12} className="animate-spin" />
+                                            : <Check size={12} />}
+                                        Approve
+                                    </button>
+                                    <button
+                                        onClick={() => handleReject(req.id)}
+                                        disabled={!!processingId}
+                                        className="h-8 px-3 flex items-center justify-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-red-200 dark:hover:border-red-800 transition-all disabled:opacity-50"
+                                    >
+                                        {isProcessing && reject.isPending
+                                            ? <Loader2 size={12} className="animate-spin" />
+                                            : <X size={12} />}
+                                        Decline
                                     </button>
                                 </div>
                             </div>

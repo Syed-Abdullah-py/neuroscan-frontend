@@ -17,11 +17,11 @@ export interface Case {
     patient_id: string;
     patient_first_name: string | null;
     patient_last_name: string | null;
-    /**
-     * References workspace_members.id — NOT users.id.
-     * Use this to compare against the current user's membership ID.
-     */
     assigned_to_member_id: string | null;
+    /** Stable reference to the assigned doctor's user account; persists after membership changes. */
+    assigned_to_user_id: string | null;
+    /** Display name of the assigned doctor; null if unassigned. */
+    assigned_to_name: string | null;
     created_at: string;
     updated_at: string;
 }

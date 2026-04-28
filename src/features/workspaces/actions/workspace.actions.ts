@@ -74,6 +74,31 @@ export async function removeMemberAction(workspaceId: string, userId: string) {
     }
 }
 
+export async function leaveWorkspaceAction(workspaceId: string) {
+    try {
+        const cookieStore = await cookies();
+        const token = cookieStore.get("session")?.value;
+        if (!token) return { success: false, message: "Not authenticated." };
+
+        const [, payloadBase64] = token.split(".");
+        const payload = JSON.parse(Buffer.from(payloadBase64, "base64").toString());
+        const userId = payload.sub as string;
+        if (!userId) return { success: false, message: "Could not resolve user." };
+
+        await workspacesApi.removeMember(workspaceId, userId);
+
+        if (cookieStore.get("active_workspace")?.value === workspaceId) {
+            cookieStore.delete("active_workspace");
+        }
+
+        revalidatePath("/", "layout");
+        return { success: true, message: "Left workspace." };
+    } catch (err) {
+        if (err instanceof ApiError) return { success: false, message: err.message };
+        return { success: false, message: "Failed to leave workspace." };
+    }
+}
+
 // ── Invitations ────────────────────────────────────────────────────────────
 
 export async function inviteMemberAction(workspaceId: string, email: string) {

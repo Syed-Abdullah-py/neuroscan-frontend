@@ -1,4 +1,4 @@
-// Compatibility shim — all implementations live in feature folders.
+// Compatibility shim - all implementations live in feature folders.
 // Import from here only if you haven't migrated the call site yet.
 
 export {
@@ -25,6 +25,7 @@ export {
   approveJoinRequestAction,
   rejectJoinRequestAction,
   requestJoinAction as requestJoinWorkspace,
+  leaveWorkspaceAction as leaveWorkspace,
 } from "@/features/workspaces/actions/workspace.actions";
 
 // These are now handled by React Query hooks + client API
@@ -36,7 +37,6 @@ export async function getTeamMembers(_wid?: string) { return []; }
 export async function getMyInvitations() { return []; }
 export async function getWorkspaceInvitations(_wid: string) { return []; }
 export async function getDiscoverableWorkspaces() { return []; }
-export async function leaveWorkspace(_wid: string) { return { success: false, message: "Use workspace settings." }; }
 export async function resolveJoinRequest(_id: string, _action: "approve" | "reject") { return { success: false, message: "Use workspace hooks." }; }
 export async function searchUsers(_query: string) { return []; }
 export async function addWorkspaceMember(_wid: string, _email: string, _role: string) { return { success: false, message: "Use invitations." }; }

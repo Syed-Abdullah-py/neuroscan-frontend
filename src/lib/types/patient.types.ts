@@ -4,7 +4,7 @@ export interface Patient {
     workspace_id: string;
     first_name: string;
     last_name: string;
-    /** Date string — YYYY-MM-DD */
+    /** Date string - YYYY-MM-DD */
     dob: string;
     gender: string;
     phone_number: string;
@@ -30,7 +30,7 @@ export interface PatientCreate {
     city?: string;
 }
 
-/** Body for PUT /patients/{id} — all fields optional */
+/** Body for PUT /patients/{id} - all fields optional */
 export interface PatientUpdate {
     first_name?: string;
     last_name?: string;
