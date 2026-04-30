@@ -16,6 +16,7 @@ import { useWorkspace } from "@/providers/workspace-provider";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { WorkspaceRole, WorkspaceMember } from "@/lib/types/workspace.types";
 import type { Case, CaseStats } from "@/lib/types/case.types";
+import { useRouter } from "next/navigation";
 
 const container: Variants = {
     hidden: { opacity: 0 },
@@ -301,7 +302,9 @@ function CaseRow({
     onDelete: () => void;
     isDeleting: boolean;
 }) {
+    const router = useRouter();
     const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [isOpening, setIsOpening] = useState(false);
     const priority = (c.priority || "normal").toLowerCase();
 
     const assignedMember = c.assigned_to_member_id
@@ -400,13 +403,18 @@ function CaseRow({
             {/* Actions */}
             <td className="py-3.5 px-4">
                 <div className="flex items-center gap-2 justify-end">
-                    <Link
-                        href={`/cases/${c.id}`}
+                    <button
+                        onClick={() => {
+                            setIsOpening(true);
+                            router.push(`/cases/${c.id}`);
+                        }}
+                        disabled={isOpening}
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-slate-700 text-xs font-bold text-black dark:text-white hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black hover:border-black dark:hover:border-white transition-all"
                     >
+                        {isOpening ? <Loader2 size={12} className="animate-spin" /> : null}
                         Open
-                        <ArrowUpRight size={12} />
-                    </Link>
+                        {!isOpening ? <ArrowUpRight size={12} /> : null}
+                    </button>
                     {isAdmin && (
                         <button
                             onClick={() => setShowDeleteModal(true)}
