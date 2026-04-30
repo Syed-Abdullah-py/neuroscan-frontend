@@ -6,6 +6,7 @@ import {
     Users, FileText, Activity, UserPlus,
     Clock, CheckCircle2,
     Search, ArrowUpRight,
+    Loader2,
     type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -13,6 +14,7 @@ import { useCaseStats, useRecentCases } from "@/features/cases/hooks/use-cases";
 import { usePatients } from "@/features/patients/hooks/use-patients";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import type { WorkspaceRole } from "@/lib/types/workspace.types";
 import type { CaseStats } from "@/lib/types/case.types";
 
@@ -375,6 +377,8 @@ export function AdminDashboard({
 }
 
 function CaseRow({ caseItem: c }: { caseItem: any }) {
+    const router = useRouter();
+    const [isOpening, setIsOpening] = useState(false);
     const priorityColors: Record<string, string> = {
         urgent: "text-red-700 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-900/30",
         high: "text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-900/30",
@@ -415,13 +419,21 @@ function CaseRow({ caseItem: c }: { caseItem: any }) {
                 {new Date(c.created_at).toLocaleDateString("en-GB")}
             </td>
             <td className="py-3.5 px-5 text-right">
-                <Link
-                    href={`/cases/${c.id}`}
+                <button
+                    onClick={() => {
+                        setIsOpening(true);
+                        router.push(`/cases/${c.id}`);
+                    }}
+                    disabled={isOpening}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-slate-700 text-xs font-bold text-black dark:text-white hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black hover:border-black dark:hover:border-white transition-all"
                 >
+                    {isOpening ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                        <ArrowUpRight className="w-3 h-3" />
+                    )}
                     Open
-                    <ArrowUpRight className="w-3 h-3" />
-                </Link>
+                </button>
             </td>
         </tr>
     );

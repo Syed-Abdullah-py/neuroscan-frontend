@@ -1,10 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion, type Variants } from "framer-motion";
 import {
     Brain, Clock, CheckCircle2, Activity,
     ArrowUpRight, Calendar, AlertCircle,
+    Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCaseStats, useRecentCases } from "@/features/cases/hooks/use-cases";
@@ -31,6 +34,8 @@ export function DoctorDashboard({
     initialStats,
     initialRecentCases,
 }: DoctorDashboardProps) {
+    const router = useRouter();
+    const [openingCaseId, setOpeningCaseId] = useState<string | null>(null);
     // Seed React Query cache with server data so isLoading is false on first render.
     const { data: stats } = useCaseStats(initialStats);
     const { data: recentCases = [] } = useRecentCases(initialRecentCases);
@@ -222,13 +227,21 @@ export function DoctorDashboard({
                                                 {new Date(c.updated_at).toLocaleDateString("en-GB")}
                                             </td>
                                             <td className="py-3.5 px-5 text-right">
-                                                <Link
-                                                    href={`/cases/${c.id}`}
-                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-slate-700 text-xs font-bold text-black dark:text-white hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black hover:border-black dark:hover:border-white transition-all"
+                                                <button
+                                                    onClick={() => {
+                                                        setOpeningCaseId(c.id);
+                                                        router.push(`/cases/${c.id}`);
+                                                    }}
+                                                    disabled={openingCaseId !== null}
+                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-neutral-200 dark:border-slate-700 text-xs font-bold text-black dark:text-white hover:bg-black hover:text-white dark:hover:bg-white dark:hover:text-black hover:border-black dark:hover:border-white transition-all disabled:opacity-70"
                                                 >
+                                                    {openingCaseId === c.id ? (
+                                                        <Loader2 className="w-3 h-3 animate-spin" />
+                                                    ) : (
+                                                        <ArrowUpRight className="w-3 h-3" />
+                                                    )}
                                                     Open
-                                                    <ArrowUpRight className="w-3 h-3" />
-                                                </Link>
+                                                </button>
                                             </td>
                                         </tr>
                                     );
