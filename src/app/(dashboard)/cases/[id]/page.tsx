@@ -1,6 +1,7 @@
 import { redirect, notFound } from "next/navigation";
 import { getWorkspaceContext } from "@/lib/api/request-cache";
 import { casesApi } from "@/lib/api/cases.api";
+import { patientsApi } from "@/lib/api/patients.api";
 import { CaseDetailShell } from "@/features/cases/components/case-detail-shell";
 import type { WorkspaceRole } from "@/lib/types/workspace.types";
 
@@ -21,6 +22,8 @@ export default async function CaseDetailPage({
     const caseItem = await casesApi.get(id, workspaceId).catch(() => null);
     if (!caseItem) notFound();
 
+    const patient = await patientsApi.get(caseItem.patient_id, workspaceId).catch(() => null);
+
     const membershipId = activeWorkspace?.id ?? null;
 
     const isDoctor = workspaceRole === "DOCTOR";
@@ -39,6 +42,7 @@ export default async function CaseDetailPage({
             workspaceId={workspaceId}
             workspaceRole={(workspaceRole ?? null) as WorkspaceRole | null}
             membershipId={membershipId}
+            patient={patient}
             user={{
                 name: user.name,
                 email: user.email,

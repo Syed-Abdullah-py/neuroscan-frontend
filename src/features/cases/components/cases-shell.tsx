@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { motion, type Variants } from "framer-motion";
 import {
     FileText, Plus, User, Calendar,
     Search, ArrowUpRight, Trash2, Loader2,
+    ArrowUpDown, ArrowUp, ArrowDown, AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCases, useDeleteCase } from "@/features/cases/hooks/use-cases";
@@ -54,6 +56,7 @@ export function CasesShell({
     const [search, setSearch] = useState("");
     const [statusFilter, setStatusFilter] = useState("ALL");
     const [priorityFilter, setPriorityFilter] = useState("ALL");
+    const [dateSort, setDateSort] = useState<"none" | "asc" | "desc">("none");
 
     const { data: cases = [], isLoading } = useCases(initialCases);
     const { data: members = [] } = useWorkspaceMembers(activeWorkspaceId ?? undefined);
@@ -61,17 +64,28 @@ export function CasesShell({
 
     const isAdmin = workspaceRole === "OWNER" || workspaceRole === "ADMIN";
 
-    const filtered = cases.filter((c) => {
-        const q = search.toLowerCase();
-        const matchSearch =
-            !q ||
-            c.patient_id.toLowerCase().includes(q) ||
-            c.id.toLowerCase().includes(q);
-        const matchStatus = statusFilter === "ALL" || c.status === statusFilter;
-        const matchPriority =
-            priorityFilter === "ALL" || c.priority === priorityFilter;
-        return matchSearch && matchStatus && matchPriority;
-    });
+    const filtered = cases
+        .filter((c) => {
+            const q = search.toLowerCase();
+            const fullName = `${c.patient_first_name ?? ""} ${c.patient_last_name ?? ""}`.trim().toLowerCase();
+            const matchSearch =
+                !q ||
+                fullName.includes(q) ||
+                (c.patient_first_name ?? "").toLowerCase().includes(q) ||
+                (c.patient_last_name ?? "").toLowerCase().includes(q);
+            const matchStatus = statusFilter === "ALL" || c.status === statusFilter;
+            const matchPriority =
+                priorityFilter === "ALL" || c.priority === priorityFilter;
+            return matchSearch && matchStatus && matchPriority;
+        })
+        .sort((a, b) => {
+            if (dateSort === "none") return 0;
+            const diff = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+            return dateSort === "asc" ? diff : -diff;
+        });
+
+    const cycleSort = () =>
+        setDateSort((s) => s === "none" ? "desc" : s === "desc" ? "asc" : "none");
 
     if (!workspaceId) {
         return (
@@ -158,11 +172,23 @@ export function CasesShell({
                 <table className="w-full">
                     <thead>
                         <tr className="border-b border-neutral-200 dark:border-slate-700/50 bg-neutral-50/50 dark:bg-gray-900/50">
-                            {["Patient", "Assigned", "Priority", "Status", "Created", ""].map((h) => (
+                            {["Patient", "Assigned", "Priority", "Status"].map((h) => (
                                 <th key={h} className="py-3 px-4 text-left text-[11px] font-bold text-neutral-500 uppercase tracking-widest">
                                     {h}
                                 </th>
                             ))}
+                            <th className="py-3 px-4 text-left text-[11px] font-bold text-neutral-500 uppercase tracking-widest">
+                                <button
+                                    onClick={cycleSort}
+                                    className="flex items-center gap-1 hover:text-black dark:hover:text-white transition-colors"
+                                >
+                                    Created
+                                    {dateSort === "none" && <ArrowUpDown size={11} className="opacity-40" />}
+                                    {dateSort === "desc" && <ArrowDown size={11} />}
+                                    {dateSort === "asc" && <ArrowUp size={11} />}
+                                </button>
+                            </th>
+                            <th className="py-3 px-4" />
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-neutral-100 dark:divide-slate-700/30">
@@ -207,6 +233,58 @@ export function CasesShell({
     );
 }
 
+function DeleteConfirmModal({
+    patientName,
+    caseId,
+    onConfirm,
+    onCancel,
+}: {
+    patientName: string | null;
+    caseId: string;
+    onConfirm: () => void;
+    onCancel: () => void;
+}) {
+    return createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onCancel} />
+            <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-neutral-200 dark:border-slate-700 w-full max-w-sm mx-4 p-6 flex flex-col gap-4">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-red-50 dark:bg-red-900/20 flex items-center justify-center shrink-0">
+                        <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                    </div>
+                    <div>
+                        <h3 className="text-sm font-bold text-black dark:text-white">Delete Case</h3>
+                        <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">This action cannot be undone.</p>
+                    </div>
+                </div>
+
+                <div className="bg-neutral-50 dark:bg-slate-800/50 rounded-xl px-4 py-3 border border-neutral-100 dark:border-slate-700">
+                    {patientName && (
+                        <p className="text-sm font-medium text-black dark:text-white">{patientName}</p>
+                    )}
+                    <p className="text-[10px] font-mono text-neutral-400 dark:text-neutral-500 mt-0.5">{caseId}</p>
+                </div>
+
+                <div className="flex gap-2 mt-1">
+                    <button
+                        onClick={onCancel}
+                        className="flex-1 px-4 py-2.5 rounded-xl border border-neutral-200 dark:border-slate-700 text-sm font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-slate-800 transition-colors"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={onConfirm}
+                        className="flex-1 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-sm font-semibold text-white transition-colors"
+                    >
+                        Delete
+                    </button>
+                </div>
+            </div>
+        </div>,
+        document.body
+    );
+}
+
 function CaseRow({
     caseItem: c,
     isAdmin,
@@ -221,6 +299,7 @@ function CaseRow({
     onDelete: () => void;
     isDeleting: boolean;
 }) {
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
     const priority = (c.priority || "normal").toLowerCase();
 
     const assignedMember = c.assigned_to_member_id
@@ -244,6 +323,15 @@ function CaseRow({
     });
 
     return (
+        <>
+        {showDeleteModal && (
+            <DeleteConfirmModal
+                patientName={patientName}
+                caseId={c.id}
+                onConfirm={() => { setShowDeleteModal(false); onDelete(); }}
+                onCancel={() => setShowDeleteModal(false)}
+            />
+        )}
         <tr className="group hover:bg-neutral-50 dark:hover:bg-slate-800/30 transition-colors">
             {/* Patient */}
             <td className="py-3.5 px-4">
@@ -252,10 +340,16 @@ function CaseRow({
                         <div className="w-7 h-7 rounded-md bg-neutral-100 dark:bg-slate-800 flex items-center justify-center text-[10px] font-bold text-neutral-500 shrink-0">
                             {(c.patient_first_name?.[0] ?? "")}{(c.patient_last_name?.[0] ?? "")}
                         </div>
-                        <span className="text-sm font-medium text-black dark:text-white">{patientName}</span>
+                        <div className="flex flex-col">
+                            <span className="text-sm font-medium text-black dark:text-white">{patientName}</span>
+                            <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-mono">{c.id}</span>
+                        </div>
                     </div>
                 ) : (
-                    <span className="text-xs text-neutral-400 italic">Unknown</span>
+                    <div className="flex flex-col gap-0.5">
+                        <span className="text-xs text-neutral-400 italic">Unknown</span>
+                        <span className="text-[10px] text-neutral-400 dark:text-neutral-500 font-mono">{c.id}</span>
+                    </div>
                 )}
             </td>
             {/* Assigned */}
@@ -313,9 +407,7 @@ function CaseRow({
                     </Link>
                     {isAdmin && (
                         <button
-                            onClick={() => {
-                                if (confirm("Delete this case?")) onDelete();
-                            }}
+                            onClick={() => setShowDeleteModal(true)}
                             disabled={isDeleting}
                             className="p-1.5 rounded-lg text-neutral-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
                         >
@@ -329,5 +421,6 @@ function CaseRow({
                 </div>
             </td>
         </tr>
+        </>
     );
 }

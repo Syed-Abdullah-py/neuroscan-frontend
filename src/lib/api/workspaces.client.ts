@@ -105,5 +105,11 @@ export function makeWorkspacesClient(token: string, workspaceId?: string) {
                 `/workspaces/join-requests/${requestId}/reject`,
                 { token, workspaceId: wsId, method: "POST" }
             ),
+
+        invitableUsers: (wsId: string, q: string) =>
+            clientFetch<{ id: string; email: string; name: string | null; global_role: string | null }[]>(
+                `/workspaces/${wsId}/invitable-users?q=${encodeURIComponent(q)}`,
+                { token, workspaceId: wsId }
+            ),
     };
 }

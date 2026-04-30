@@ -1,10 +1,11 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Building2, Plus, Search, LogOut,
-    CheckCircle2, Loader2, AlertCircle,
+    CheckCircle2, Loader2, AlertCircle, AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/providers/workspace-provider";
@@ -36,6 +37,7 @@ export function WorkspaceListPanel({
     const [slug, setSlug] = useState("");
     const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
     const [isPending, startTransition] = useTransition();
+    const [leaveWsId, setLeaveWsId] = useState<string | null>(null);
     const { switchWorkspace, isSwitching } = useWorkspace();
     const router = useRouter();
 
@@ -60,7 +62,13 @@ export function WorkspaceListPanel({
     };
 
     const handleLeave = (wsId: string) => {
-        if (!confirm("Are you sure you want to leave this workspace?")) return;
+        setLeaveWsId(wsId);
+    };
+
+    const confirmLeave = () => {
+        if (!leaveWsId) return;
+        const wsId = leaveWsId;
+        setLeaveWsId(null);
         startTransition(async () => {
             const res = await leaveWorkspaceAction(wsId);
             if (res.success) {
@@ -72,6 +80,41 @@ export function WorkspaceListPanel({
     };
 
     return (
+        <>
+        {leaveWsId && createPortal(
+            <div className="fixed inset-0 z-50 flex items-center justify-center">
+                <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setLeaveWsId(null)} />
+                <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-neutral-200 dark:border-slate-700 w-full max-w-sm mx-4 p-6 flex flex-col gap-4">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-red-50 dark:bg-red-900/20 flex items-center justify-center shrink-0">
+                            <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                        </div>
+                        <div>
+                            <h3 className="text-sm font-bold text-black dark:text-white">Leave Workspace</h3>
+                            <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">This action cannot be undone.</p>
+                        </div>
+                    </div>
+                    <div className="bg-neutral-50 dark:bg-slate-800/50 rounded-xl px-4 py-3 border border-neutral-100 dark:border-slate-700">
+                        <p className="text-sm text-neutral-600 dark:text-neutral-300">You will lose access to this workspace immediately.</p>
+                    </div>
+                    <div className="flex gap-2 mt-1">
+                        <button
+                            onClick={() => setLeaveWsId(null)}
+                            className="flex-1 px-4 py-2.5 rounded-xl border border-neutral-200 dark:border-slate-700 text-sm font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-slate-800 transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={confirmLeave}
+                            className="flex-1 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-sm font-semibold text-white transition-colors"
+                        >
+                            Leave
+                        </button>
+                    </div>
+                </div>
+            </div>,
+            document.body
+        )}
         <div className="rounded-3xl border border-neutral-200 dark:border-slate-700/50 bg-white dark:bg-gray-900/40 overflow-hidden">
             <div className="p-6 border-b border-neutral-100 dark:border-slate-700/50">
                 <h3 className="text-lg font-bold text-black dark:text-white mb-1">
@@ -280,5 +323,6 @@ export function WorkspaceListPanel({
                 )}
             </div>
         </div>
+        </>
     );
 }

@@ -1,13 +1,14 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
     Building2, Users, Settings, LayoutDashboard,
     Copy, Check, RefreshCw, Plus, LogOut,
     UserPlus, ChevronRight, Loader2, X,
-    CheckCircle2, Search, Trash2, Save,
+    CheckCircle2, Search, Trash2, Save, AlertTriangle,
 } from "lucide-react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/providers/workspace-provider";
 import {
@@ -27,6 +28,7 @@ import {
     useDeleteWorkspace,
     useDiscoverWorkspaces,
     useRequestJoin,
+    useInvitableUsers,
 } from "@/features/workspaces/hooks/use-workspaces";
 import { leaveWorkspaceAction } from "@/features/workspaces/actions/workspace.actions";
 import type { WorkspaceRole } from "@/lib/types/workspace.types";
@@ -105,7 +107,7 @@ export function WorkspacesShell({
 
             <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
                 {/* Left column: workspace list */}
-                <div className="xl:col-span-4 space-y-4">
+                <div className="xl:col-span-3 space-y-4">
                     <WorkspaceListPanel
                         workspaces={workspaceList}
                         activeWorkspaceId={workspaceId}
@@ -225,7 +227,7 @@ export function WorkspacesShell({
                 </div>
 
                 {/* Right column: requests & invitations */}
-                <div className="xl:col-span-3 space-y-4">
+                <div className="xl:col-span-4 space-y-4">
                     {isAdmin && (
                         <RequestsCard
                             joinRequests={joinRequests}
@@ -264,8 +266,16 @@ function WorkspaceListPanel({
     const [msg, setMsg] = useState("");
     const [isLeavePending, startLeave] = useTransition();
 
+    const [leaveWsId, setLeaveWsId] = useState<string | null>(null);
+
     const handleLeave = (wsId: string) => {
-        if (!confirm("Are you sure you want to leave this workspace?")) return;
+        setLeaveWsId(wsId);
+    };
+
+    const confirmLeave = () => {
+        if (!leaveWsId) return;
+        const wsId = leaveWsId;
+        setLeaveWsId(null);
         startLeave(async () => {
             const res = await leaveWorkspaceAction(wsId);
             if (!res.success) setMsg(res.message || "Failed to leave workspace.");
@@ -297,6 +307,35 @@ function WorkspaceListPanel({
     };
 
     return (
+        <>
+        {leaveWsId && createPortal(
+            <div className="fixed inset-0 z-50 flex items-center justify-center">
+                <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setLeaveWsId(null)} />
+                <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-neutral-200 dark:border-slate-700 w-full max-w-sm mx-4 p-6 flex flex-col gap-4">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-red-50 dark:bg-red-900/20 flex items-center justify-center shrink-0">
+                            <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                        </div>
+                        <div>
+                            <h3 className="text-sm font-bold text-black dark:text-white">Leave Workspace</h3>
+                            <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">This action cannot be undone.</p>
+                        </div>
+                    </div>
+                    <div className="bg-neutral-50 dark:bg-slate-800/50 rounded-xl px-4 py-3 border border-neutral-100 dark:border-slate-700">
+                        <p className="text-sm text-neutral-600 dark:text-neutral-300">You will lose access to this workspace immediately.</p>
+                    </div>
+                    <div className="flex gap-2 mt-1">
+                        <button onClick={() => setLeaveWsId(null)} className="flex-1 px-4 py-2.5 rounded-xl border border-neutral-200 dark:border-slate-700 text-sm font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-slate-800 transition-colors">
+                            Cancel
+                        </button>
+                        <button onClick={confirmLeave} className="flex-1 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-sm font-semibold text-white transition-colors">
+                            Leave
+                        </button>
+                    </div>
+                </div>
+            </div>,
+            document.body
+        )}
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm p-6">
             <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-bold text-slate-900 dark:text-white">
@@ -490,6 +529,7 @@ function WorkspaceListPanel({
                 )}
             </div>
         </div>
+        </>
     );
 }
 
@@ -561,16 +601,44 @@ function MembersTab({
     workspaceRole,
     isAdmin,
 }: any) {
-    const [inviteEmail, setInviteEmail] = useState("");
+    const [query, setQuery] = useState("");
+    const [selected, setSelected] = useState<{ email: string; name: string | null } | null>(null);
+    const [dropdownOpen, setDropdownOpen] = useState(false);
     const [inviteMsg, setInviteMsg] = useState("");
     const invite = useInviteMember();
     const remove = useRemoveMember();
+    const [removeTarget, setRemoveTarget] = useState<{ userId: string; name: string } | null>(null);
+    const wrapperRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLInputElement>(null);
+    const [dropdownRect, setDropdownRect] = useState<DOMRect | null>(null);
+
+    const { data: invitableUsers = [], isFetching: searchingUsers } = useInvitableUsers(
+        isAdmin ? workspaceId : undefined,
+        query
+    );
+
+    useEffect(() => {
+        function handleClickOutside(e: MouseEvent) {
+            if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+                setDropdownOpen(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    useEffect(() => {
+        if (dropdownOpen && inputRef.current) {
+            setDropdownRect(inputRef.current.getBoundingClientRect());
+        }
+    }, [dropdownOpen, query]);
 
     const handleInvite = async () => {
-        if (!inviteEmail.includes("@")) return;
+        if (!selected) return;
         try {
-            await invite.mutateAsync(inviteEmail);
-            setInviteEmail("");
+            await invite.mutateAsync(selected.email);
+            setSelected(null);
+            setQuery("");
             setInviteMsg("Invitation sent!");
             setTimeout(() => setInviteMsg(""), 3000);
         } catch (err: any) {
@@ -579,6 +647,43 @@ function MembersTab({
     };
 
     return (
+        <>
+        {removeTarget && createPortal(
+            <div className="fixed inset-0 z-50 flex items-center justify-center">
+                <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setRemoveTarget(null)} />
+                <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-neutral-200 dark:border-slate-700 w-full max-w-sm mx-4 p-6 flex flex-col gap-4">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-red-50 dark:bg-red-900/20 flex items-center justify-center shrink-0">
+                            <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                        </div>
+                        <div>
+                            <h3 className="text-sm font-bold text-black dark:text-white">Remove Member</h3>
+                            <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">This action cannot be undone.</p>
+                        </div>
+                    </div>
+                    <div className="bg-neutral-50 dark:bg-slate-800/50 rounded-xl px-4 py-3 border border-neutral-100 dark:border-slate-700">
+                        <p className="text-sm text-neutral-600 dark:text-neutral-300">
+                            <span className="font-semibold text-black dark:text-white">{removeTarget.name}</span> will be removed from this workspace.
+                        </p>
+                    </div>
+                    <div className="flex gap-2 mt-1">
+                        <button
+                            onClick={() => setRemoveTarget(null)}
+                            className="flex-1 px-4 py-2.5 rounded-xl border border-neutral-200 dark:border-slate-700 text-sm font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-slate-800 transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={() => { remove.mutate({ userId: removeTarget.userId }); setRemoveTarget(null); }}
+                            className="flex-1 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-sm font-semibold text-white transition-colors"
+                        >
+                            Remove
+                        </button>
+                    </div>
+                </div>
+            </div>,
+            document.body
+        )}
         <motion.div
             initial={{ opacity: 0, x: 10 }}
             animate={{ opacity: 1, x: 0 }}
@@ -589,21 +694,120 @@ function MembersTab({
             {isAdmin && (
                 <div className="space-y-3">
                     <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                        Invite by Email
+                        Invite Member
                     </p>
                     <div className="flex gap-2">
-                        <input
-                            type="email"
-                            value={inviteEmail}
-                            onChange={(e) => setInviteEmail(e.target.value)}
-                            onKeyDown={(e) => e.key === "Enter" && handleInvite()}
-                            placeholder="doctor@hospital.org"
-                            className="flex-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:text-white"
-                        />
+                        {/* User picker */}
+                        <div ref={wrapperRef} className="relative flex-1">
+                            {selected ? (
+                                <div className="flex items-center gap-2 px-3 py-2.5 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-xl">
+                                    <div className="w-6 h-6 rounded-full bg-blue-200 dark:bg-blue-800 flex items-center justify-center text-[10px] font-bold text-blue-700 dark:text-blue-300 shrink-0">
+                                        {(selected.name || selected.email).charAt(0).toUpperCase()}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-semibold text-slate-900 dark:text-white truncate leading-tight">
+                                            {selected.name || selected.email}
+                                        </p>
+                                        {selected.name && (
+                                            <p className="text-[11px] text-slate-500 truncate">{selected.email}</p>
+                                        )}
+                                    </div>
+                                    <button
+                                        onClick={() => { setSelected(null); setQuery(""); }}
+                                        className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 shrink-0"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                </div>
+                            ) : (
+                                <div className="relative">
+                                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                                    <input
+                                        ref={inputRef}
+                                        value={query}
+                                        onChange={(e) => { setQuery(e.target.value); setDropdownOpen(true); }}
+                                        onFocus={() => setDropdownOpen(true)}
+                                        placeholder="Search by name or email…"
+                                        autoComplete="off"
+                                        autoCorrect="off"
+                                        autoCapitalize="off"
+                                        spellCheck={false}
+                                        name="invite-search-field"
+                                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-9 pr-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 dark:text-white"
+                                    />
+                                    {searchingUsers && (
+                                        <Loader2 size={13} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-slate-400" />
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Dropdown — portalled to body to escape overflow:hidden parents */}
+                            <AnimatePresence>
+                                {dropdownOpen && !selected && dropdownRect && createPortal(
+                                    <motion.div
+                                        initial={{ opacity: 0, y: -4 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: -4 }}
+                                        transition={{ duration: 0.15 }}
+                                        style={{
+                                            position: "fixed",
+                                            top: dropdownRect.bottom + 6,
+                                            left: dropdownRect.left,
+                                            width: dropdownRect.width,
+                                            zIndex: 9999,
+                                        }}
+                                        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl overflow-hidden"
+                                    >
+                                        {invitableUsers.length === 0 ? (
+                                            <div className="px-4 py-6 text-center text-xs text-slate-400 font-medium">
+                                                {query ? "No users found" : "No users available to invite"}
+                                            </div>
+                                        ) : (
+                                            <div className="max-h-52 overflow-y-auto py-1.5">
+                                                {invitableUsers.map((u) => (
+                                                    <button
+                                                        key={u.id}
+                                                        onMouseDown={(e) => {
+                                                            e.preventDefault();
+                                                            setSelected({ email: u.email, name: u.name });
+                                                            setDropdownOpen(false);
+                                                            setQuery("");
+                                                        }}
+                                                        className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-left"
+                                                    >
+                                                        <div className={cn(
+                                                            "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0",
+                                                            getAvatarColor(u.id).bg, getAvatarColor(u.id).text
+                                                        )}>
+                                                            {(u.name || u.email).charAt(0).toUpperCase()}
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">
+                                                                {u.name || u.email}
+                                                            </p>
+                                                            {u.name && (
+                                                                <p className="text-xs text-slate-500 truncate">{u.email}</p>
+                                                            )}
+                                                        </div>
+                                                        {u.global_role && (
+                                                            <span className="ml-auto text-[10px] font-semibold uppercase text-slate-400 shrink-0">
+                                                                {u.global_role}
+                                                            </span>
+                                                        )}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </motion.div>,
+                                    document.body
+                                )}
+                            </AnimatePresence>
+                        </div>
+
                         <button
                             onClick={handleInvite}
-                            disabled={invite.isPending || !inviteEmail.includes("@")}
-                            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold rounded-xl disabled:opacity-50 transition-colors flex items-center gap-2"
+                            disabled={invite.isPending || !selected}
+                            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold rounded-xl disabled:opacity-50 transition-colors flex items-center gap-2 shrink-0"
                         >
                             {invite.isPending ? (
                                 <Loader2 size={14} className="animate-spin" />
@@ -614,7 +818,9 @@ function MembersTab({
                         </button>
                     </div>
                     {inviteMsg && (
-                        <p
+                        <motion.p
+                            initial={{ opacity: 0, y: -4 }}
+                            animate={{ opacity: 1, y: 0 }}
                             className={cn(
                                 "text-xs font-medium",
                                 inviteMsg.includes("sent")
@@ -623,7 +829,7 @@ function MembersTab({
                             )}
                         >
                             {inviteMsg}
-                        </p>
+                        </motion.p>
                     )}
                 </div>
             )}
@@ -675,7 +881,7 @@ function MembersTab({
                                 </span>
                                 {canRemove && (
                                     <button
-                                        onClick={() => remove.mutate({ userId })}
+                                        onClick={() => setRemoveTarget({ userId, name })}
                                         disabled={remove.isPending}
                                         className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
                                     >
@@ -688,6 +894,7 @@ function MembersTab({
                 })}
             </div>
         </motion.div>
+        </>
     );
 }
 
@@ -843,96 +1050,121 @@ function RequestsCard({
     };
 
     return (
-        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+        <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, ease: "easeOut" }}
+            className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden"
+        >
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-slate-800">
-                <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center">
-                        <UserPlus size={14} className="text-amber-600 dark:text-amber-400" />
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800">
+                <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center">
+                        <UserPlus size={15} className="text-amber-600 dark:text-amber-400" />
                     </div>
                     <h4 className="text-sm font-bold text-slate-900 dark:text-white">Join Requests</h4>
                 </div>
-                {joinRequests.length > 0 && (
-                    <span className="min-w-[22px] h-[22px] px-1.5 bg-amber-500 text-white text-[11px] font-bold rounded-full flex items-center justify-center">
-                        {joinRequests.length}
-                    </span>
-                )}
+                <AnimatePresence>
+                    {joinRequests.length > 0 && (
+                        <motion.span
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            exit={{ scale: 0 }}
+                            className="min-w-[22px] h-[22px] px-1.5 bg-amber-500 text-white text-[11px] font-bold rounded-full flex items-center justify-center"
+                        >
+                            {joinRequests.length}
+                        </motion.span>
+                    )}
+                </AnimatePresence>
             </div>
 
             {/* Body */}
-            <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                {joinRequests.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-10 gap-2">
-                        <CheckCircle2 className="w-6 h-6 text-slate-300 dark:text-slate-600" />
-                        <p className="text-xs text-slate-400 font-medium">No pending requests</p>
-                    </div>
-                ) : (
-                    joinRequests.map((req: any) => {
-                        const isProcessing = processingId === req.id;
-                        const name = req.user_name || req.user_email?.split("@")[0] || "Unknown";
-                        const initials = name.slice(0, 2).toUpperCase();
-                        const color = getAvatarColor(req.user_id || req.user_email || req.id);
+            <div className="px-4 py-3 space-y-2">
+                <AnimatePresence initial={false}>
+                    {joinRequests.length === 0 ? (
+                        <motion.div
+                            key="empty"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="flex flex-col items-center justify-center py-10 gap-2"
+                        >
+                            <CheckCircle2 className="w-6 h-6 text-slate-300 dark:text-slate-600" />
+                            <p className="text-xs text-slate-400 font-medium">No pending requests</p>
+                        </motion.div>
+                    ) : (
+                        joinRequests.map((req: any, index: number) => {
+                            const isProcessing = processingId === req.id;
+                            const name = req.user_name || req.user_email?.split("@")[0] || "Unknown";
+                            const initials = name.slice(0, 2).toUpperCase();
+                            const color = getAvatarColor(req.user_id || req.user_email || req.id);
 
-                        return (
-                            <div
-                                key={req.id}
-                                className={cn(
-                                    "flex items-center gap-4 px-5 py-4 transition-opacity",
-                                    isProcessing && "opacity-50 pointer-events-none"
-                                )}
-                            >
-                                {/* Avatar */}
-                                <div className={cn(
-                                    "w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold shrink-0",
-                                    color.bg, color.text
-                                )}>
-                                    {initials}
-                                </div>
-
-                                {/* Info */}
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-semibold text-slate-900 dark:text-white truncate leading-tight">
-                                        {name}
-                                    </p>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                                        {req.user_email}
-                                    </p>
-                                    {req.created_at && (
-                                        <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 font-medium">
-                                            Requested {timeAgo(req.created_at)}
-                                        </p>
+                            return (
+                                <motion.div
+                                    key={req.id}
+                                    initial={{ opacity: 0, x: -10 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    exit={{ opacity: 0, x: 10, height: 0, marginBottom: 0 }}
+                                    transition={{ duration: 0.25, delay: index * 0.05 }}
+                                    whileHover={{ scale: 1.01 }}
+                                    className={cn(
+                                        "flex items-center gap-3 px-4 py-3 rounded-2xl border transition-colors",
+                                        "bg-slate-50/80 dark:bg-slate-800/50 border-slate-100 dark:border-slate-700/60",
+                                        "hover:border-slate-200 dark:hover:border-slate-600 hover:shadow-sm",
+                                        isProcessing && "opacity-50 pointer-events-none"
                                     )}
-                                </div>
+                                >
+                                    {/* Avatar */}
+                                    <div className={cn(
+                                        "w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold shrink-0",
+                                        color.bg, color.text
+                                    )}>
+                                        {initials}
+                                    </div>
 
-                                {/* Actions */}
-                                <div className="flex flex-col gap-1.5 shrink-0">
-                                    <button
-                                        onClick={() => handleApprove(req.id)}
-                                        disabled={!!processingId}
-                                        className="h-8 px-3 flex items-center justify-center gap-1.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition-all shadow-sm shadow-blue-500/20 disabled:opacity-50"
-                                    >
-                                        {isProcessing && approve.isPending
-                                            ? <Loader2 size={12} className="animate-spin" />
-                                            : <Check size={12} />}
-                                        Approve
-                                    </button>
-                                    <button
-                                        onClick={() => handleReject(req.id)}
-                                        disabled={!!processingId}
-                                        className="h-8 px-3 flex items-center justify-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-red-200 dark:hover:border-red-800 transition-all disabled:opacity-50"
-                                    >
-                                        {isProcessing && reject.isPending
-                                            ? <Loader2 size={12} className="animate-spin" />
-                                            : <X size={12} />}
-                                        Decline
-                                    </button>
-                                </div>
-                            </div>
-                        );
-                    })
-                )}
+                                    {/* Info */}
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-semibold text-slate-900 dark:text-white truncate leading-tight">
+                                            {name}
+                                        </p>
+                                        <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">
+                                            {req.user_email}
+                                            {req.created_at && (
+                                                <span className="text-slate-400 dark:text-slate-500"> · {timeAgo(req.created_at)}</span>
+                                            )}
+                                        </p>
+                                    </div>
+
+                                    {/* Actions — inline horizontal */}
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                        <button
+                                            onClick={() => handleReject(req.id)}
+                                            disabled={!!processingId}
+                                            className="h-7 w-7 flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-red-200 dark:hover:border-red-800 transition-all disabled:opacity-50"
+                                            title="Decline"
+                                        >
+                                            {isProcessing && reject.isPending
+                                                ? <Loader2 size={12} className="animate-spin" />
+                                                : <X size={12} />}
+                                        </button>
+                                        <button
+                                            onClick={() => handleApprove(req.id)}
+                                            disabled={!!processingId}
+                                            className="h-7 px-3 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition-all shadow-sm shadow-blue-500/20 disabled:opacity-50"
+                                        >
+                                            {isProcessing && approve.isPending
+                                                ? <Loader2 size={12} className="animate-spin" />
+                                                : <Check size={12} />}
+                                            Approve
+                                        </button>
+                                    </div>
+                                </motion.div>
+                            );
+                        })
+                    )}
+                </AnimatePresence>
             </div>
-        </div>
+        </motion.div>
     );
 }
 
@@ -976,123 +1208,160 @@ function InvitationsCard({
     const hasContent = myInvitations.length > 0 || (isAdmin && sentInvitations.length > 0);
 
     return (
-        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm p-6">
-            <div className="flex items-center justify-between mb-4">
+        <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, ease: "easeOut", delay: 0.08 }}
+            className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden"
+        >
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800">
                 <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
                     Invitations
                 </h4>
-                {myInvitations.length > 0 && (
-                    <span className="min-w-[20px] h-5 px-1.5 bg-blue-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                        {myInvitations.length}
-                    </span>
-                )}
+                <AnimatePresence>
+                    {myInvitations.length > 0 && (
+                        <motion.span
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            exit={{ scale: 0 }}
+                            className="min-w-[20px] h-5 px-1.5 bg-blue-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center"
+                        >
+                            {myInvitations.length}
+                        </motion.span>
+                    )}
+                </AnimatePresence>
             </div>
 
-            {!hasContent && (
-                <div className="flex flex-col items-center justify-center py-8 gap-2 opacity-40">
-                    <Building2 className="w-6 h-6 text-slate-400" />
-                    <p className="text-xs text-slate-500 font-medium">No invitations</p>
-                </div>
-            )}
-
-            {/* Received invitations */}
-            {myInvitations.length > 0 && (
-                <div className={cn(isAdmin && sentInvitations.length > 0 ? "mb-5" : "")}>
-                    {isAdmin && (
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
-                            Received
-                        </p>
+            <div className="px-4 py-3 space-y-4">
+                <AnimatePresence initial={false}>
+                    {!hasContent && (
+                        <motion.div
+                            key="empty"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            className="flex flex-col items-center justify-center py-8 gap-2 opacity-40"
+                        >
+                            <Building2 className="w-6 h-6 text-slate-400" />
+                            <p className="text-xs text-slate-500 font-medium">No invitations</p>
+                        </motion.div>
                     )}
+                </AnimatePresence>
+
+                {/* Received invitations */}
+                {myInvitations.length > 0 && (
                     <div className="space-y-2">
-                        {myInvitations.map((inv: any) => {
-                            const isProcessing = processingId === inv.id;
-                            return (
-                                <div
-                                    key={inv.id}
-                                    className={cn(
-                                        "rounded-xl border overflow-hidden transition-opacity",
-                                        "border-blue-200 dark:border-blue-900/40 bg-blue-50/60 dark:bg-blue-900/10",
-                                        isProcessing && "opacity-50 pointer-events-none"
-                                    )}
-                                >
-                                    <div className="flex items-center gap-3 px-3 pt-3 pb-2">
-                                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shrink-0 shadow-md shadow-blue-500/20">
-                                            <Building2 size={16} className="text-white" />
+                        {isAdmin && (
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">
+                                Received
+                            </p>
+                        )}
+                        <AnimatePresence initial={false}>
+                            {myInvitations.map((inv: any, index: number) => {
+                                const isProcessing = processingId === inv.id;
+                                const isUrgent = new Date(inv.expires_at).getTime() - Date.now() < 86400000 * 2;
+                                return (
+                                    <motion.div
+                                        key={inv.id}
+                                        initial={{ opacity: 0, x: -10 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        exit={{ opacity: 0, x: 10, height: 0 }}
+                                        transition={{ duration: 0.25, delay: index * 0.05 }}
+                                        className={cn(
+                                            "flex items-center gap-3 px-4 py-3 rounded-2xl border transition-opacity",
+                                            "border-blue-200 dark:border-blue-900/40 bg-blue-50/60 dark:bg-blue-900/10",
+                                            isProcessing && "opacity-50 pointer-events-none"
+                                        )}
+                                    >
+                                        <div className="w-9 h-9 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center shrink-0">
+                                            <Building2 size={17} className="text-slate-400 dark:text-slate-500" strokeWidth={1.5} />
                                         </div>
                                         <div className="min-w-0 flex-1">
                                             <p className="text-sm font-bold text-slate-900 dark:text-white truncate leading-tight">
                                                 {inv.workspace_name || "Workspace"}
                                             </p>
                                             <p className={cn(
-                                                "text-[11px] font-medium mt-0.5",
-                                                new Date(inv.expires_at).getTime() - Date.now() < 86400000 * 2
-                                                    ? "text-amber-600 dark:text-amber-400"
-                                                    : "text-slate-500"
+                                                "text-[11px] font-medium",
+                                                isUrgent ? "text-amber-600 dark:text-amber-400" : "text-slate-500"
                                             )}>
                                                 {expiryLabel(inv.expires_at)}
                                             </p>
                                         </div>
-                                    </div>
-                                    <div className="flex gap-2 px-3 pb-3">
-                                        <button
-                                            onClick={() => handleReject(inv.id)}
-                                            disabled={!!processingId}
-                                            className="flex-1 h-7 flex items-center justify-center gap-1 text-xs font-semibold text-slate-500 hover:text-red-600 bg-white dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-red-200 dark:hover:border-red-800 transition-all"
-                                        >
-                                            {isProcessing && reject.isPending ? (
-                                                <Loader2 size={12} className="animate-spin" />
-                                            ) : (
-                                                <X size={12} />
-                                            )}
-                                            Decline
-                                        </button>
-                                        <button
-                                            onClick={() => handleAccept(inv)}
-                                            disabled={!!processingId}
-                                            className="flex-1 h-7 flex items-center justify-center gap-1 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition-all shadow-sm shadow-blue-500/20"
-                                        >
-                                            {isProcessing && accept.isPending ? (
-                                                <Loader2 size={12} className="animate-spin" />
-                                            ) : (
-                                                <Check size={12} />
-                                            )}
-                                            Accept
-                                        </button>
-                                    </div>
-                                </div>
-                            );
-                        })}
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                            <button
+                                                onClick={() => handleReject(inv.id)}
+                                                disabled={!!processingId}
+                                                className="h-7 w-7 flex items-center justify-center text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg border border-blue-200 dark:border-blue-800 hover:border-red-200 transition-all"
+                                                title="Decline"
+                                            >
+                                                {isProcessing && reject.isPending
+                                                    ? <Loader2 size={12} className="animate-spin" />
+                                                    : <X size={12} />}
+                                            </button>
+                                            <button
+                                                onClick={() => handleAccept(inv)}
+                                                disabled={!!processingId}
+                                                className="h-7 px-3 flex items-center justify-center gap-1.5 text-[11px] font-bold text-white bg-blue-600 hover:bg-blue-500 rounded-lg transition-all shadow-sm shadow-blue-500/20"
+                                            >
+                                                {isProcessing && accept.isPending
+                                                    ? <Loader2 size={12} className="animate-spin" />
+                                                    : <Check size={12} />}
+                                                Accept
+                                            </button>
+                                        </div>
+                                    </motion.div>
+                                );
+                            })}
+                        </AnimatePresence>
                     </div>
-                </div>
-            )}
+                )}
 
-            {/* Sent invitations (admin only) */}
-            {isAdmin && sentInvitations.length > 0 && (
-                <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
-                        Sent
-                    </p>
-                    <div className="space-y-1.5">
-                        {sentInvitations.map((inv: any) => (
-                            <div
-                                key={inv.id}
-                                className="flex items-center justify-between px-3 py-2 bg-slate-50 dark:bg-slate-800/50 rounded-xl"
-                            >
-                                <div className="flex items-center gap-2 min-w-0">
-                                    <div className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
-                                    <p className="text-xs font-medium text-slate-600 dark:text-slate-400 truncate">
-                                        {inv.email}
-                                    </p>
-                                </div>
-                                <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 px-1.5 py-0.5 rounded-md shrink-0 ml-2">
-                                    {expiryLabel(inv.expires_at)}
-                                </span>
-                            </div>
-                        ))}
+                {/* Sent invitations (admin only) */}
+                {isAdmin && sentInvitations.length > 0 && (
+                    <div className="space-y-2">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-1">
+                            Sent
+                        </p>
+                        <AnimatePresence initial={false}>
+                            {sentInvitations.map((inv: any, index: number) => {
+                                const isExpired = new Date(inv.expires_at).getTime() <= Date.now();
+                                const isUrgent = !isExpired && new Date(inv.expires_at).getTime() - Date.now() < 86400000 * 2;
+                                return (
+                                    <motion.div
+                                        key={inv.id}
+                                        initial={{ opacity: 0, x: -10 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        exit={{ opacity: 0, x: 10, height: 0 }}
+                                        transition={{ duration: 0.25, delay: index * 0.05 }}
+                                        whileHover={{ scale: 1.01 }}
+                                        className="flex items-center gap-3 px-4 py-3 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-700/60 hover:border-slate-200 dark:hover:border-slate-600 transition-colors hover:shadow-sm"
+                                    >
+                                        <div className={cn(
+                                            "w-2 h-2 rounded-full shrink-0",
+                                            isExpired ? "bg-slate-300 dark:bg-slate-600" : isUrgent ? "bg-red-400" : "bg-amber-400"
+                                        )} />
+                                        <p className="text-xs font-medium text-slate-600 dark:text-slate-300 truncate flex-1">
+                                            {inv.email}
+                                        </p>
+                                        <span className={cn(
+                                            "text-[10px] font-semibold px-2 py-0.5 rounded-lg shrink-0",
+                                            isExpired
+                                                ? "text-slate-500 bg-slate-100 dark:bg-slate-700 dark:text-slate-400"
+                                                : isUrgent
+                                                    ? "text-red-600 bg-red-50 dark:bg-red-900/20 dark:text-red-400"
+                                                    : "text-amber-600 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-400"
+                                        )}>
+                                            {expiryLabel(inv.expires_at)}
+                                        </span>
+                                    </motion.div>
+                                );
+                            })}
+                        </AnimatePresence>
                     </div>
-                </div>
-            )}
-        </div>
+                )}
+            </div>
+        </motion.div>
     );
 }
 

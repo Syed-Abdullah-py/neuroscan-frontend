@@ -3,18 +3,21 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useState, useRef, useEffect, useCallback, memo } from "react";
+import { createPortal } from "react-dom";
 import { motion, type Variants } from "framer-motion";
 import {
-    ArrowLeft, Brain, User, FileText, Activity, ShieldAlert,
+    ArrowLeft, Brain, User, FileText, ShieldAlert,
     Calendar, Loader2, AlertCircle, ScanLine, Box,
     ChevronLeft, ChevronRight, ChevronDown, ChevronUp, LayoutGrid,
     Maximize2, Minimize2, Play, Pause, Settings2,
     SlidersHorizontal, CheckCircle2, X,
+    Phone, MapPin, CreditCard, Stethoscope, Clock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCase, useUpdateCase } from "@/features/cases/hooks/use-cases";
 import { useWorkspace } from "@/providers/workspace-provider";
 import type { Case, CaseStatus } from "@/lib/types/case.types";
+import type { Patient } from "@/lib/types/patient.types";
 import type { WorkspaceRole } from "@/lib/types/workspace.types";
 
 // ── Dynamic imports (SSR disabled) ────────────────────────────────────────
@@ -104,6 +107,7 @@ interface CaseDetailShellProps {
     workspaceId: string;
     workspaceRole: WorkspaceRole | null;
     membershipId: string | null;
+    patient: Patient | null;
     user: { name: string; email: string; globalRole: string };
 }
 
@@ -195,6 +199,7 @@ const ViewerPanel = memo(function ViewerPanel({
     );
     const [fetchToastCollapsed, setFetchToastCollapsed] = useState(false);
     const [fetchToastDismissed, setFetchToastDismissed] = useState(() => !!cached);
+    const [viewMode, setViewMode] = useState<"slider" | "contact">("slider");
 
     const patchFetch = useCallback((i: number, patch: Partial<FileFetchState>) => {
         setFetchStates(prev => prev.map((s, j) => j === i ? { ...s, ...patch } : s));
@@ -290,10 +295,10 @@ const ViewerPanel = memo(function ViewerPanel({
             slicesPrefetched: false,
             cachedAt: Date.now(),
         });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [allMainDone, caseId]);
 
-    // Phase 2 - PNG slice pre-fetch via proxy, starts only after main files are ready.
+    // Phase 2 - PNG slice pre-fetch via proxy, starts immediately after main files are done.
     // Uses the same URLs as ModalityContactSheet <img> tags so the browser cache is shared.
     useEffect(() => {
         if (!allMainDone || !scanFiles.length) return;
@@ -337,7 +342,7 @@ const ViewerPanel = memo(function ViewerPanel({
         if (entry && !entry.slicesPrefetched) {
             _scanBufferCache.set(caseId, { ...entry, slicesPrefetched: true });
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [allSlicesDone, caseId]);
 
     // Auto-dismiss 3 s after everything (files + slices) is done
@@ -354,7 +359,6 @@ const ViewerPanel = memo(function ViewerPanel({
     const [slice, setSlice] = useState(0);
     const [totalSlices, setTotalSlices] = useState(155);
     const [showMask, setShowMask] = useState(false);
-    const [viewMode, setViewMode] = useState<"slider" | "contact">("slider");
     const [isFullscreen, setIsFullscreen] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
     const [playFps, setPlayFps] = useState(8);
@@ -410,8 +414,8 @@ const ViewerPanel = memo(function ViewerPanel({
 
     return (
         <>
-            {showFetchToast && (
-                <div className={cn(
+            {showFetchToast && createPortal(
+              <div className={cn(
                     "fixed bottom-6 right-6 z-50 w-[320px] rounded-2xl shadow-2xl overflow-hidden border bg-white dark:bg-slate-900",
                     allFetchDone
                         ? "border-emerald-200 dark:border-emerald-800/60"
@@ -541,7 +545,8 @@ const ViewerPanel = memo(function ViewerPanel({
                             )}
                         </div>
                     )}
-                </div>
+                </div>,
+              document.body
             )}
 
             <div
@@ -835,9 +840,21 @@ interface SidebarProps {
     isAdmin: boolean;
     isAssignedDoctor: boolean;
     fileUrls: string[];
+    patient: Patient | null;
 }
 
-const CaseSidebar = memo(function CaseSidebar({ caseItem, isAdmin, isAssignedDoctor, fileUrls }: SidebarProps) {
+const CaseSidebar = memo(function CaseSidebar({ caseItem, isAdmin, isAssignedDoctor, fileUrls, patient }: SidebarProps) {
+    const patientName = patient
+        ? `${patient.first_name} ${patient.last_name}`
+        : [caseItem.patient_first_name, caseItem.patient_last_name].filter(Boolean).join(" ") || "Unknown Patient";
+
+    const initials = patientName.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+
+    const age = patient?.dob ? calcAge(patient.dob) : null;
+    const formattedDob = patient?.dob
+        ? new Date(patient.dob).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })
+        : null;
+
     return (
         <div className="lg:col-span-4 space-y-4">
             {/* AI Analysis */}
@@ -874,17 +891,71 @@ const CaseSidebar = memo(function CaseSidebar({ caseItem, isAdmin, isAssignedDoc
             </motion.div>
 
             {/* Patient Details */}
-            <motion.div variants={fadeUp} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em] mb-4 flex items-center gap-2">
-                    <User size={12} /> Patient Details
-                </h3>
-                <div className="space-y-3">
-                    <div>
-                        <p className="text-sm font-bold text-slate-900 dark:text-white font-mono">
-                            #{caseItem.patient_id.slice(-8).toUpperCase()}
-                        </p>
-                        <p className="text-[10px] text-slate-400 font-mono mt-0.5 break-all">{caseItem.patient_id}</p>
+            <motion.div variants={fadeUp} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                {/* Card header */}
+                <div className="px-5 pt-5 pb-4 border-b border-slate-100 dark:border-slate-800">
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em] flex items-center gap-2 mb-4">
+                        <User size={12} /> Patient Details
+                    </p>
+                    <div className="flex items-center gap-3">
+                        <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-md shadow-blue-500/20">
+                            {initials}
+                        </div>
+                        <div className="min-w-0">
+                            <p className="text-sm font-bold text-slate-900 dark:text-white truncate">{patientName}</p>
+                            <p className="text-[10px] font-mono text-slate-400 mt-0.5">
+                                {patient?.mrn ? `MRN: ${patient.mrn}` : `ID: #${caseItem.patient_id.slice(-8).toUpperCase()}`}
+                            </p>
+                        </div>
+                        {patient?.gender && (
+                            <span className={cn(
+                                "ml-auto shrink-0 px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider",
+                                patient.gender.toLowerCase() === "male"
+                                    ? "bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400"
+                                    : "bg-pink-50 text-pink-600 dark:bg-pink-900/20 dark:text-pink-400"
+                            )}>
+                                {patient.gender}
+                            </span>
+                        )}
                     </div>
+                </div>
+
+                {/* Stats row */}
+                {(age !== null || formattedDob) && (
+                    <div className="grid grid-cols-2 divide-x divide-slate-100 dark:divide-slate-800 border-b border-slate-100 dark:border-slate-800">
+                        {age !== null && (
+                            <div className="px-4 py-3 text-center">
+                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Age</p>
+                                <p className="text-lg font-bold text-slate-900 dark:text-white leading-none">
+                                    {age} <span className="text-xs font-normal text-slate-400">yrs</span>
+                                </p>
+                            </div>
+                        )}
+                        {formattedDob && (
+                            <div className="px-4 py-3 text-center">
+                                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Date of Birth</p>
+                                <p className="text-xs font-bold text-slate-900 dark:text-white">{formattedDob}</p>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Detail rows */}
+                <div className="px-5 py-4 space-y-3">
+                    {patient?.phone_number && (
+                        <PatientInfoRow icon={Phone} label="Phone" value={patient.phone_number} />
+                    )}
+                    {patient?.cnic && (
+                        <PatientInfoRow icon={CreditCard} label="CNIC" value={patient.cnic} mono />
+                    )}
+                    {(patient?.address || patient?.city) && (
+                        <PatientInfoRow
+                            icon={MapPin}
+                            label="Address"
+                            value={[patient.address, patient.city].filter(Boolean).join(", ")}
+                        />
+                    )}
+
                     <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2.5">
                         <Row label="Assigned To" value={
                             <span className={cn("text-xs font-semibold", caseItem.assigned_to_name ? "text-blue-600 dark:text-blue-400" : "text-slate-400 italic")}>
@@ -900,39 +971,76 @@ const CaseSidebar = memo(function CaseSidebar({ caseItem, isAdmin, isAssignedDoc
                 </div>
             </motion.div>
 
-            {/* Current Status */}
-            <motion.div variants={fadeUp} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.15em] mb-3 flex items-center gap-2">
-                    <Activity size={12} /> Current Status
-                </h3>
-                <StatusSelector caseId={caseItem.id} currentStatus={caseItem.status} isAdmin={isAdmin} />
-            </motion.div>
-
             {/* Diagnostic Verdict */}
-            <motion.div variants={fadeUp} className={cn(
-                "p-5 rounded-2xl border shadow-sm",
-                isAssignedDoctor
-                    ? "bg-blue-50/50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800"
-                    : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800"
-            )}>
-                <div className="flex items-center gap-3 mb-4">
-                    <div className={cn("p-1.5 rounded-lg", caseItem.verdict ? "bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400" : "bg-slate-200 dark:bg-slate-800 text-slate-500")}>
-                        <ShieldAlert size={14} />
+            <motion.div variants={fadeUp} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                {/* Verdict header */}
+                <div className={cn(
+                    "px-5 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between gap-3",
+                    caseItem.verdict
+                        ? "bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30"
+                        : "bg-slate-50 dark:bg-slate-800/40"
+                )}>
+                    <div className="flex items-center gap-3">
+                        <div className={cn(
+                            "p-2 rounded-xl",
+                            caseItem.verdict
+                                ? "bg-emerald-100 dark:bg-emerald-900/40"
+                                : "bg-slate-200 dark:bg-slate-700"
+                        )}>
+                            <Stethoscope size={14} className={caseItem.verdict ? "text-emerald-600 dark:text-emerald-400" : "text-slate-500"} />
+                        </div>
+                        <div>
+                            <p className="text-sm font-bold text-slate-900 dark:text-white leading-tight">Diagnostic Verdict</p>
+                            <p className={cn(
+                                "text-[10px] font-semibold uppercase tracking-wider",
+                                caseItem.verdict ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400"
+                            )}>
+                                {caseItem.verdict ? "Assessment recorded" : "Pending review"}
+                            </p>
+                        </div>
                     </div>
-                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">Diagnostic Verdict</h3>
+                    {caseItem.verdict && (
+                        <CheckCircle2 size={18} className="text-emerald-500 shrink-0" />
+                    )}
                 </div>
-                {isAssignedDoctor ? (
-                    <VerdictForm caseId={caseItem.id} initialVerdict={caseItem.verdict} />
-                ) : (
-                    <div className={cn(
-                        "p-4 rounded-xl text-sm border",
-                        caseItem.verdict
-                            ? "bg-white dark:bg-slate-950 border-green-200 dark:border-green-900/30 text-slate-700 dark:text-slate-300"
-                            : "bg-slate-50 dark:bg-slate-950/50 border-dashed border-slate-200 dark:border-slate-800 text-slate-400 italic text-center"
-                    )}>
-                        {caseItem.verdict || "Waiting for doctor's assessment."}
-                    </div>
-                )}
+
+                <div className="p-5">
+                    {isAssignedDoctor ? (
+                        <VerdictForm caseId={caseItem.id} initialVerdict={caseItem.verdict} />
+                    ) : caseItem.verdict ? (
+                        <div className="space-y-3">
+                            {/* Doctor + date meta */}
+                            <div className="flex items-center justify-between text-[10px] text-slate-400">
+                                {caseItem.assigned_to_name && (
+                                    <span className="flex items-center gap-1.5 font-medium text-slate-500 dark:text-slate-400">
+                                        <User size={10} />
+                                        Dr. {caseItem.assigned_to_name}
+                                    </span>
+                                )}
+                                {caseItem.verdict_updated_at && (
+                                    <span className="flex items-center gap-1 font-mono">
+                                        <Clock size={9} />
+                                        {new Date(caseItem.verdict_updated_at).toLocaleDateString("en-GB")}
+                                    </span>
+                                )}
+                            </div>
+                            {/* Verdict text */}
+                            <div className="relative">
+                                <div className="absolute left-0 top-0 bottom-0 w-0.5 bg-emerald-400 dark:bg-emerald-600 rounded-full" />
+                                <p className="pl-4 text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+                                    {caseItem.verdict}
+                                </p>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex flex-col items-center gap-2 py-4 text-center">
+                            <div className="p-3 rounded-2xl bg-slate-100 dark:bg-slate-800">
+                                <ShieldAlert size={20} className="text-slate-400 dark:text-slate-500" />
+                            </div>
+                            <p className="text-xs text-slate-400 italic">Waiting for doctor&apos;s assessment.</p>
+                        </div>
+                    )}
+                </div>
             </motion.div>
         </div>
     );
@@ -940,7 +1048,7 @@ const CaseSidebar = memo(function CaseSidebar({ caseItem, isAdmin, isAssignedDoc
 
 // ── Shell ──────────────────────────────────────────────────────────────────
 
-export function CaseDetailShell({ caseItem: initialCaseItem, workspaceRole, membershipId }: CaseDetailShellProps) {
+export function CaseDetailShell({ caseItem: initialCaseItem, workspaceRole, membershipId, patient }: CaseDetailShellProps) {
     const { data: caseItem = initialCaseItem } = useCase(initialCaseItem.id, initialCaseItem);
     const isAdmin = workspaceRole === "OWNER" || workspaceRole === "ADMIN";
     // Any doctor who reaches this page has passed the server-side guard (they ARE the assigned doctor)
@@ -964,23 +1072,24 @@ export function CaseDetailShell({ caseItem: initialCaseItem, workspaceRole, memb
                     <div>
                         <div className="flex items-center gap-2 mb-0.5">
                             <h1 className="text-xl md:text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
-                                Case <span className="font-mono">#{caseItem.id.slice(-6).toUpperCase()}</span>
+                                {patient
+                                    ? `${patient.first_name} ${patient.last_name}`
+                                    : [caseItem.patient_first_name, caseItem.patient_last_name].filter(Boolean).join(" ") || `Case #${caseItem.id.slice(-6).toUpperCase()}`}
                             </h1>
                             <span className={cn("px-2 py-0.5 rounded-md text-[11px] font-bold uppercase tracking-wider", PRIORITY_STYLES[priority] ?? PRIORITY_STYLES.normal)}>
                                 {priority}
                             </span>
                         </div>
-                        <p className="text-xs text-slate-500 flex items-center gap-1">
+                        <p className="text-xs text-slate-500 flex items-center gap-1.5">
                             <Calendar size={11} />
+                            Case <span className="font-mono">#{caseItem.id.slice(-6).toUpperCase()}</span>
+                            <span className="text-slate-300 dark:text-slate-600">·</span>
                             Created {new Date(caseItem.created_at).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
                         </p>
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
-                    <div className="text-right">
-                        <p className="text-[10px] text-slate-400 uppercase tracking-wider">Patient</p>
-                        <p className="text-sm font-bold font-mono text-slate-900 dark:text-white">#{caseItem.patient_id.slice(-8).toUpperCase()}</p>
-                    </div>
+                <div className="flex items-center gap-2 shrink-0">
+                    <HeaderStatusControl caseId={caseItem.id} currentStatus={caseItem.status} isAdmin={isAdmin} />
                     <div className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
                         Radiology
                     </div>
@@ -1067,6 +1176,7 @@ export function CaseDetailShell({ caseItem: initialCaseItem, workspaceRole, memb
                     isAdmin={isAdmin}
                     isAssignedDoctor={isAssignedDoctor}
                     fileUrls={fileUrls}
+                    patient={patient}
                 />
             </motion.div>
         </motion.div>
@@ -1075,11 +1185,68 @@ export function CaseDetailShell({ caseItem: initialCaseItem, workspaceRole, memb
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
+function calcAge(dob: string): number {
+    const today = new Date();
+    const birth = new Date(dob);
+    let age = today.getFullYear() - birth.getFullYear();
+    const m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+    return age;
+}
+
+function PatientInfoRow({ icon: Icon, label, value, mono }: { icon: React.ComponentType<{ size?: number; className?: string }>; label: string; value: string; mono?: boolean }) {
+    return (
+        <div className="flex items-start gap-3">
+            <div className="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 shrink-0 mt-0.5">
+                <Icon size={11} className="text-slate-500 dark:text-slate-400" />
+            </div>
+            <div className="min-w-0">
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">{label}</p>
+                <p className={cn("text-xs font-medium text-slate-700 dark:text-slate-300 break-all", mono && "font-mono")}>{value}</p>
+            </div>
+        </div>
+    );
+}
+
 function Row({ label, value }: { label: string; value: React.ReactNode }) {
     return (
         <div className="flex items-center justify-between gap-2">
             <span className="text-xs text-slate-500 shrink-0">{label}</span>
             {value}
+        </div>
+    );
+}
+
+function HeaderStatusControl({ caseId, currentStatus, isAdmin }: { caseId: string; currentStatus: CaseStatus; isAdmin: boolean }) {
+    const updateCase = useUpdateCase();
+    const statuses: CaseStatus[] = ["PENDING", "PROCESSING", "REVIEWED"];
+
+    if (!isAdmin) {
+        return (
+            <span className={cn("px-3 py-1.5 rounded-xl text-xs font-bold uppercase tracking-wider", STATUS_COLORS[currentStatus])}>
+                {currentStatus}
+            </span>
+        );
+    }
+    return (
+        <div className="flex items-center gap-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-1">
+            {statuses.map((s) => (
+                <button
+                    key={s}
+                    disabled={updateCase.isPending || s === currentStatus}
+                    onClick={() => updateCase.mutate({ caseId, data: { status: s } })}
+                    className={cn(
+                        "px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all",
+                        s === currentStatus
+                            ? STATUS_COLORS[s]
+                            : "text-slate-400 dark:text-slate-600 hover:text-slate-700 dark:hover:text-slate-300 disabled:opacity-50"
+                    )}
+                >
+                    {updateCase.isPending && updateCase.variables?.data?.status === s
+                        ? <Loader2 size={10} className="animate-spin mx-auto" />
+                        : s}
+                </button>
+            ))}
         </div>
     );
 }
@@ -1124,6 +1291,7 @@ function VerdictForm({ caseId, initialVerdict }: { caseId: string; initialVerdic
     const [verdict, setVerdict] = useState(initialVerdict || "");
     const [msg, setMsg] = useState("");
     const updateCase = useUpdateCase();
+    const wordCount = verdict.trim().split(/\s+/).filter(Boolean).length;
 
     const handleSubmit = async () => {
         if (!verdict.trim()) return;
@@ -1138,17 +1306,34 @@ function VerdictForm({ caseId, initialVerdict }: { caseId: string; initialVerdic
 
     return (
         <div className="space-y-3">
-            <textarea
-                value={verdict}
-                onChange={e => setVerdict(e.target.value)}
-                rows={4}
-                placeholder="Enter detailed diagnostic findings and recommendation..."
-                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-3 text-sm focus:ring-2 focus:ring-blue-500/20 outline-none resize-none transition-all placeholder:text-slate-400 dark:text-white"
-            />
+            {/* Editor hint */}
+            <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 dark:bg-blue-950/30 rounded-xl border border-blue-100 dark:border-blue-900/40">
+                <FileText size={12} className="text-blue-500 shrink-0" />
+                <span className="text-[11px] font-medium text-blue-700 dark:text-blue-300">
+                    {initialVerdict ? "Revise your diagnostic report below" : "Write your diagnostic assessment and findings"}
+                </span>
+            </div>
+
+            {/* Textarea */}
+            <div className="relative">
+                <textarea
+                    value={verdict}
+                    onChange={e => setVerdict(e.target.value)}
+                    rows={5}
+                    placeholder="Describe findings, impression, and clinical recommendations..."
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl p-4 text-sm leading-relaxed focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 dark:focus:border-blue-600 outline-none resize-none transition-all placeholder:text-slate-400 dark:text-white"
+                />
+                <span className="absolute bottom-3 right-3 text-[10px] font-mono text-slate-400 pointer-events-none">
+                    {wordCount}w
+                </span>
+            </div>
+
+            {/* Footer */}
             <div className="flex items-center justify-between gap-2">
                 {msg ? (
-                    <span className={cn("text-xs font-medium flex items-center gap-1.5", msg.includes("saved") ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400")}>
-                        <AlertCircle size={11} /> {msg}
+                    <span className={cn("text-xs font-medium flex items-center gap-1.5", msg.includes("saved") ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")}>
+                        {msg.includes("saved") ? <CheckCircle2 size={11} /> : <AlertCircle size={11} />}
+                        {msg}
                     </span>
                 ) : <span />}
                 <button
@@ -1156,7 +1341,9 @@ function VerdictForm({ caseId, initialVerdict }: { caseId: string; initialVerdic
                     disabled={updateCase.isPending || !verdict.trim()}
                     className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-xl disabled:opacity-50 flex items-center gap-2 transition-all shadow-md shadow-blue-500/20"
                 >
-                    {updateCase.isPending && <Loader2 size={12} className="animate-spin" />}
+                    {updateCase.isPending
+                        ? <Loader2 size={12} className="animate-spin" />
+                        : <CheckCircle2 size={12} />}
                     {initialVerdict ? "Update Verdict" : "Submit Verdict"}
                 </button>
             </div>
