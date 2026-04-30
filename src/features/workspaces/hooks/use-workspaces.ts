@@ -12,6 +12,7 @@ export const workspaceKeys = {
     myInvitations: () => [...workspaceKeys.all, "my-invitations"] as const,
     joinRequests: (id: string) => [...workspaceKeys.all, id, "join-requests"] as const,
     discover: () => [...workspaceKeys.all, "discover"] as const,
+    invitableUsers: (id: string, q: string) => [...workspaceKeys.all, id, "invitable-users", q] as const,
 };
 
 function useApi() {
@@ -198,5 +199,15 @@ export function useDiscoverWorkspaces() {
         queryKey: workspaceKeys.discover(),
         queryFn: () => makeWorkspacesClient(token).discover(),
         enabled: !!token,
+    });
+}
+
+export function useInvitableUsers(workspaceId: string | undefined, q: string) {
+    const { token } = useWorkspace();
+    return useQuery({
+        queryKey: workspaceKeys.invitableUsers(workspaceId ?? "", q),
+        queryFn: () => makeWorkspacesClient(token).invitableUsers(workspaceId!, q),
+        enabled: !!token && !!workspaceId,
+        staleTime: 30_000,
     });
 }

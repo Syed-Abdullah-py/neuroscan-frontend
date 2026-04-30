@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Shield, Stethoscope, Trash2, UserPlus, Loader2, CheckCircle2, AlertCircle, LogOut } from "lucide-react";
+import { createPortal } from "react-dom";
+import { Shield, Stethoscope, Trash2, UserPlus, Loader2, CheckCircle2, AlertCircle, LogOut, AlertTriangle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
     inviteMemberAction,
@@ -28,6 +29,11 @@ export function MembersPanel({
     const [email, setEmail] = useState("");
     const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
     const [isPending, startTransition] = useTransition();
+    const [confirmModal, setConfirmModal] = useState<
+        | { type: "leave" }
+        | { type: "remove"; userId: string; userEmail: string }
+        | null
+    >(null);
 
     const canManage =
         currentUserRole === "OWNER" || currentUserRole === "ADMIN";
@@ -42,22 +48,72 @@ export function MembersPanel({
     };
 
     const handleRemove = (userId: string, userEmail: string) => {
-        if (!confirm(`Remove ${userEmail} from this workspace?`)) return;
-        startTransition(async () => {
-            const res = await removeMemberAction(workspaceId, userId);
-            setMsg({ text: res.message, ok: res.success });
-        });
+        setConfirmModal({ type: "remove", userId, userEmail });
     };
 
     const handleLeave = () => {
-        if (!confirm("Are you sure you want to leave this workspace?")) return;
-        startTransition(async () => {
-            const res = await leaveWorkspaceAction(workspaceId);
-            setMsg({ text: res.message, ok: res.success });
-        });
+        setConfirmModal({ type: "leave" });
     };
 
+    const executeConfirm = () => {
+        if (!confirmModal) return;
+        if (confirmModal.type === "leave") {
+            startTransition(async () => {
+                const res = await leaveWorkspaceAction(workspaceId);
+                setMsg({ text: res.message, ok: res.success });
+            });
+        } else {
+            const { userId } = confirmModal;
+            startTransition(async () => {
+                const res = await removeMemberAction(workspaceId, userId);
+                setMsg({ text: res.message, ok: res.success });
+            });
+        }
+        setConfirmModal(null);
+    };
+
+    const confirmTitle = confirmModal?.type === "leave" ? "Leave Workspace" : "Remove Member";
+    const confirmBody = confirmModal?.type === "leave"
+        ? "You will lose access to this workspace immediately."
+        : `${confirmModal?.userEmail} will be removed from this workspace.`;
+    const confirmLabel = confirmModal?.type === "leave" ? "Leave" : "Remove";
+
     return (
+        <>
+        {confirmModal && createPortal(
+            <div className="fixed inset-0 z-50 flex items-center justify-center">
+                <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setConfirmModal(null)} />
+                <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-neutral-200 dark:border-slate-700 w-full max-w-sm mx-4 p-6 flex flex-col gap-4">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-red-50 dark:bg-red-900/20 flex items-center justify-center shrink-0">
+                            <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                        </div>
+                        <div>
+                            <h3 className="text-sm font-bold text-black dark:text-white">{confirmTitle}</h3>
+                            <p className="text-xs text-neutral-500 dark:text-neutral-400 mt-0.5">This action cannot be undone.</p>
+                        </div>
+                    </div>
+                    <div className="bg-neutral-50 dark:bg-slate-800/50 rounded-xl px-4 py-3 border border-neutral-100 dark:border-slate-700">
+                        <p className="text-sm text-neutral-600 dark:text-neutral-300">{confirmBody}</p>
+                    </div>
+                    <div className="flex gap-2 mt-1">
+                        <button
+                            onClick={() => setConfirmModal(null)}
+                            className="flex-1 px-4 py-2.5 rounded-xl border border-neutral-200 dark:border-slate-700 text-sm font-semibold text-neutral-700 dark:text-neutral-300 hover:bg-neutral-50 dark:hover:bg-slate-800 transition-colors"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            onClick={executeConfirm}
+                            className="flex-1 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-sm font-semibold text-white transition-colors"
+                        >
+                            {confirmLabel}
+                        </button>
+                    </div>
+                </div>
+            </div>,
+            document.body
+        )}
         <div className="space-y-6">
             {/* Invite form - admin/owner only */}
             {canManage && (
@@ -189,5 +245,6 @@ export function MembersPanel({
                 </div>
             </div>
         </div>
+        </>
     );
 }
