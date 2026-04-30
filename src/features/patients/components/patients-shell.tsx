@@ -126,7 +126,8 @@ export function PatientsShell({
                 variants={item}
                 className="rounded-2xl border border-neutral-200 dark:border-slate-700/50 overflow-hidden bg-white dark:bg-gray-900/20"
             >
-                <table className="w-full">
+                <div className="overflow-x-auto">
+                <table className="w-full min-w-[720px]">
                     <thead>
                         <tr className="border-b border-neutral-200 dark:border-slate-700/50 bg-neutral-50/50 dark:bg-gray-900/50">
                             {["Patient", "Phone", "DOB", "Gender", "City", "MRN", "Actions"].map(
@@ -178,6 +179,7 @@ export function PatientsShell({
                         )}
                     </tbody>
                 </table>
+                </div>
             </motion.div>
 
             {/* Edit modal */}
@@ -346,7 +348,7 @@ function EditPatientModal({
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">
                                 First Name
@@ -371,7 +373,7 @@ function EditPatientModal({
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">
                                 Phone
@@ -399,7 +401,7 @@ function EditPatientModal({
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">
                                 MRN
@@ -424,7 +426,7 @@ function EditPatientModal({
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5 block">
                                 City

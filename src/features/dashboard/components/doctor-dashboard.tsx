@@ -143,7 +143,8 @@ export function DoctorDashboard({
                 </div>
 
                 <div className="rounded-2xl border border-neutral-200 dark:border-slate-700/50 overflow-hidden bg-white dark:bg-gray-900/20">
-                    <table className="w-full">
+                    <div className="overflow-x-auto">
+                    <table className="w-full min-w-[560px]">
                         <thead>
                             <tr className="border-b border-neutral-200 dark:border-slate-700/50 bg-neutral-50/50 dark:bg-gray-900/50">
                                 {["Patient", "Priority", "Status", "Updated", ""].map((h) => (
@@ -235,6 +236,7 @@ export function DoctorDashboard({
                             )}
                         </tbody>
                     </table>
+                    </div>
                 </div>
             </motion.div>
         </motion.div>
