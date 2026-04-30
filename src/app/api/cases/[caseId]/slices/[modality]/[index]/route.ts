@@ -12,8 +12,12 @@ export async function GET(
     const { caseId, modality, index } = await params;
 
     const cookieStore = await cookies();
-    const token = cookieStore.get("session")?.value;
-    const workspaceId = cookieStore.get("active_workspace")?.value;
+    const cookieToken = cookieStore.get("session")?.value;
+    const cookieWorkspaceId = cookieStore.get("active_workspace")?.value;
+    const headerToken = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim();
+    const headerWorkspaceId = req.headers.get("x-workspace-id")?.trim();
+    const token = cookieToken || headerToken;
+    const workspaceId = cookieWorkspaceId || headerWorkspaceId;
     if (!token || !workspaceId) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

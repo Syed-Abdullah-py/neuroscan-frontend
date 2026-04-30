@@ -6,7 +6,7 @@ export const runtime = "nodejs";
 const AUTH_SERVICE_URL = (process.env.AUTH_SERVICE_URL ?? "http://localhost:8000").replace(/\/$/, "");
 
 export async function GET(
-    _req: NextRequest,
+    req: NextRequest,
     { params }: { params: Promise<{ caseId: string; index: string }> }
 ) {
     const { caseId, index } = await params;
@@ -16,8 +16,12 @@ export async function GET(
     }
 
     const cookieStore = await cookies();
-    const token = cookieStore.get("session")?.value;
-    const workspaceId = cookieStore.get("active_workspace")?.value;
+    const cookieToken = cookieStore.get("session")?.value;
+    const cookieWorkspaceId = cookieStore.get("active_workspace")?.value;
+    const headerToken = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim();
+    const headerWorkspaceId = req.headers.get("x-workspace-id")?.trim();
+    const token = cookieToken || headerToken;
+    const workspaceId = cookieWorkspaceId || headerWorkspaceId;
     if (!token || !workspaceId) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

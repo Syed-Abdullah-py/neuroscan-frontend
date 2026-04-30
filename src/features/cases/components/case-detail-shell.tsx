@@ -140,10 +140,12 @@ const ViewerPanel = memo(function ViewerPanel({
     activeTab,
     caseId,
     scanFiles,
+    authHeaders,
 }: {
     activeTab: TabKey;
     caseId: string;
     scanFiles: string[];
+    authHeaders?: HeadersInit;
 }) {
     const is3D = activeTab === "3d";
     const isGrid = activeTab === "grid";
@@ -239,7 +241,7 @@ const ViewerPanel = memo(function ViewerPanel({
         FETCH_URLS.forEach((url, i) => {
             if (!url) return;
             patchFetch(i, { status: "downloading" });
-            fetch(url, { signal: fileControllers[i].signal })
+            fetch(url, { signal: fileControllers[i].signal, headers: authHeaders })
                 .then(res => {
                     if (!res.ok) throw new Error(`${res.status}`);
                     const total = parseInt(res.headers.get("Content-Length") ?? "0", 10);
@@ -321,7 +323,10 @@ const ViewerPanel = memo(function ViewerPanel({
                     const end = Math.min(start + CONCURRENT, SLICE_TOTAL);
                     await Promise.allSettled(
                         Array.from({ length: end - start }, (_, k) => start + k).map(idx =>
-                            fetch(`/api/cases/${caseId}/slices/${mod}/${idx}`, { signal: sig })
+                            fetch(`/api/cases/${caseId}/slices/${mod}/${idx}`, {
+                                signal: sig,
+                                headers: authHeaders,
+                            })
                                 .then(() => { done++; patchSlice(modIdx, { done }); })
                                 .catch(() => { })
                         )
@@ -1050,6 +1055,7 @@ const CaseSidebar = memo(function CaseSidebar({ caseItem, isAdmin, isAssignedDoc
 
 export function CaseDetailShell({ caseItem: initialCaseItem, workspaceRole, membershipId, patient }: CaseDetailShellProps) {
     const { data: caseItem = initialCaseItem } = useCase(initialCaseItem.id, initialCaseItem);
+    const { token, activeWorkspaceId } = useWorkspace();
     const isAdmin = workspaceRole === "OWNER" || workspaceRole === "ADMIN";
     // Any doctor who reaches this page has passed the server-side guard (they ARE the assigned doctor)
     const isAssignedDoctor = workspaceRole === "DOCTOR";
@@ -1156,6 +1162,12 @@ export function CaseDetailShell({ caseItem: initialCaseItem, workspaceRole, memb
                             activeTab={activeTab}
                             caseId={caseItem.id}
                             scanFiles={fileUrls}
+                            authHeaders={{
+                                Authorization: `Bearer ${token}`,
+                                ...(activeWorkspaceId
+                                    ? { "X-Workspace-Id": activeWorkspaceId }
+                                    : {}),
+                            }}
                         />
                     </motion.div>
 
