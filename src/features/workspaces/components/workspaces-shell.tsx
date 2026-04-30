@@ -123,7 +123,7 @@ export function WorkspacesShell({
                 {/* Center: active workspace details */}
                 <div className="xl:col-span-5 min-w-0">
                     {workspaceId ? (
-                        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-visible">
                             {/* Workspace header */}
                             <div className="p-8 border-b border-slate-100 dark:border-slate-800">
                                 <h2 className="text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight mb-3">
@@ -735,22 +735,15 @@ function MembersTab({
                                 </div>
                             )}
 
-                            {/* Dropdown — portalled to body to escape overflow:hidden parents */}
+                            {/* Dropdown */}
                             <AnimatePresence>
-                                {dropdownOpen && !selected && inputRef.current && createPortal(
+                                {dropdownOpen && !selected && (
                                     <motion.div
                                         initial={{ opacity: 0, y: -4 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         exit={{ opacity: 0, y: -4 }}
                                         transition={{ duration: 0.15 }}
-                                        style={{
-                                            position: "fixed",
-                                            top: inputRef.current.getBoundingClientRect().bottom + 6,
-                                            left: inputRef.current.getBoundingClientRect().left,
-                                            width: inputRef.current.getBoundingClientRect().width,
-                                            zIndex: 9999,
-                                        }}
-                                        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl overflow-hidden"
+                                        className="absolute left-0 right-0 top-[calc(100%+6px)] z-[60] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl overflow-hidden"
                                     >
                                         {searchingUsers ? (
                                             <div className="px-4 py-6 flex items-center justify-center gap-2 text-xs text-slate-400 font-medium">
@@ -797,8 +790,7 @@ function MembersTab({
                                                 ))}
                                             </div>
                                         )}
-                                    </motion.div>,
-                                    document.body
+                                    </motion.div>
                                 )}
                             </AnimatePresence>
                         </div>
