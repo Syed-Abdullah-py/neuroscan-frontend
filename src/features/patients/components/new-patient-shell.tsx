@@ -69,7 +69,7 @@ export function NewPatientShell({ workspaceRole: _ }: NewPatientShellProps) {
                     )}
 
                     {/* Name */}
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label className={labelCls}>
                                 First Name <span className="text-red-500">*</span>
@@ -113,7 +113,7 @@ export function NewPatientShell({ workspaceRole: _ }: NewPatientShellProps) {
                     </div>
 
                     {/* DOB + Gender */}
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label className={labelCls}>
                                 Date of Birth <span className="text-red-500">*</span>
@@ -182,7 +182,7 @@ export function NewPatientShell({ workspaceRole: _ }: NewPatientShellProps) {
                     </div>
 
                     {/* MRN + CNIC */}
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label className={labelCls}>MRN</label>
                             <input
@@ -202,7 +202,7 @@ export function NewPatientShell({ workspaceRole: _ }: NewPatientShellProps) {
                     </div>
 
                     {/* City + Address */}
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label className={labelCls}>City</label>
                             <input

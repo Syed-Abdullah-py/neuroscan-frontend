@@ -107,7 +107,7 @@ export function WorkspacesShell({
 
             <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start">
                 {/* Left column: workspace list */}
-                <div className="xl:col-span-3 space-y-4">
+                <div className="xl:col-span-3 space-y-4 min-w-0">
                     <WorkspaceListPanel
                         workspaces={workspaceList}
                         activeWorkspaceId={workspaceId}
@@ -121,7 +121,7 @@ export function WorkspacesShell({
                 </div>
 
                 {/* Center: active workspace details */}
-                <div className="xl:col-span-5">
+                <div className="xl:col-span-5 min-w-0">
                     {workspaceId ? (
                         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
                             {/* Workspace header */}
@@ -227,7 +227,7 @@ export function WorkspacesShell({
                 </div>
 
                 {/* Right column: requests & invitations */}
-                <div className="xl:col-span-4 space-y-4">
+                <div className="xl:col-span-4 space-y-4 min-w-0">
                     {isAdmin && (
                         <RequestsCard
                             joinRequests={joinRequests}
@@ -610,7 +610,6 @@ function MembersTab({
     const [removeTarget, setRemoveTarget] = useState<{ userId: string; name: string } | null>(null);
     const wrapperRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
-    const [dropdownRect, setDropdownRect] = useState<DOMRect | null>(null);
 
     const { data: invitableUsers = [], isFetching: searchingUsers } = useInvitableUsers(
         isAdmin ? workspaceId : undefined,
@@ -627,11 +626,6 @@ function MembersTab({
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    useEffect(() => {
-        if (dropdownOpen && inputRef.current) {
-            setDropdownRect(inputRef.current.getBoundingClientRect());
-        }
-    }, [dropdownOpen, query]);
 
     const handleInvite = async () => {
         if (!selected) return;
@@ -743,7 +737,7 @@ function MembersTab({
 
                             {/* Dropdown — portalled to body to escape overflow:hidden parents */}
                             <AnimatePresence>
-                                {dropdownOpen && !selected && dropdownRect && createPortal(
+                                {dropdownOpen && !selected && inputRef.current && createPortal(
                                     <motion.div
                                         initial={{ opacity: 0, y: -4 }}
                                         animate={{ opacity: 1, y: 0 }}
@@ -751,16 +745,21 @@ function MembersTab({
                                         transition={{ duration: 0.15 }}
                                         style={{
                                             position: "fixed",
-                                            top: dropdownRect.bottom + 6,
-                                            left: dropdownRect.left,
-                                            width: dropdownRect.width,
+                                            top: inputRef.current.getBoundingClientRect().bottom + 6,
+                                            left: inputRef.current.getBoundingClientRect().left,
+                                            width: inputRef.current.getBoundingClientRect().width,
                                             zIndex: 9999,
                                         }}
                                         className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-2xl overflow-hidden"
                                     >
-                                        {invitableUsers.length === 0 ? (
+                                        {searchingUsers ? (
+                                            <div className="px-4 py-6 flex items-center justify-center gap-2 text-xs text-slate-400 font-medium">
+                                                <Loader2 size={13} className="animate-spin" />
+                                                Searching…
+                                            </div>
+                                        ) : invitableUsers.length === 0 ? (
                                             <div className="px-4 py-6 text-center text-xs text-slate-400 font-medium">
-                                                {query ? "No users found" : "No users available to invite"}
+                                                {query ? "No users found matching your search" : "No users available to invite"}
                                             </div>
                                         ) : (
                                             <div className="max-h-52 overflow-y-auto py-1.5">

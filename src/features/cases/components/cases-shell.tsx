@@ -131,7 +131,7 @@ export function CasesShell({
                         placeholder="Search cases..."
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        className="pl-9 pr-4 py-2 rounded-full border border-neutral-200 dark:border-slate-700 bg-white dark:bg-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white w-48"
+                        className="pl-9 pr-4 py-2 rounded-full border border-neutral-200 dark:border-slate-700 bg-white dark:bg-gray-900 text-sm focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white w-36 sm:w-48"
                     />
                 </div>
 
@@ -169,7 +169,8 @@ export function CasesShell({
 
             {/* Table */}
             <motion.div variants={item} className="rounded-2xl border border-neutral-200 dark:border-slate-700/50 overflow-hidden bg-white dark:bg-gray-900/20">
-                <table className="w-full">
+                <div className="overflow-x-auto">
+                <table className="w-full min-w-[640px]">
                     <thead>
                         <tr className="border-b border-neutral-200 dark:border-slate-700/50 bg-neutral-50/50 dark:bg-gray-900/50">
                             {["Patient", "Assigned", "Priority", "Status"].map((h) => (
@@ -228,6 +229,7 @@ export function CasesShell({
                         )}
                     </tbody>
                 </table>
+                </div>
             </motion.div>
         </motion.div>
     );

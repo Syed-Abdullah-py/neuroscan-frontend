@@ -218,7 +218,7 @@ export function NewCaseShell({ patients, members }: NewCaseShellProps) {
           </div>
 
           {/* Priority + Assign */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className={labelCls}>Priority</label>
               <div className="relative">
@@ -267,7 +267,7 @@ export function NewCaseShell({ patients, members }: NewCaseShellProps) {
               </span>
             </label>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {MODALITY_META.map(({ key, label, full, color }) => {
                 const file = scans[key];
                 return (
