@@ -4,6 +4,7 @@ const nextConfig: NextConfig = {
   experimental: {
     serverActions: {
       bodySizeLimit: "500mb",
+      allowedOrigins: ["localhost:3000", "93g00jmj-3000.inc1.devtunnels.ms"],
     },
   },
   allowedDevOrigins: [
@@ -27,7 +28,8 @@ const nextConfig: NextConfig = {
     "10.229.193.10.nip.io:3002",
     "10.229.193.10",
     "10.229.193.10.nip.io",
-    "neuroscan.local"
+    "neuroscan.local",
+    "https://93g00jmj-3000.inc1.devtunnels.ms"
   ],
   transpilePackages: ["@niivue/niivue"],
 };

@@ -369,6 +369,7 @@ const ViewerPanel = memo(function ViewerPanel({
     const [playFps, setPlayFps] = useState(8);
     const [settingsOpen, setSettingsOpen] = useState(false);
     const [controlsVisible, setControlsVisible] = useState(true);
+    const [isClient, setIsClient] = useState(false);
     const viewerCardRef = useRef<HTMLDivElement>(null);
 
     // Reset when tab changes
@@ -386,6 +387,10 @@ const ViewerPanel = memo(function ViewerPanel({
         const handler = () => setIsFullscreen(!!document.fullscreenElement);
         document.addEventListener("fullscreenchange", handler);
         return () => document.removeEventListener("fullscreenchange", handler);
+    }, []);
+
+    useEffect(() => {
+        setIsClient(true);
     }, []);
 
     // Playback loop - interval only, no extra deps
@@ -419,7 +424,7 @@ const ViewerPanel = memo(function ViewerPanel({
 
     return (
         <>
-            {showFetchToast && createPortal(
+            {showFetchToast && isClient && createPortal(
               <div className={cn(
                     "fixed bottom-6 right-6 z-50 w-[320px] rounded-2xl shadow-2xl overflow-hidden border bg-white dark:bg-slate-900",
                     allFetchDone

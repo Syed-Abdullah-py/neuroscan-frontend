@@ -67,6 +67,9 @@ export function CasesShell({
 
     const filtered = cases
         .filter((c) => {
+            // Hide cases whose AI pipeline is still running
+            if (c.status === "PROCESSING" && statusFilter !== "PROCESSING") return false;
+
             const q = search.toLowerCase();
             const fullName = `${c.patient_first_name ?? ""} ${c.patient_last_name ?? ""}`.trim().toLowerCase();
             const matchSearch =
