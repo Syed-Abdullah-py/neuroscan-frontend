@@ -7,9 +7,9 @@ const AUTH_SERVICE_URL = (process.env.AUTH_SERVICE_URL ?? "http://localhost:8000
 
 export async function GET(
     req: NextRequest,
-    { params }: { params: Promise<{ caseId: string; modality: string; index: string }> }
+    { params }: { params: Promise<{ caseId: string; modality: string }> }
 ) {
-    const { caseId, modality, index } = await params;
+    const { caseId, modality } = await params;
 
     const cookieStore = await cookies();
     const cookieToken = cookieStore.get("session")?.value;
@@ -18,12 +18,12 @@ export async function GET(
     const headerWorkspaceId = req.headers.get("x-workspace-id")?.trim();
     const token = cookieToken || headerToken;
     const workspaceId = cookieWorkspaceId || headerWorkspaceId;
+
     if (!token || !workspaceId) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const masked = req.nextUrl.searchParams.get("masked") === "true";
-    const backendUrl = `${AUTH_SERVICE_URL}/cases/${caseId}/slices/${modality}/${index}${masked ? "?masked=true" : ""}`;
+    const backendUrl = `${AUTH_SERVICE_URL}/cases/${caseId}/slices/${modality}/zip`;
 
     const res = await fetch(backendUrl, {
         headers: {
@@ -39,7 +39,7 @@ export async function GET(
     }
 
     const forwardHeaders: Record<string, string> = {
-        "Content-Type": "image/png",
+        "Content-Type": "application/zip",
         "Cache-Control": "private, max-age=86400",
     };
     const contentLength = res.headers.get("Content-Length");
