@@ -14,6 +14,7 @@ export interface Case {
     verdict: string | null;
     verdict_updated_at: string | null;
     notes: string | null;
+    survival_prediction: "Short" | "Mid" | "Long" | null;
     patient_id: string;
     patient_first_name: string | null;
     patient_last_name: string | null;

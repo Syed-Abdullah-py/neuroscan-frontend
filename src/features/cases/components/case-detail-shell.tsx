@@ -12,6 +12,7 @@ import {
     Maximize2, Minimize2, Play, Pause, Settings2,
     SlidersHorizontal, CheckCircle2, X,
     Phone, MapPin, CreditCard, Stethoscope, Clock,
+    Activity, Timer,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCase, useUpdateCase } from "@/features/cases/hooks/use-cases";
@@ -843,6 +844,47 @@ const ViewerPanel = memo(function ViewerPanel({
     );
 });
 
+// ── Survival prediction config ─────────────────────────────────────────────
+
+const SURVIVAL_CONFIG = {
+    Short: {
+        label: "Short Survival",
+        sublabel: "≤ 300 days",
+        wrapperGradient: "from-rose-200 via-red-100 to-rose-200 dark:from-rose-800/60 dark:via-red-900/40 dark:to-rose-800/60",
+        innerGradient: "from-rose-50 to-red-50 dark:from-rose-950/60 dark:to-red-950/60",
+        iconGradient: "from-rose-500 to-red-600",
+        accentText: "text-rose-600 dark:text-rose-400",
+        badge: "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300",
+        bar: "bg-gradient-to-r from-rose-400 to-red-500",
+        barWidth: "33%",
+        dot: "bg-rose-500",
+    },
+    Mid: {
+        label: "Intermediate",
+        sublabel: "301 – 450 days",
+        wrapperGradient: "from-amber-200 via-yellow-100 to-amber-200 dark:from-amber-800/60 dark:via-yellow-900/40 dark:to-amber-800/60",
+        innerGradient: "from-amber-50 to-yellow-50 dark:from-amber-950/60 dark:to-yellow-950/60",
+        iconGradient: "from-amber-500 to-orange-500",
+        accentText: "text-amber-600 dark:text-amber-400",
+        badge: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
+        bar: "bg-gradient-to-r from-amber-400 to-orange-500",
+        barWidth: "66%",
+        dot: "bg-amber-500",
+    },
+    Long: {
+        label: "Extended Survival",
+        sublabel: "> 450 days",
+        wrapperGradient: "from-emerald-200 via-teal-100 to-emerald-200 dark:from-emerald-800/60 dark:via-teal-900/40 dark:to-emerald-800/60",
+        innerGradient: "from-emerald-50 to-teal-50 dark:from-emerald-950/60 dark:to-teal-950/60",
+        iconGradient: "from-emerald-500 to-teal-600",
+        accentText: "text-emerald-600 dark:text-emerald-400",
+        badge: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+        bar: "bg-gradient-to-r from-emerald-400 to-teal-500",
+        barWidth: "100%",
+        dot: "bg-emerald-500",
+    },
+} as const;
+
 // ── Sidebar - memoized, never re-renders on slice changes ──────────────────
 
 interface SidebarProps {
@@ -899,6 +941,96 @@ const CaseSidebar = memo(function CaseSidebar({ caseItem, isAdmin, isAssignedDoc
                     </div>
                 </div>
             </motion.div>
+
+            {/* Survival Prognosis */}
+            {(() => {
+                const pred = caseItem.survival_prediction;
+                const cfg = pred ? SURVIVAL_CONFIG[pred] : null;
+
+                return (
+                    <motion.div
+                        variants={fadeUp}
+                        className={cn(
+                            "bg-gradient-to-br p-px rounded-2xl",
+                            cfg ? cfg.wrapperGradient : "from-slate-200 via-slate-100 to-slate-200 dark:from-slate-700/60 dark:via-slate-800/40 dark:to-slate-700/60"
+                        )}
+                    >
+                        <div className={cn(
+                            "bg-gradient-to-br p-5 rounded-[15px] space-y-4",
+                            cfg ? cfg.innerGradient : "from-slate-50 to-white dark:from-slate-900 dark:to-slate-900/80"
+                        )}>
+                            {/* Header */}
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    <div className={cn(
+                                        "p-2 bg-gradient-to-br rounded-lg shadow-md shrink-0",
+                                        cfg ? cfg.iconGradient : "from-slate-400 to-slate-500"
+                                    )}>
+                                        <Activity className="w-4 h-4 text-white" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm font-bold text-slate-900 dark:text-white leading-tight">Survival Prognosis</p>
+                                        <p className={cn(
+                                            "text-[10px] font-semibold uppercase tracking-wider",
+                                            cfg ? cfg.accentText : "text-slate-400"
+                                        )}>
+                                            {cfg ? "AI Predicted" : "Not computed"}
+                                        </p>
+                                    </div>
+                                </div>
+                                {pred && cfg && (
+                                    <span className={cn("text-[10px] font-bold px-2 py-1 rounded-lg uppercase tracking-wider", cfg.badge)}>
+                                        {pred}
+                                    </span>
+                                )}
+                            </div>
+
+                            {/* Main display */}
+                            {cfg && pred ? (
+                                <>
+                                    <div className="bg-white/60 dark:bg-slate-900/60 backdrop-blur-sm rounded-xl p-4 text-center space-y-1 border border-white/80 dark:border-slate-700/50">
+                                        <p className={cn("text-2xl font-black tracking-tight", cfg.accentText)}>
+                                            {cfg.label}
+                                        </p>
+                                        <div className="flex items-center justify-center gap-1.5">
+                                            <Timer className="w-3 h-3 text-slate-400" />
+                                            <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">{cfg.sublabel}</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Progress bar */}
+                                    <div className="space-y-1.5">
+                                        <div className="flex justify-between text-[9px] font-bold text-slate-400 uppercase tracking-wider">
+                                            <span>Short</span>
+                                            <span>Mid</span>
+                                            <span>Long</span>
+                                        </div>
+                                        <div className="h-2 bg-slate-200 dark:bg-slate-700/60 rounded-full overflow-hidden">
+                                            <div
+                                                className={cn("h-full rounded-full transition-all duration-700", cfg.bar)}
+                                                style={{ width: cfg.barWidth }}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <p className="text-[10px] text-slate-400 dark:text-slate-500 text-center leading-relaxed">
+                                        Estimated from tumor morphology &amp; patient age via ML model. Not a clinical diagnosis.
+                                    </p>
+                                </>
+                            ) : (
+                                <div className="flex flex-col items-center gap-2 py-2 text-center">
+                                    <div className="p-3 rounded-2xl bg-slate-100 dark:bg-slate-800">
+                                        <Activity size={20} className="text-slate-400 dark:text-slate-500" />
+                                    </div>
+                                    <p className="text-xs text-slate-400 dark:text-slate-500 leading-relaxed">
+                                        Prognosis is available for cases processed after the AI update. Re-upload scans to generate a prediction.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    </motion.div>
+                );
+            })()}
 
             {/* Patient Details */}
             <motion.div variants={fadeUp} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
