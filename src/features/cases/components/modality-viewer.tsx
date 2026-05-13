@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { Loader2 } from "lucide-react";
 
 // ── ModalityViewer (single modality, NiiVue-based) ────────────────────────
@@ -138,27 +138,91 @@ export function ModalityContactSheet({
     sliceBase,
     modality,
     showMask,
+    sliceBlobs,
 }: {
     caseId?: string;
     sliceBase?: string;
     modality: string;
     showMask: boolean;
+    // Map key format: "{modality}/{filename}" e.g. "t1/000.png", "t1/000_m.png"
+    // undefined = demo mode (not applicable), null = ZIPs not yet downloaded
+    sliceBlobs?: Map<string, Blob> | null;
 }) {
-    const buildSrc = (sliceIdx: number): string => {
-        const idx = String(sliceIdx).padStart(3, "0");
-        if (caseId) {
-            return `/api/cases/${caseId}/slices/${modality}/${sliceIdx}${showMask ? "?masked=true" : ""}`;
+    // Blob URLs created from the extracted ZIP. Recreated when modality or sliceBlobs changes.
+    // prevUrlsRef lets us revoke old URLs *after* new ones exist, avoiding a flash of broken images.
+    const prevUrlsRef = useRef<string[]>([]);
+    const [blobUrls, setBlobUrls] = useState<Map<number, { clean: string; masked: string }> | null>(null);
+
+    useEffect(() => {
+        if (!sliceBlobs) {
+            setBlobUrls(null);
+            return;
         }
+
+        const map = new Map<number, { clean: string; masked: string }>();
+        const newUrls: string[] = [];
+
+        for (let i = 0; i < BRATS_TOTAL; i++) {
+            const pad = String(i).padStart(3, "0");
+            const cleanBlob = sliceBlobs.get(`${modality}/${pad}.png`);
+            const maskedBlob = sliceBlobs.get(`${modality}/${pad}_m.png`);
+            if (cleanBlob) {
+                const cleanUrl = URL.createObjectURL(cleanBlob);
+                const maskedUrl = maskedBlob ? URL.createObjectURL(maskedBlob) : cleanUrl;
+                newUrls.push(cleanUrl);
+                if (maskedBlob) newUrls.push(maskedUrl);
+                map.set(i, { clean: cleanUrl, masked: maskedUrl });
+            }
+        }
+
+        // Revoke previous set only after new URLs are ready — no broken-image flash
+        prevUrlsRef.current.forEach(url => URL.revokeObjectURL(url));
+        prevUrlsRef.current = newUrls;
+        setBlobUrls(map.size > 0 ? map : null);
+
+        return () => {
+            // Revoke on unmount; update-triggered revocation is handled above
+        };
+    }, [sliceBlobs, modality]);
+
+    // Final cleanup on unmount
+    useEffect(() => {
+        return () => { prevUrlsRef.current.forEach(url => URL.revokeObjectURL(url)); };
+    }, []);
+
+    const buildSrc = useMemo(() => (sliceIdx: number): string => {
+        // Real case with extracted ZIP blobs
+        if (blobUrls) {
+            const entry = blobUrls.get(sliceIdx);
+            return entry ? (showMask ? entry.masked : entry.clean) : "";
+        }
+        // BraTS demo: static local files
         if (sliceBase) {
+            const idx = String(sliceIdx).padStart(3, "0");
             return `${sliceBase}/${modality}/${idx}${showMask ? "_m" : ""}.png`;
         }
         return "";
-    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [blobUrls, sliceBase, modality, showMask]);
 
     if (!caseId && !sliceBase) {
         return (
             <div className="flex h-full items-center justify-center" style={{ background: "#050d18" }}>
                 <p className="text-xs text-slate-500">Contact sheet not available</p>
+            </div>
+        );
+    }
+
+    // Real case — show loading state while ZIPs are downloading OR while blob URLs are
+    // being created from the extracted Map (there is one render cycle between sliceBlobs
+    // becoming a Map and blobUrls being populated by the effect).
+    if (caseId && sliceBlobs !== undefined && !blobUrls) {
+        return (
+            <div className="flex h-full flex-col items-center justify-center gap-3" style={{ background: "#050d18" }}>
+                <Loader2 className="w-6 h-6 animate-spin text-cyan-400/60" />
+                <p className="text-xs text-slate-500 font-mono tracking-wide">
+                    {sliceBlobs === null ? "Downloading slice archives…" : "Preparing images…"}
+                </p>
             </div>
         );
     }
@@ -182,7 +246,6 @@ export function ModalityContactSheet({
                                 src={src}
                                 alt={`Slice ${sliceIdx + 1}`}
                                 className="w-full h-full object-cover"
-                                loading="lazy"
                                 draggable={false}
                             />
                             <div className="absolute inset-0 ring-1 ring-inset ring-cyan-400/0 group-hover:ring-cyan-400/60 transition-all" />
