@@ -12,7 +12,7 @@ import {
     Maximize2, Minimize2, Play, Pause, Settings2,
     SlidersHorizontal, CheckCircle2, X,
     Phone, MapPin, CreditCard, Stethoscope, Clock,
-    Activity, Timer,
+    Activity, Timer, FileDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCase, useUpdateCase } from "@/features/cases/hooks/use-cases";
@@ -1246,6 +1246,13 @@ export function CaseDetailShell({ caseItem: initialCaseItem, workspaceRole, memb
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                     <HeaderStatusControl caseId={caseItem.id} currentStatus={caseItem.status} isAdmin={isAdmin} />
+                    <button
+                        onClick={() => window.open(`/cases/${caseItem.id}/report`, "_blank")}
+                        className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold tracking-wide transition-colors shadow-sm shadow-indigo-500/25"
+                    >
+                        <FileDown size={13} />
+                        Generate Report
+                    </button>
                     <div className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">
                         Radiology
                     </div>
