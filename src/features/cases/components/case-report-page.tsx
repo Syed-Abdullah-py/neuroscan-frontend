@@ -63,7 +63,15 @@ export function CaseReportPage({ caseItem, patient }: Props) {
         flair: { orig: null, masked: null },
     });
     const [loadState, setLoadState] = useState<"loading" | "done" | "error">("loading");
+    const [reportDate, setReportDate] = useState<string>("");
+    const [reportTime, setReportTime] = useState<string>("");
     const objectUrlsRef = useRef<string[]>([]);
+
+    useEffect(() => {
+        const now = new Date();
+        setReportDate(fmtDate(now.toISOString()) ?? "");
+        setReportTime(now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" }));
+    }, []);
 
     // Cleanup object URLs on unmount
     useEffect(() => {
@@ -140,8 +148,6 @@ export function CaseReportPage({ caseItem, patient }: Props) {
     const priority = (caseItem.priority ?? "normal").toLowerCase();
     const survival = caseItem.survival_prediction ? SURVIVAL_MAP[caseItem.survival_prediction] : null;
     const caseRef = caseItem.id.slice(-8).toUpperCase();
-    const reportDate = fmtDate(new Date().toISOString())!;
-    const reportTime = new Date().toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 
     const anySliceLoaded = Object.values(slices).some(s => s.orig);
 

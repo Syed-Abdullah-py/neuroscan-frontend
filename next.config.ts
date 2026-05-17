@@ -32,6 +32,7 @@ const nextConfig: NextConfig = {
     "https://93g00jmj-3000.inc1.devtunnels.ms"
   ],
   transpilePackages: ["@niivue/niivue"],
+  devIndicators: false,
 };
 
 export default nextConfig;
